@@ -3,9 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:AdaptiveWorkout.Phone"
              xmlns:components="clr-namespace:AdaptiveWorkout.Phone.Components"
-             x:Class="AdaptiveWorkout.Phone.MainPage">
+             x:Class="AdaptiveWorkout.Phone.MainPage"
+             BackgroundColor="#000000">
 
-    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
+    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" BackgroundColor="#000000">
         <BlazorWebView.RootComponents>
             <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
         </BlazorWebView.RootComponents>

@@ -43,7 +43,7 @@ Galaxy Watch4 and newer run Wear OS, so they install apps over Wi-Fi with `adb`.
 
 1. Watch: **Settings > About watch > Software information**, tap **Software version** until developer mode turns on.
 2. **Settings > Developer options**: turn on **ADB debugging** and **Wireless debugging**.
-3. Put the watch on the same Wi-Fi network as the PC. Samsung recommends turning off automatic Wi-Fi switching so the watch doesn't drop Wi-Fi while it's paired to the phone over Bluetooth.
+3. Put the watch on the same Wi-Fi network as the PC. Wear OS turns the watch's Wi-Fi off whenever it has a Bluetooth link to the phone (the Watch4 and newer have no "always on" Wi-Fi option), so while deploying, turn Bluetooth off on the phone. **Settings > Connections > Wi-Fi** on the watch should then show the network as connected.
 4. **Wireless debugging > Pair new device** shows an IP, a pairing port, and a code:
    ```
    adb pair 192.168.1.50:37000      # pairing port, then enter the code
@@ -56,6 +56,13 @@ Galaxy Watch4 and newer run Wear OS, so they install apps over Wi-Fi with `adb`.
 Pairing is a one-time step. The connect port usually changes when the watch reboots or Wireless debugging is toggled, so check the screen and repeat `adb connect` when that happens.
 
 If an Android build ever fails over output paths, temporarily remove the two artifacts lines in `Directory.Build.props` to rule out the `artifacts/` output folder.
+
+## Design
+
+- Design system (colors, type, spacing, the mark and app icon): https://claude.ai/artifact/H9wJAoBQE834PEQ9qG4wmq
+- First-launch mockups (splash, first screen, app icon): https://claude.ai/artifact/EwspcKFgzTGB9FsPDC4RdC
+
+Black with one hot pink accent. The app icon and splash live in `src/AdaptiveWorkout.Phone/Resources` (SVG) and `src/AdaptiveWorkout.Watch/Resources/drawable` (vector drawables); the phone's CSS tokens are in `wwwroot/app.css`.
 
 ## Tests
 
