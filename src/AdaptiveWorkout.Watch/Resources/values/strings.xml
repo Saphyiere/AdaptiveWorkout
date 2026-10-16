@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AdaptiveWorkout</string>
+    <string name="app_text">Hello from AdaptiveWorkout</string>
+</resources>

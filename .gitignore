@@ -1,0 +1,17 @@
+# Build output (see Directory.Build.props)
+build/
+
+# In case a tool ignores the artifacts layout
+bin/
+obj/
+
+# IDE / user files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# OS files
+.DS_Store
+Thumbs.db

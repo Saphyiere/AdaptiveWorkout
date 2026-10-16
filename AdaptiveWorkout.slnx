@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AdaptiveWorkout.Core/AdaptiveWorkout.Core.csproj" />
+    <Project Path="src/AdaptiveWorkout.Phone/AdaptiveWorkout.Phone.csproj">
+      <Deploy />
+    </Project>
+    <Project Path="src/AdaptiveWorkout.Watch/AdaptiveWorkout.Watch.csproj">
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AdaptiveWorkout.Core.Tests/AdaptiveWorkout.Core.Tests.csproj" />
+  </Folder>
+</Solution>

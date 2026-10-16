@@ -1,0 +1,87 @@
+# AdaptiveWorkout
+
+Personal workout app for an Android phone, with heart rate coming from a Samsung Galaxy Watch. Not meant for app stores.
+
+## Layout
+
+```
+src/
+  AdaptiveWorkout.Core/     Shared business logic (plain .NET 10). Used by both apps, covered by tests.
+  AdaptiveWorkout.Phone/    Phone app: .NET MAUI Blazor Hybrid, Android only.
+  AdaptiveWorkout.Watch/    Watch app: .NET for Android targeting Wear OS.
+tests/
+  AdaptiveWorkout.Core.Tests/   xUnit v3 tests for Core. Business logic only.
+build/                      All bin/obj output (git-ignored, set in Directory.Build.props).
+```
+
+Open `AdaptiveWorkout.slnx` in Visual Studio 2026 or Rider.
+
+## One-time setup (Windows)
+
+1. Install **Visual Studio 2026** with the **.NET Multi-platform App UI development** workload. That brings the .NET 10 SDK, the Android SDK, and a JDK.
+   - CLI-only alternative: install the .NET 10 SDK, then `dotnet workload install maui-android`, then
+     `dotnet build src/AdaptiveWorkout.Phone -t:InstallAndroidDependencies -p:AndroidSdkDirectory=C:\Android\sdk -p:JavaSdkDirectory=C:\Android\jdk -p:AcceptAndroidSDKLicenses=True`
+     (downloads the Android SDK and a JDK into those folders).
+2. `adb` lives in the Android SDK's `platform-tools` folder (Visual Studio: `C:\Program Files (x86)\Android\android-sdk\platform-tools`, or **Tools > Android > Android Adb Command Prompt**).
+
+## Hello world on the phone
+
+1. Phone: **Settings > About phone > Software information**, tap **Build number** 7 times. Then **Settings > Developer options**, turn on **USB debugging** (or **Wireless debugging** if you'd rather not plug in).
+2. Plug the phone in and accept the "Allow USB debugging" prompt. `adb devices` should list it.
+3. Visual Studio: set **AdaptiveWorkout.Phone** as the startup project, pick the phone in the device dropdown, and press F5.
+   CLI: `dotnet build src/AdaptiveWorkout.Phone -t:Run`
+
+You should see "Hello from AdaptiveWorkout" and your phone's model.
+
+## Hello world on the watch (no USB needed)
+
+Galaxy Watch4 and newer run Wear OS, so they install apps over Wi-Fi with `adb`.
+
+1. Watch: **Settings > About watch > Software information**, tap **Software version** until developer mode turns on.
+2. **Settings > Developer options**: turn on **ADB debugging** and **Wireless debugging**.
+3. Put the watch on the same Wi-Fi network as the PC. Samsung recommends turning off automatic Wi-Fi switching so the watch doesn't drop Wi-Fi while it's paired to the phone over Bluetooth.
+4. **Wireless debugging > Pair new device** shows an IP, a pairing port, and a code:
+   ```
+   adb pair 192.168.1.50:37000      # pairing port, then enter the code
+   adb connect 192.168.1.50:41234   # the *other* port shown on the Wireless debugging screen
+   adb devices
+   ```
+5. Visual Studio: set **AdaptiveWorkout.Watch** as the startup project, pick the watch, press F5.
+   CLI (with the phone also connected, name the watch): `dotnet build src/AdaptiveWorkout.Watch -t:Run -p:AdbTarget="-s 192.168.1.50:41234"`
+
+Pairing is a one-time step. The connect port usually changes when the watch reboots or Wireless debugging is toggled, so check the screen and repeat `adb connect` when that happens.
+
+If an Android build ever fails over output paths, temporarily remove the two artifacts lines in `Directory.Build.props` to rule out the `build/` folder setup.
+
+## Tests
+
+```
+dotnet test --project tests/AdaptiveWorkout.Core.Tests
+```
+
+Tests are only for business logic in `Core`: no UI, wording, or plumbing tests. `HeartRateZones` is a placeholder example; replace it once the real workout rules are decided.
+
+## Why these choices
+
+**Phone: .NET MAUI Blazor Hybrid.** MAUI is Microsoft's supported C# phone framework; it replaced Xamarin, which was retired in 2024. The Blazor Hybrid flavor writes the UI as Razor components (HTML/CSS) inside the native app. That's what makes a web version cheap later: move `Components/` into a Razor class library and host it from a Blazor web app too (the `maui-blazor-web` template shows the setup).
+
+**Watch: C#, not Kotlin.** .NET for Android can build Wear OS apps (`dotnet new androidwear`), so the watch app stays in C# and shares `Core` with the phone. Kotlin with Jetpack Compose is Google's first-class path and has better samples. Switch only if the C# bindings get in the way.
+
+**Getting heart rate off the watch**, best first:
+
+| Option | Live? | Watch code? | Notes |
+|---|---|---|---|
+| Own watch app reads the HR sensor and sends it to the phone over the Wear OS Data Layer | Yes, about 1/sec | Yes (small) | The plan. Sensor via Android `SensorManager` (or the Health Services API, whose .NET binding is still prerelease); phone link via `Xamarin.GooglePlayServices.Wearable`. Both apps share an `ApplicationId` and signing key, which the Data Layer requires. |
+| Third-party watch app (e.g. *Heart for Bluetooth*) that makes the watch act like a Bluetooth chest strap; phone reads the standard BLE Heart Rate service | Yes | No | Fastest "just a connector". The phone code would also work with any HR strap. Depends on someone else's app. |
+| Health Connect on the phone (Samsung Health syncs into it) | No | No | Data arrives in batches, often roughly per minute and only after Samsung Health syncs. Fine for history, not for a live workout. |
+| Samsung Health Sensor SDK | Yes | Yes | Needs Samsung partner approval. Skip. |
+
+Heart rate permissions: Wear OS 6 (Android 16) replaces `BODY_SENSORS` with `android.permission.health.READ_HEART_RATE` for apps targeting API 36. This matters when the watch app starts reading heart rate.
+
+## Next steps
+
+1. Get both hello worlds running on the real devices.
+2. Watch: read live heart rate and show it on the watch.
+3. Watch → phone: send readings over the Data Layer; phone shows them live.
+4. Decide what the workout logic actually is, and put it in `Core` with tests.
+5. Later: storage (local SQLite first; Google sign-in plus Firebase or Google Drive if cloud sync is wanted).
