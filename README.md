@@ -5,13 +5,17 @@ Personal workout app for an Android phone, with heart rate coming from a Samsung
 ## Layout
 
 ```
+build/
+  AdaptiveWorkout.Build/    Solution items project (compiles nothing). Shows every repo-root file
+                            (README, Directory.Build.props, global.json, ...) in Solution Explorer.
+                            Put local-dev files here.
 src/
   AdaptiveWorkout.Core/     Shared business logic (plain .NET 10). Used by both apps, covered by tests.
   AdaptiveWorkout.Phone/    Phone app: .NET MAUI Blazor Hybrid, Android only.
   AdaptiveWorkout.Watch/    Watch app: .NET for Android targeting Wear OS.
 tests/
   AdaptiveWorkout.Core.Tests/   xUnit v3 tests for Core. Business logic only.
-build/                      All bin/obj output (git-ignored, set in Directory.Build.props).
+artifacts/                  All bin/obj output (git-ignored, set in Directory.Build.props).
 ```
 
 Open `AdaptiveWorkout.slnx` in Visual Studio 2026 or Rider.
@@ -26,7 +30,7 @@ Open `AdaptiveWorkout.slnx` in Visual Studio 2026 or Rider.
 
 ## Hello world on the phone
 
-1. Phone: **Settings > About phone > Software information**, tap **Build number** 7 times. Then **Settings > Developer options**, turn on **USB debugging** (or **Wireless debugging** if you'd rather not plug in).
+1. Phone (Pixel): **Settings > About phone**, tap **Build number** 7 times. Newer Pixels show a short Developer options menu even before this, but **USB debugging** and **Wireless debugging** only appear after tapping Build number. Then **Settings > System > Developer options**, turn on **USB debugging** (or **Wireless debugging** if you'd rather not plug in).
 2. Plug the phone in and accept the "Allow USB debugging" prompt. `adb devices` should list it.
 3. Visual Studio: set **AdaptiveWorkout.Phone** as the startup project, pick the phone in the device dropdown, and press F5.
    CLI: `dotnet build src/AdaptiveWorkout.Phone -t:Run`
@@ -51,7 +55,7 @@ Galaxy Watch4 and newer run Wear OS, so they install apps over Wi-Fi with `adb`.
 
 Pairing is a one-time step. The connect port usually changes when the watch reboots or Wireless debugging is toggled, so check the screen and repeat `adb connect` when that happens.
 
-If an Android build ever fails over output paths, temporarily remove the two artifacts lines in `Directory.Build.props` to rule out the `build/` folder setup.
+If an Android build ever fails over output paths, temporarily remove the two artifacts lines in `Directory.Build.props` to rule out the `artifacts/` output folder.
 
 ## Tests
 

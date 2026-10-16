@@ -1,5 +1,5 @@
 # Build output (see Directory.Build.props)
-build/
+artifacts/
 
 # In case a tool ignores the artifacts layout
 bin/

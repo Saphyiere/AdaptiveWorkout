@@ -1,9 +1,9 @@
 <Project>
 
   <PropertyGroup>
-    <!-- All bin/obj output goes to ./build instead of next to each project. -->
+    <!-- All bin/obj output goes to ./artifacts instead of next to each project. -->
     <UseArtifactsOutput>true</UseArtifactsOutput>
-    <ArtifactsPath>$(MSBuildThisFileDirectory)build</ArtifactsPath>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
 
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
