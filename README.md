@@ -1,6 +1,6 @@
 # AdaptiveWorkout
 
-Personal workout app for an Android phone, with heart rate coming from a Samsung Galaxy Watch. Not meant for app stores.
+Personal workout app for an Android phone, with heart rate coming from a Samsung Galaxy Watch5 (Wear OS; Wear OS 6 once updated to One UI 8 Watch). Not meant for app stores.
 
 ## Layout
 
