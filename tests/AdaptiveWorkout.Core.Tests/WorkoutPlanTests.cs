@@ -79,5 +79,6 @@ public class WorkoutPlanTests
 
         Assert.Null(WorkoutPlan.Next([], [], lastTime, []));
         Assert.Equal(new PlanStep(Dips, 2, 3, null, true), WorkoutPlan.Next([], Done(Rows, Dips), lastTime, []));
+        Assert.Equal(new PlanStep(Dips, 4, null, null, true), WorkoutPlan.Next([], Done(Dips, Dips, Dips), lastTime, []));
     }
 }

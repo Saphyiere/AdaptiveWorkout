@@ -27,9 +27,11 @@ public static class WorkoutPlan
         {
             if (done.Count == 0) return null;
 
+            // Last time's count is shown only until I pass it; without a plan there's nothing to move on to.
             var lastExerciseId = done[^1].ExerciseId;
-            int? lastTimeCount = setsLastTime.GetValueOrDefault(lastExerciseId) is > 0 and var count ? count : null;
-            return new PlanStep(lastExerciseId, doneCounts[lastExerciseId] + 1, lastTimeCount, null, true);
+            var setNumber = doneCounts[lastExerciseId] + 1;
+            int? lastTimeCount = setsLastTime.GetValueOrDefault(lastExerciseId) is var count && count >= setNumber ? count : null;
+            return new PlanStep(lastExerciseId, setNumber, lastTimeCount, null, true);
         }
 
         var blocks = Blocks(plan);

@@ -105,7 +105,7 @@
         templates = routine is null ? [] : await Store.GetTemplatesAsync(routine.Id);
         sessions = await Store.GetSessionsAsync();
         nextTemplate = Rotation.Next(templates, sessions);
-        openSession = await Store.GetOpenSessionAsync();
+        openSession = (await Flow.LoadAsync())?.Session;
         loaded = true;
     }
 

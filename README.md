@@ -39,7 +39,7 @@ What the app does and how its data is shaped: [docs/concept.md](docs/concept.md)
 3. Visual Studio: set **AdaptiveWorkout.Phone** as the startup project, pick the phone in the device dropdown, and press F5.
    CLI: `dotnet build src/AdaptiveWorkout.Phone -t:Run`
 
-You should see "Hello from AdaptiveWorkout" and your phone's model.
+The app opens on Today. For everyday use, deploy the **Release** configuration (Visual Studio's configuration dropdown, or `-c Release`): Debug builds run noticeably slower on Android.
 
 ## Hello world on the watch (no USB needed)
 

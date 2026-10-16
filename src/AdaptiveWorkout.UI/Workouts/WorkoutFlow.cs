@@ -1,99 +1,140 @@
+using System.Diagnostics;
 using AdaptiveWorkout.Core;
 using AdaptiveWorkout.UI.Storage;
 
 namespace AdaptiveWorkout.UI.Workouts;
 
-/// <summary>Starting, stopping and finishing: every change to the open workout goes through here.</summary>
+/// <summary>
+/// Starting, stopping and finishing. Every change updates the in-memory workout first, so the screen moves on at once,
+/// then saves in the background; the store keeps those saves in order.
+/// </summary>
 public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings)
 {
-    // Skipping lives only for the open workout; it isn't worth storing.
-    private readonly Dictionary<long, HashSet<long>> skippedBySession = [];
+    private Task? loading;
+    private List<WorkoutSession> pastSessions = [];
+    private List<WorkoutSet> pastSets = [];
 
-    /// <summary>The open workout, or null when there is none.</summary>
+    /// <summary>The open workout, or null when there is none (or nothing has loaded yet).</summary>
+    public WorkoutState? Current { get; private set; }
+
+    /// <summary>Loads history and any open workout once; later calls return what's in memory.</summary>
     public async Task<WorkoutState?> LoadAsync()
     {
-        var session = await store.GetOpenSessionAsync();
-        if (session is null) return null;
-
-        var template = session.TemplateId is long templateId ? await store.GetTemplateAsync(templateId) : null;
-        IReadOnlyList<TemplateExercise> plan = template is null ? [] : await store.GetTemplateExercisesAsync(template.Id);
-        var exercises = await store.GetExercisesAsync();
-        var allSets = await store.GetSetsAsync();
-        return new WorkoutState
-        {
-            Session = session,
-            Template = template,
-            Plan = plan,
-            Exercises = exercises.ToDictionary(e => e.Id),
-            Sets = [.. allSets.Where(s => s.SessionId == session.Id)],
-            AllSessions = await store.GetSessionsAsync(),
-            AllSets = allSets,
-            Skipped = skippedBySession.GetValueOrDefault(session.Id) ?? [],
-            HitGoalStep = settings.HitGoalStep,
-        };
+        await (loading ??= LoadHistoryAsync());
+        return Current;
     }
 
-    /// <summary>Starts a session now. With a planned first exercise, its first set starts right away.</summary>
+    /// <summary>Starts a session now, or resumes the open one. With a planned first exercise, its first set starts right away.</summary>
     public async Task StartSessionAsync(long? templateId)
     {
-        await store.StartSessionAsync(templateId, DateTimeOffset.Now);
-        var state = await LoadAsync();
-        if (state?.Next is { } first) await StartSetAsync(state, state.Exercises[first.ExerciseId]);
+        if (await LoadAsync() is not null) return;
+
+        var session = new WorkoutSession { TemplateId = templateId, StartedAt = DateTimeOffset.Now };
+        Save(store.StartSessionAsync(session));
+        Current = await CreateStateAsync(session, []);
+        if (Current.Next is { } first) StartSet(Current.Exercises[first.ExerciseId]);
     }
 
     /// <summary>Saves the set being logged, then starts a set of the exercise with suggested values.</summary>
-    public async Task StartSetAsync(WorkoutState state, Exercise exercise)
+    public void StartSet(Exercise exercise)
     {
-        if (state.ToLog is { } logged) await store.UpdateSetAsync(logged);
+        if (Current is not { } state) return;
+        if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
 
         var thisSession = state.Sets.Where(s => s.ExerciseId == exercise.Id).ToList();
-        var lastTime = state.History(exercise.Id, 1).FirstOrDefault()?.Sets ?? [];
+        var lastTime = state.History(exercise.Id).FirstOrDefault()?.Sets ?? [];
         var values = exercise.Measure == ExerciseMeasure.Weight ? SetSuggestion.For(thisSession, lastTime, settings.HitGoalStep) : null;
-        await store.InsertSetAsync(new WorkoutSet
+        var set = new WorkoutSet
         {
-            SessionId = state.Session.Id,
             ExerciseId = exercise.Id,
             Order = state.Sets.Count + 1,
             StartedAt = DateTimeOffset.Now,
             Weight = values?.Weight,
             WeightUnit = values?.Unit ?? settings.Unit,
             Reps = values?.Reps,
-        });
+        };
+        state.Exercises.TryAdd(exercise.Id, exercise);
+        state.Sets.Add(set);
+        state.Refresh();
+        Save(store.InsertSetAsync(state.Session, set));
     }
 
     /// <summary>Stops the running set; for a time exercise the stopwatch becomes its duration.</summary>
-    public async Task StopSetAsync(WorkoutState state)
+    public void StopSet()
     {
-        if (state.Running is not { } running) return;
+        if (Current?.Running is not { } running) return;
 
         running.StoppedAt = DateTimeOffset.Now;
-        if (state.Exercises[running.ExerciseId].Measure == ExerciseMeasure.Time) running.DurationSeconds = (int)Math.Round((running.StoppedAt - running.StartedAt)?.TotalSeconds ?? 0);
-        await store.UpdateSetAsync(running);
+        if (Current.Exercises[running.ExerciseId].Measure == ExerciseMeasure.Time) running.DurationSeconds = (int)Math.Round((running.StoppedAt - running.StartedAt)?.TotalSeconds ?? 0);
+        Current.Refresh();
+        Save(store.UpdateSetAsync(running));
     }
 
-    public Task SaveSetAsync(WorkoutSet set) => store.UpdateSetAsync(set);
+    /// <summary>Saves edits to a set (weight, reps, hit goal).</summary>
+    public void SaveSet(WorkoutSet set) => Save(store.UpdateSetAsync(set));
 
-    public void Skip(WorkoutState state, long exerciseId)
+    public void Skip(long exerciseId)
     {
-        if (!skippedBySession.TryGetValue(state.Session.Id, out var skipped)) skippedBySession[state.Session.Id] = skipped = [];
-        skipped.Add(exerciseId);
+        if (Current is null) return;
+
+        Current.Skipped.Add(exerciseId);
+        Current.Refresh();
     }
 
     /// <summary>Stops a running set, saves the one being logged, and closes the session.</summary>
-    public async Task FinishAsync(WorkoutState state)
+    public void Finish()
     {
-        await StopSetAsync(state);
-        if (state.ToLog is { } logged) await store.UpdateSetAsync(logged);
-        await store.FinishSessionAsync(state.Session.Id, DateTimeOffset.Now);
-        skippedBySession.Remove(state.Session.Id);
+        if (Current is not { } state) return;
+
+        StopSet();
+        if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
+        state.Session.FinishedAt = DateTimeOffset.Now;
+        Save(store.FinishSessionAsync(state.Session));
+        pastSessions.Add(state.Session);
+        pastSets.AddRange(state.Sets);
+        Current = null;
     }
 
     /// <summary>Throws away a session that has no sets yet.</summary>
-    public async Task CancelAsync(WorkoutState state)
+    public void Cancel()
     {
-        if (state.Sets.Count > 0) return;
+        if (Current is not { Sets.Count: 0 } state) return;
 
-        await store.DeleteSessionAsync(state.Session.Id);
-        skippedBySession.Remove(state.Session.Id);
+        Save(store.DeleteSessionAsync(state.Session));
+        Current = null;
     }
+
+    /// <summary>Creates (or links to) an exercise picked by name mid-workout.</summary>
+    public Task<Exercise> GetOrCreateExerciseAsync(string name, ExerciseMeasure measure) => store.GetOrCreateExerciseAsync(name, measure);
+
+    private async Task LoadHistoryAsync()
+    {
+        var sessions = await store.GetSessionsAsync();
+        var sets = await store.GetSetsAsync();
+        var open = sessions.LastOrDefault(s => s.FinishedAt is null);
+        pastSessions = [.. sessions.Where(s => s != open)];
+        pastSets = [.. sets.Where(s => s.SessionId != open?.Id)];
+        if (open is not null) Current = await CreateStateAsync(open, [.. sets.Where(s => s.SessionId == open.Id)]);
+    }
+
+    private async Task<WorkoutState> CreateStateAsync(WorkoutSession session, List<WorkoutSet> sets)
+    {
+        var template = session.TemplateId is long templateId ? await store.GetTemplateAsync(templateId) : null;
+        var state = new WorkoutState
+        {
+            Session = session,
+            Template = template,
+            Plan = template is null ? [] : await store.GetTemplateExercisesAsync(template.Id),
+            Exercises = (await store.GetExercisesAsync()).ToDictionary(e => e.Id),
+            Sets = sets,
+            PastSessions = pastSessions,
+            PastSets = pastSets,
+            HitGoalStep = settings.HitGoalStep,
+        };
+        state.Refresh();
+        return state;
+    }
+
+    // Saves run in the background; a failure is logged rather than holding up the screen.
+    private static void Save(Task write) => write.ContinueWith(t => Debug.WriteLine($"AdaptiveWorkout: saving failed: {t.Exception}"), TaskContinuationOptions.OnlyOnFaulted);
 }

@@ -2,7 +2,7 @@
 <section class="list">
     @foreach (var exercise in Exercises)
     {
-        var last = State.History(exercise.Id, 1).FirstOrDefault();
+        var last = State.History(exercise.Id).FirstOrDefault();
         <button type="button" class="row" @onclick="() => OnPick.InvokeAsync(exercise)">
             <span class="row-text">
                 <span class="body strong">@exercise.Name</span>

@@ -6,7 +6,11 @@ using Microsoft.Data.Sqlite;
 
 namespace AdaptiveWorkout.UI.Storage;
 
-/// <summary>Everything the app records, in one SQLite file on the phone.</summary>
+/// <summary>
+/// Everything the app records, in one SQLite file on the phone.
+/// All work runs on a background thread, one piece at a time in call order: the screen never waits on SQLite,
+/// a write can be started without waiting for it, and every read sees the writes started before it.
+/// </summary>
 public sealed class WorkoutStore(string databasePath)
 {
     private const string Schema = """
@@ -20,7 +24,9 @@ public sealed class WorkoutStore(string databasePath)
         CREATE TABLE IF NOT EXISTS BodyWeightEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Weight REAL NOT NULL, WeightUnit INTEGER NOT NULL);
         """;
 
-    private readonly SemaphoreSlim schemaLock = new(1, 1);
+    private readonly string connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString();
+    private readonly Lock laneGate = new();
+    private Task lane = Task.CompletedTask;
     private bool schemaReady;
 
     static WorkoutStore()
@@ -31,173 +37,106 @@ public sealed class WorkoutStore(string databasePath)
         SqlMapper.AddTypeHandler(new DateTimeOffsetHandler());
     }
 
-    public async Task<Routine?> GetRoutineAsync()
-    {
-        await using var connection = await OpenAsync();
-        return await connection.QueryFirstOrDefaultAsync<Routine>("SELECT Id, Name FROM Routine ORDER BY Id LIMIT 1");
-    }
+    public Task<Routine?> GetRoutineAsync() => RunAsync(c => c.QueryFirstOrDefaultAsync<Routine?>("SELECT Id, Name FROM Routine ORDER BY Id LIMIT 1"));
 
-    public async Task<Routine> CreateRoutineAsync(string name)
+    public Task<Routine> CreateRoutineAsync(string name) => RunAsync(async c =>
     {
-        await using var connection = await OpenAsync();
-        var id = await connection.ExecuteScalarAsync<long>("INSERT INTO Routine (Name) VALUES (@name); SELECT last_insert_rowid();", new { name });
+        var id = await c.ExecuteScalarAsync<long>("INSERT INTO Routine (Name) VALUES (@name); SELECT last_insert_rowid();", new { name });
         return new Routine { Id = id, Name = name };
-    }
+    });
 
-    public async Task<IReadOnlyList<SessionTemplate>> GetTemplatesAsync(long routineId)
-    {
-        await using var connection = await OpenAsync();
-        var templates = await connection.QueryAsync<SessionTemplate>("""SELECT Id, RoutineId, Name, "Order" FROM SessionTemplate WHERE RoutineId = @routineId ORDER BY "Order" """, new { routineId });
-        return templates.AsList();
-    }
+    public Task<List<SessionTemplate>> GetTemplatesAsync(long routineId) => RunAsync(async c =>
+        (await c.QueryAsync<SessionTemplate>("""SELECT Id, RoutineId, Name, "Order" FROM SessionTemplate WHERE RoutineId = @routineId ORDER BY "Order" """, new { routineId })).AsList());
 
-    public async Task<SessionTemplate?> GetTemplateAsync(long id)
-    {
-        await using var connection = await OpenAsync();
-        return await connection.QueryFirstOrDefaultAsync<SessionTemplate>("""SELECT Id, RoutineId, Name, "Order" FROM SessionTemplate WHERE Id = @id""", new { id });
-    }
+    public Task<SessionTemplate?> GetTemplateAsync(long id) => RunAsync(c =>
+        c.QueryFirstOrDefaultAsync<SessionTemplate?>("""SELECT Id, RoutineId, Name, "Order" FROM SessionTemplate WHERE Id = @id""", new { id }));
 
-    public async Task<IReadOnlyList<TemplateExercise>> GetTemplateExercisesAsync(long templateId)
-    {
-        await using var connection = await OpenAsync();
-        var entries = await connection.QueryAsync<TemplateExercise>("""SELECT Id, TemplateId, ExerciseId, "Order", PlannedSets, SupersetGroup FROM TemplateExercise WHERE TemplateId = @templateId ORDER BY "Order" """, new { templateId });
-        return entries.AsList();
-    }
+    public Task<List<TemplateExercise>> GetTemplateExercisesAsync(long templateId) => RunAsync(async c =>
+        (await c.QueryAsync<TemplateExercise>("""SELECT Id, TemplateId, ExerciseId, "Order", PlannedSets, SupersetGroup FROM TemplateExercise WHERE TemplateId = @templateId ORDER BY "Order" """, new { templateId })).AsList());
 
     /// <summary>Saves a template's name and replaces its exercise list. A new template goes last in its routine.</summary>
-    public async Task<long> SaveTemplateAsync(SessionTemplate template, IReadOnlyList<TemplateExercise> entries)
+    public Task SaveTemplateAsync(SessionTemplate template, IReadOnlyList<TemplateExercise> entries) => RunAsync(async c =>
     {
-        await using var connection = await OpenAsync();
-        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
-
-        if (template.Id == 0) template.Id = await connection.ExecuteScalarAsync<long>("""INSERT INTO SessionTemplate (RoutineId, Name, "Order") VALUES (@RoutineId, @Name, (SELECT COALESCE(MAX("Order"), -1) + 1 FROM SessionTemplate WHERE RoutineId = @RoutineId)); SELECT last_insert_rowid();""", template, transaction);
-        else await connection.ExecuteAsync("UPDATE SessionTemplate SET Name = @Name WHERE Id = @Id", template, transaction);
+        await using var transaction = (SqliteTransaction)await c.BeginTransactionAsync();
+        if (template.Id == 0) template.Id = await c.ExecuteScalarAsync<long>("""INSERT INTO SessionTemplate (RoutineId, Name, "Order") VALUES (@RoutineId, @Name, (SELECT COALESCE(MAX("Order"), -1) + 1 FROM SessionTemplate WHERE RoutineId = @RoutineId)); SELECT last_insert_rowid();""", template, transaction);
+        else await c.ExecuteAsync("UPDATE SessionTemplate SET Name = @Name WHERE Id = @Id", template, transaction);
 
         foreach (var entry in entries) entry.TemplateId = template.Id;
-        await connection.ExecuteAsync("DELETE FROM TemplateExercise WHERE TemplateId = @Id", template, transaction);
-        await connection.ExecuteAsync("""INSERT INTO TemplateExercise (TemplateId, ExerciseId, "Order", PlannedSets, SupersetGroup) VALUES (@TemplateId, @ExerciseId, @Order, @PlannedSets, @SupersetGroup)""", entries, transaction);
+        await c.ExecuteAsync("DELETE FROM TemplateExercise WHERE TemplateId = @Id", template, transaction);
+        await c.ExecuteAsync("""INSERT INTO TemplateExercise (TemplateId, ExerciseId, "Order", PlannedSets, SupersetGroup) VALUES (@TemplateId, @ExerciseId, @Order, @PlannedSets, @SupersetGroup)""", entries, transaction);
         await transaction.CommitAsync();
-        return template.Id;
-    }
+    });
 
-    public async Task<IReadOnlyList<Exercise>> GetExercisesAsync()
-    {
-        await using var connection = await OpenAsync();
-        var exercises = await connection.QueryAsync<Exercise>("SELECT Id, Name, Measure FROM Exercise ORDER BY Name");
-        return exercises.AsList();
-    }
+    public Task<List<Exercise>> GetExercisesAsync() => RunAsync(async c => (await c.QueryAsync<Exercise>("SELECT Id, Name, Measure FROM Exercise ORDER BY Name")).AsList());
 
     /// <summary>Links to the exercise with the same name if there is one; otherwise creates it with the given measure.</summary>
-    public async Task<Exercise> GetOrCreateExerciseAsync(string name, ExerciseMeasure measure)
+    public Task<Exercise> GetOrCreateExerciseAsync(string name, ExerciseMeasure measure) => RunAsync(async c =>
     {
-        await using var connection = await OpenAsync();
         var key = ExerciseNames.Key(name);
-        var existing = await connection.QueryFirstOrDefaultAsync<Exercise>("SELECT Id, Name, Measure FROM Exercise WHERE NameKey = @key", new { key });
+        var existing = await c.QueryFirstOrDefaultAsync<Exercise>("SELECT Id, Name, Measure FROM Exercise WHERE NameKey = @key", new { key });
         if (existing is not null) return existing;
 
         var exercise = new Exercise { Name = ExerciseNames.Clean(name), Measure = measure };
-        exercise.Id = await connection.ExecuteScalarAsync<long>("INSERT INTO Exercise (Name, NameKey, Measure) VALUES (@Name, @key, @Measure); SELECT last_insert_rowid();", new { exercise.Name, key, exercise.Measure });
+        exercise.Id = await c.ExecuteScalarAsync<long>("INSERT INTO Exercise (Name, NameKey, Measure) VALUES (@Name, @key, @Measure); SELECT last_insert_rowid();", new { exercise.Name, key, exercise.Measure });
         return exercise;
-    }
+    });
 
-    public async Task<IReadOnlyList<WorkoutSession>> GetSessionsAsync()
-    {
-        await using var connection = await OpenAsync();
-        var sessions = await connection.QueryAsync<WorkoutSession>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward FROM WorkoutSession ORDER BY Id");
-        return sessions.AsList();
-    }
+    public Task<List<WorkoutSession>> GetSessionsAsync() => RunAsync(async c =>
+        (await c.QueryAsync<WorkoutSession>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward FROM WorkoutSession ORDER BY Id")).AsList());
 
-    public async Task<WorkoutSession?> GetOpenSessionAsync()
-    {
-        await using var connection = await OpenAsync();
-        return await connection.QueryFirstOrDefaultAsync<WorkoutSession>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward FROM WorkoutSession WHERE FinishedAt IS NULL ORDER BY Id DESC LIMIT 1");
-    }
+    /// <summary>Saves a new session and fills in its Id.</summary>
+    public Task StartSessionAsync(WorkoutSession session) => RunAsync(async c =>
+        session.Id = await c.ExecuteScalarAsync<long>("INSERT INTO WorkoutSession (TemplateId, StartedAt) VALUES (@TemplateId, @StartedAt); SELECT last_insert_rowid();", session));
 
-    public async Task<WorkoutSession> StartSessionAsync(long? templateId, DateTimeOffset at)
-    {
-        await using var connection = await OpenAsync();
-        var session = new WorkoutSession { TemplateId = templateId, StartedAt = at };
-        session.Id = await connection.ExecuteScalarAsync<long>("INSERT INTO WorkoutSession (TemplateId, StartedAt) VALUES (@TemplateId, @StartedAt); SELECT last_insert_rowid();", session);
-        return session;
-    }
-
-    public async Task FinishSessionAsync(long sessionId, DateTimeOffset at)
-    {
-        await using var connection = await OpenAsync();
-        await connection.ExecuteAsync("UPDATE WorkoutSession SET FinishedAt = @at WHERE Id = @sessionId", new { sessionId, at });
-    }
+    public Task FinishSessionAsync(WorkoutSession session) => RunAsync(c => c.ExecuteAsync("UPDATE WorkoutSession SET FinishedAt = @FinishedAt WHERE Id = @Id", session));
 
     /// <summary>Removes a session and its sets, e.g. one started by mistake.</summary>
-    public async Task DeleteSessionAsync(long sessionId)
-    {
-        await using var connection = await OpenAsync();
-        await connection.ExecuteAsync("DELETE FROM WorkoutSession WHERE Id = @sessionId", new { sessionId });
-    }
+    public Task DeleteSessionAsync(WorkoutSession session) => RunAsync(c => c.ExecuteAsync("DELETE FROM WorkoutSession WHERE Id = @Id", session));
 
-    public async Task<IReadOnlyList<WorkoutSet>> GetSetsAsync()
-    {
-        await using var connection = await OpenAsync();
-        var sets = await connection.QueryAsync<WorkoutSet>("""SELECT Id, SessionId, ExerciseId, "Order", StartedAt, StoppedAt, Weight, WeightUnit, Reps, DurationSeconds, HitGoal FROM WorkoutSet ORDER BY SessionId, "Order" """);
-        return sets.AsList();
-    }
+    public Task<List<WorkoutSet>> GetSetsAsync() => RunAsync(async c =>
+        (await c.QueryAsync<WorkoutSet>("""SELECT Id, SessionId, ExerciseId, "Order", StartedAt, StoppedAt, Weight, WeightUnit, Reps, DurationSeconds, HitGoal FROM WorkoutSet ORDER BY SessionId, "Order" """)).AsList());
 
-    public async Task InsertSetAsync(WorkoutSet set)
+    /// <summary>Saves a new set and fills in its Id. The session may still be waiting to be saved; its Id is read when this runs.</summary>
+    public Task InsertSetAsync(WorkoutSession session, WorkoutSet set) => RunAsync(async c =>
     {
-        await using var connection = await OpenAsync();
-        set.Id = await connection.ExecuteScalarAsync<long>("""INSERT INTO WorkoutSet (SessionId, ExerciseId, "Order", StartedAt, StoppedAt, Weight, WeightUnit, Reps, DurationSeconds, HitGoal) VALUES (@SessionId, @ExerciseId, @Order, @StartedAt, @StoppedAt, @Weight, @WeightUnit, @Reps, @DurationSeconds, @HitGoal); SELECT last_insert_rowid();""", set);
-    }
+        set.SessionId = session.Id;
+        set.Id = await c.ExecuteScalarAsync<long>("""INSERT INTO WorkoutSet (SessionId, ExerciseId, "Order", StartedAt, StoppedAt, Weight, WeightUnit, Reps, DurationSeconds, HitGoal) VALUES (@SessionId, @ExerciseId, @Order, @StartedAt, @StoppedAt, @Weight, @WeightUnit, @Reps, @DurationSeconds, @HitGoal); SELECT last_insert_rowid();""", set);
+    });
 
-    public async Task UpdateSetAsync(WorkoutSet set)
+    public Task UpdateSetAsync(WorkoutSet set) => RunAsync(c =>
+        c.ExecuteAsync("UPDATE WorkoutSet SET StoppedAt = @StoppedAt, Weight = @Weight, WeightUnit = @WeightUnit, Reps = @Reps, DurationSeconds = @DurationSeconds, HitGoal = @HitGoal WHERE Id = @Id", set));
+
+    public Task AddFoodAsync(int calories, DateTimeOffset at) => RunAsync(c => c.ExecuteAsync("INSERT INTO FoodEntry (At, Calories) VALUES (@at, @calories)", new { at, calories }));
+
+    public Task<List<FoodEntry>> GetFoodSinceAsync(DateTimeOffset since) => RunAsync(async c =>
+        (await c.QueryAsync<FoodEntry>("SELECT Id, At, Calories FROM FoodEntry ORDER BY Id")).Where(e => e.At >= since).ToList());
+
+    public Task AddBodyWeightAsync(double weight, WeightUnit unit, DateTimeOffset at) => RunAsync(c =>
+        c.ExecuteAsync("INSERT INTO BodyWeightEntry (At, Weight, WeightUnit) VALUES (@at, @weight, @unit)", new { at, weight, unit }));
+
+    public Task<List<BodyWeightEntry>> GetBodyWeightsAsync() => RunAsync(async c =>
+        (await c.QueryAsync<BodyWeightEntry>("SELECT Id, At, Weight, WeightUnit FROM BodyWeightEntry ORDER BY Id")).AsList());
+
+    /// <summary>Queues work behind everything started before it and runs it on a background thread with its own connection.</summary>
+    private Task<T> RunAsync<T>(Func<SqliteConnection, Task<T>> work)
     {
-        await using var connection = await OpenAsync();
-        await connection.ExecuteAsync("UPDATE WorkoutSet SET StoppedAt = @StoppedAt, Weight = @Weight, WeightUnit = @WeightUnit, Reps = @Reps, DurationSeconds = @DurationSeconds, HitGoal = @HitGoal WHERE Id = @Id", set);
-    }
-
-    public async Task AddFoodAsync(int calories, DateTimeOffset at)
-    {
-        await using var connection = await OpenAsync();
-        await connection.ExecuteAsync("INSERT INTO FoodEntry (At, Calories) VALUES (@at, @calories)", new { at, calories });
-    }
-
-    public async Task<IReadOnlyList<FoodEntry>> GetFoodSinceAsync(DateTimeOffset since)
-    {
-        await using var connection = await OpenAsync();
-        var entries = await connection.QueryAsync<FoodEntry>("SELECT Id, At, Calories FROM FoodEntry ORDER BY Id");
-        return [.. entries.Where(e => e.At >= since)];
-    }
-
-    public async Task AddBodyWeightAsync(double weight, WeightUnit unit, DateTimeOffset at)
-    {
-        await using var connection = await OpenAsync();
-        await connection.ExecuteAsync("INSERT INTO BodyWeightEntry (At, Weight, WeightUnit) VALUES (@at, @weight, @unit)", new { at, weight, unit });
-    }
-
-    public async Task<IReadOnlyList<BodyWeightEntry>> GetBodyWeightsAsync()
-    {
-        await using var connection = await OpenAsync();
-        var entries = await connection.QueryAsync<BodyWeightEntry>("SELECT Id, At, Weight, WeightUnit FROM BodyWeightEntry ORDER BY Id");
-        return entries.AsList();
-    }
-
-    private async Task<SqliteConnection> OpenAsync()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString());
-        await connection.OpenAsync();
-        if (schemaReady) return connection;
-
-        await schemaLock.WaitAsync();
-        try
+        lock (laneGate)
         {
-            if (!schemaReady) await connection.ExecuteAsync(Schema);
-            schemaReady = true;
+            // ContinueWith runs whether the previous piece succeeded or failed, so one failure doesn't block the lane.
+            var next = lane.ContinueWith(async _ =>
+            {
+                await using var connection = new SqliteConnection(connectionString);
+                await connection.OpenAsync();
+                if (!schemaReady) await connection.ExecuteAsync(Schema);
+                schemaReady = true;
+                return await work(connection);
+            }, CancellationToken.None, TaskContinuationOptions.DenyChildAttach, TaskScheduler.Default).Unwrap();
+            lane = next;
+            return next;
         }
-        finally
-        {
-            schemaLock.Release();
-        }
-
-        return connection;
     }
+
+    private Task RunAsync(Func<SqliteConnection, Task> work) => RunAsync(async c => { await work(c); return true; });
 
     private sealed class DateTimeOffsetHandler : SqlMapper.TypeHandler<DateTimeOffset>
     {

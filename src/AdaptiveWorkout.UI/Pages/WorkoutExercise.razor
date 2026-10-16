@@ -1,6 +1,5 @@
 @page "/workout/exercise"
 @inject WorkoutFlow Flow
-@inject WorkoutStore Store
 @inject NavigationManager Nav
 
 <PageTitle>Pick an exercise</PageTitle>
@@ -8,9 +7,9 @@
 @if (state is not null)
 {
     var key = ExerciseNames.Key(query);
-    var sessionStarts = state.AllSessions.ToDictionary(s => s.Id, s => s.StartedAt);
+    var sessionStarts = state.PastSessions.ToDictionary(s => s.Id, s => s.StartedAt);
     var remainingPlan = state.Plan.Select(e => state.Exercises[e.ExerciseId]).Where(e => state.Sets.All(s => s.ExerciseId != e.Id)).ToList();
-    var doneBefore = state.AllSets.Where(s => s.SessionId != state.Session.Id && remainingPlan.All(e => e.Id != s.ExerciseId)).GroupBy(s => s.ExerciseId)
+    var doneBefore = state.PastSets.Where(s => s.SessionId != state.Session.Id && remainingPlan.All(e => e.Id != s.ExerciseId)).GroupBy(s => s.ExerciseId)
         .OrderByDescending(g => g.Max(s => sessionStarts[s.SessionId])).Select(g => state.Exercises[g.Key]).ToList();
     var isNew = key.Length > 0 && state.Exercises.Values.All(e => ExerciseNames.Key(e.Name) != key);
     <div class="screen tight">
@@ -36,12 +35,12 @@
             @if (remainingPlan.Count > 0)
             {
                 <h2 class="label">Still to do in @state.Name</h2>
-                <ExerciseList Exercises="remainingPlan" State="state" OnPick="StartAsync" />
+                <ExerciseList Exercises="remainingPlan" State="state" OnPick="Start" />
             }
             @if (doneBefore.Count > 0)
             {
                 <h2 class="label">Done before</h2>
-                <ExerciseList Exercises="doneBefore.Take(8).ToList()" State="state" OnPick="StartAsync" />
+                <ExerciseList Exercises="doneBefore.Take(8).ToList()" State="state" OnPick="Start" />
             }
         }
         else
@@ -50,7 +49,7 @@
             @if (matches.Count > 0)
             {
                 <h2 class="label">Matches</h2>
-                <ExerciseList Exercises="matches" State="state" OnPick="StartAsync" />
+                <ExerciseList Exercises="matches" State="state" OnPick="Start" />
             }
             @if (isNew)
             {
@@ -72,7 +71,7 @@
             }
             @if (state.Sets.Count == 0)
             {
-                <button type="button" class="btn-ghost" @onclick="CancelAsync">Cancel workout</button>
+                <button type="button" class="btn-ghost" @onclick="Cancel">Cancel workout</button>
             }
         </div>
     </div>
@@ -85,22 +84,22 @@
 
     protected override async Task OnInitializedAsync()
     {
-        state = await Flow.LoadAsync();
+        state = Flow.Current ?? await Flow.LoadAsync();
         if (state is null) Nav.NavigateTo("", replace: true);
         else if (state.Running is not null) Nav.NavigateTo("workout", replace: true);
     }
 
-    private async Task StartAsync(Exercise exercise)
+    private void Start(Exercise exercise)
     {
-        await Flow.StartSetAsync(state!, exercise);
+        Flow.StartSet(exercise);
         Nav.NavigateTo("workout");
     }
 
-    private async Task StartNewAsync() => await StartAsync(await Store.GetOrCreateExerciseAsync(query, measure));
+    private async Task StartNewAsync() => Start(await Flow.GetOrCreateExerciseAsync(query, measure));
 
-    private async Task CancelAsync()
+    private void Cancel()
     {
-        await Flow.CancelAsync(state!);
+        Flow.Cancel();
         Nav.NavigateTo("");
     }
 }

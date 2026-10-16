@@ -122,9 +122,15 @@ What the big button offers after each set:
 
 1. If the template entry has a set count, move on after that many sets.
 2. Else, if I've done this exercise before, move on after as many sets as last time.
-3. Else, offer another set; moving on is in advanced mode.
+3. Else, offer another set, with a second button to **move on to the next exercise**, or to **finish the workout** when it's the last one.
 
 In a superset, the next step alternates through its exercises (pull-ups, dips, pull-ups, dips…) and a round counts as one set of each.
+
+When nothing planned is left, the big button is **Finish workout**. When just tracking, the break screen always offers **Different exercise** and **Finish workout** under the big button.
+
+### Speed
+
+Every tap has to feel instant. The open workout lives in memory: Stop, Start and the break screen change on the spot, and saving happens in the background, one write at a time and in order. Buttons react the moment they're pressed, and each step slides in.
 
 ### Supersets
 

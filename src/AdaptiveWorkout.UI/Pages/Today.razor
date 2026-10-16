@@ -149,7 +149,7 @@
         weekText = gymDaysThisWeek == 0 ? "No gym days yet this week" : $"{gymDaysThisWeek} gym {(gymDaysThisWeek == 1 ? "day" : "days")} this week";
         if (streak > 0) weekText += $" · {streak}-week streak";
         wentToday = gymDays.Contains(today);
-        openSession = await Store.GetOpenSessionAsync();
+        openSession = (await Flow.LoadAsync())?.Session;
 
         routine = await Store.GetRoutineAsync();
         IReadOnlyList<SessionTemplate> templates = routine is null ? [] : await Store.GetTemplatesAsync(routine.Id);

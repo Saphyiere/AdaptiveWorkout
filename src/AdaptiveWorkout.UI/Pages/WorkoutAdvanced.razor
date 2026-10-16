@@ -12,7 +12,7 @@
     var planIds = state.Plan.Select(e => e.ExerciseId).ToHashSet();
     var extraIds = stopped.Select(s => s.ExerciseId).Where(id => !planIds.Contains(id)).Distinct().ToList();
     <div class="screen tight">
-        <WorkoutHeader State="state" Advanced="true" OnFinish="FinishAsync" />
+        <WorkoutHeader State="state" Advanced="true" OnFinish="Finish" />
 
         @if (state.Plan.Count > 0)
         {
@@ -29,7 +29,7 @@
                             var exercise = state.Exercises[entry.ExerciseId];
                             var done = stopped.Where(s => s.ExerciseId == entry.ExerciseId).ToList();
                             var isCurrent = (running?.ExerciseId ?? next?.ExerciseId) == entry.ExerciseId;
-                            var last = done.Count == 0 ? state.History(entry.ExerciseId, 1).FirstOrDefault() : null;
+                            var last = done.Count == 0 ? state.History(entry.ExerciseId).FirstOrDefault() : null;
                             <div class="row">
                                 <span class="status @(isCurrent ? "current" : "")">
                                     @if (done.Count > 0 && !isCurrent)
@@ -80,20 +80,20 @@
         }
 
         <div class="grid-2">
-            <button type="button" class="btn tall" disabled="@(running is not null || stopped.Count == 0)" @onclick="AddSetAsync">Add a set</button>
+            <button type="button" class="btn tall" disabled="@(running is not null || stopped.Count == 0)" @onclick="AddSet">Add a set</button>
             <button type="button" class="btn tall" disabled="@(running is not null)" @onclick="@(() => Nav.NavigateTo("workout/exercise"))">Different exercise</button>
-            <button type="button" class="btn tall" disabled="@(running is not null || next is null || state.Plan.Count == 0)" @onclick="SkipAsync">Skip @(next is null ? "exercise" : state.Exercises[next.ExerciseId].Name)</button>
+            <button type="button" class="btn tall" disabled="@(running is not null || next is null || state.Plan.Count == 0)" @onclick="() => Flow.Skip(next!.ExerciseId)">Skip @(next is null ? "exercise" : state.Exercises[next.ExerciseId].Name)</button>
             <a class="btn tall" href="workout">Back to simple</a>
         </div>
 
         <div class="push-down">
             @if (running is not null)
             {
-                <button type="button" class="btn-primary big" @onclick="StopAsync">Stop @state.Exercises[running.ExerciseId].Name</button>
+                <button type="button" class="btn-primary big" @onclick="Stop">Stop @state.Exercises[running.ExerciseId].Name</button>
             }
             else
             {
-                <NextStepButton State="state" OnStarted="@(() => Nav.NavigateTo("workout"))" OnFinish="FinishAsync" />
+                <NextStepButton State="state" OnStarted="@(() => Nav.NavigateTo("workout"))" OnFinish="Finish" />
             }
         </div>
     </div>
@@ -102,36 +102,27 @@
 @code {
     private WorkoutState? state;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
-
-    private async Task LoadAsync()
+    protected override async Task OnInitializedAsync()
     {
-        state = await Flow.LoadAsync();
+        state = Flow.Current ?? await Flow.LoadAsync();
         if (state is null) Nav.NavigateTo("", replace: true);
     }
 
-    private async Task AddSetAsync()
+    private void AddSet()
     {
-        var lastExercise = state!.Exercises[state.Sets[^1].ExerciseId];
-        await Flow.StartSetAsync(state, lastExercise);
+        Flow.StartSet(state!.Exercises[state.Sets[^1].ExerciseId]);
         Nav.NavigateTo("workout");
     }
 
-    private async Task SkipAsync()
+    private void Stop()
     {
-        if (state?.Next is { } next) Flow.Skip(state, next.ExerciseId);
-        await LoadAsync();
-    }
-
-    private async Task StopAsync()
-    {
-        await Flow.StopSetAsync(state!);
+        Flow.StopSet();
         Nav.NavigateTo("workout");
     }
 
-    private async Task FinishAsync()
+    private void Finish()
     {
-        await Flow.FinishAsync(state!);
+        Flow.Finish();
         Nav.NavigateTo("");
     }
 }

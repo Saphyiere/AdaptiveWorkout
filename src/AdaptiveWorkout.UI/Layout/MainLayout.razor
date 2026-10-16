@@ -1,5 +1,11 @@
 @inherits LayoutComponentBase
+@inject WorkoutFlow Flow
 
 <main>
     @Body
 </main>
+
+@code {
+    // Warm up storage and the open workout in the background, so the first tap is already fast.
+    protected override void OnInitialized() => _ = Flow.LoadAsync();
+}

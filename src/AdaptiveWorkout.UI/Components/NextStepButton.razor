@@ -1,12 +1,30 @@
 @inject WorkoutFlow Flow
-@* The big button on the break screen: the next set, the next exercise, or Finish when the plan is done. *@
+@inject NavigationManager Nav
+@* The break screen's buttons: the next set or exercise, and Finish once there's nothing left to do. *@
 
 @if (State.Next is { } next)
 {
     var exercise = State.Exercises[next.ExerciseId];
     var sameExercise = State.ToLog?.ExerciseId == next.ExerciseId;
     <p class="caption center">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
-    <button type="button" class="btn-primary big" @onclick="() => StartAsync(exercise)">@(sameExercise ? $"Start set {next.SetNumber}" : $"Start {exercise.Name}")</button>
+    <button type="button" class="btn-primary big" @onclick="() => Start(exercise)">@(sameExercise ? $"Start set {next.SetNumber}" : $"Start {exercise.Name}")</button>
+
+    @if (State.Plan.Count == 0)
+    {
+        <div class="grid-2">
+            <button type="button" class="btn tall" @onclick="@(() => Nav.NavigateTo("workout/exercise"))">Different exercise</button>
+            <button type="button" class="btn tall" @onclick="OnFinish">Finish workout</button>
+        </div>
+    }
+    else if (State.CanMoveOn && State.MoveOn is { } moveOn)
+    {
+        var after = State.Exercises[moveOn.ExerciseId];
+        <button type="button" class="btn tall" @onclick="() => Start(after)">Move on to @after.Name</button>
+    }
+    else if (State.CanMoveOn)
+    {
+        <button type="button" class="btn tall" @onclick="OnFinish">Finish workout</button>
+    }
 }
 else
 {
@@ -17,14 +35,14 @@ else
 @code {
     [Parameter, EditorRequired] public WorkoutState State { get; set; } = default!;
 
-    /// <summary>Called after a set starts, so the page can reload.</summary>
+    /// <summary>Called after a set starts, so the page re-renders.</summary>
     [Parameter] public EventCallback OnStarted { get; set; }
 
     [Parameter] public EventCallback OnFinish { get; set; }
 
-    private async Task StartAsync(Exercise exercise)
+    private Task Start(Exercise exercise)
     {
-        await Flow.StartSetAsync(State, exercise);
-        await OnStarted.InvokeAsync();
+        Flow.StartSet(exercise);
+        return OnStarted.InvokeAsync();
     }
 }
