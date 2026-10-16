@@ -9,6 +9,7 @@ build/
   AdaptiveWorkout.Build/    Solution items project (compiles nothing). Shows every repo-root file
                             (README, Directory.Build.props, global.json, ...) in Solution Explorer.
                             Put local-dev files here.
+docs/                       The app concept and data model (concept.md).
 src/
   AdaptiveWorkout.Core/     Shared business logic (plain .NET 10). Used by both apps, covered by tests.
   AdaptiveWorkout.Phone/    Phone app: .NET MAUI Blazor Hybrid, Android only.
@@ -19,6 +20,8 @@ artifacts/                  All bin/obj output (git-ignored, set in Directory.Bu
 ```
 
 Open `AdaptiveWorkout.slnx` in Visual Studio 2026 or Rider.
+
+What the app does and how its data is shaped: [docs/concept.md](docs/concept.md).
 
 ## One-time setup (Windows)
 

@@ -12,6 +12,7 @@
   <ItemGroup>
     <!-- Every file at the repo root, so new top-level files show up without editing this project. -->
     <None Include="$(MSBuildThisFileDirectory)..\..\*" Exclude="$(MSBuildThisFileDirectory)..\..\*.slnx" Link="%(Filename)%(Extension)" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\docs\**" Link="docs\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>
