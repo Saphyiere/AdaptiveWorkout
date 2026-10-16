@@ -71,7 +71,7 @@ A routine is an ordered list of sessions, for example Push, Pull, Legs. The big 
 | Pull | Legs |
 | Legs | Push |
 
-It ignores weekdays: skip three days and it still suggests Legs after Pull. Doing a different session is always allowed, and the next suggestion follows whatever I actually finished.
+It ignores weekdays: skip three days and it still suggests Legs after Pull. Nothing is ever "missed"; the next session simply waits. Doing a different session is always allowed, and the next suggestion follows whatever I actually finished.
 
 ### Listing a session's exercises
 
@@ -81,16 +81,16 @@ When creating a session template, I add exercises one by one: type a name and ta
 
 ### Simple mode and advanced mode
 
-Every session starts in **simple mode**: the screen holds the current step and one big button, and tapping through follows the plan (the template, or what I did last time). For the plan's order, see the next-step rules below.
+Every session starts in **simple mode**: the screen holds the current step and one big button, and tapping through follows the plan. The plan is the template, or for exercises I've done before, what I did last time. A session I make up on the spot still gets simple mode for any exercise I link to past history. For the plan's order, see the next-step rules below.
 
-I can leave simple mode at any moment, like leaving full screen. **Advanced mode** shows everything: switch to a different exercise, add an extra set, skip ahead, reorder, finish early. **(proposed)** Switching back to simple mode continues the plan from wherever I am.
+I can leave simple mode at any moment, like leaving full screen. **Advanced mode** shows everything: switch to a different exercise, add an extra set, skip ahead, reorder, finish early. I can switch back and forth freely; simple mode picks up the plan from wherever I am. Simple and advanced are two views of the same session, not two kinds of session.
 
 ### The set loop
 
 ```
- Set running ──► Stop ──► Log the set ──► Next ──► Break ──► Start <next> ──► Set running
-                                                     │
-                                                     └──► Finish workout
+ Set running ──► Stop ──► Break (log the set here) ──► Start <next> ──► Set running
+                                     │
+                                     └──► Finish workout
 ```
 
 1. **Set running.** Front and center:
@@ -102,13 +102,16 @@ I can leave simple mode at any moment, like leaving full screen. **Advanced mode
      - `8 at 100 · 8 at 105 · 8 at 110`
    - the big **Stop** button
 2. **Stop** ends the set, and rest starts counting.
-3. **Log the set:** weight and reps, pre-filled; every set can change both. Time exercises need nothing: the stopwatch was the duration. Tap **Next**.
-4. **Break.** The rest timer and one big button naming what's next: **Start set 3**, or **Start pull-ups**.
-5. **Finish workout** is always reachable, in every state.
+3. **Break.** The rest timer, live heart rate, and the set's fields: weight and reps, pre-filled, both changeable on every set. Time exercises need nothing: the stopwatch was the duration. One big button names what's next: **Start set 3**, or **Start pull-ups**. Tapping it saves the set and starts the next one.
+4. **Finish workout** is always reachable, in every state.
 
 No rest countdown for now; a rest target may come later.
 
-**(proposed)** Pre-filled fields: from the previous set in this session; for the first set of an exercise, from the first set the last time I did it.
+### Pre-filled and suggested values
+
+The app is suggestive, especially in simple mode:
+- Weight and reps pre-fill from the previous set in this session; the first set of an exercise pre-fills from the first set the last time I did it.
+- **Hit goal:** the break screen after an exercise's last set has a **Hit goal** checkbox (e.g. I did 10, 10, 10). Next time, that exercise's first set suggests a higher weight instead of repeating the old one; once I confirm it, the following sets pre-fill from it as usual.
 
 ### Next-step rules
 
@@ -122,7 +125,7 @@ In a superset, the next step alternates through its exercises (pull-ups, dips, p
 
 ### Supersets
 
-My back days are almost all supersets: a back exercise paired with a triceps exercise, like pull-ups and dips. The sets are stored like any other, in the order I did them; only the template knows which exercises are grouped. Rest between the two halves is still measured.
+My back days are almost all supersets: a back exercise paired with a triceps exercise, like pull-ups and dips. Inside a superset there is no break: Stop on pull-ups goes straight to logging them and **Start dips**. The break comes after each round. The sets are stored like any other, in the order I did them; only the template knows which exercises are grouped. The gap between the two halves is still measured.
 
 **(later)** Other patterns, like many sets of one rep, are just many sets; nothing special is needed.
 
@@ -206,6 +209,7 @@ Set                Id, SessionId, ExerciseId, Order,
                    StartedAt, StoppedAt         (empty when logged afterward)
                    Weight, WeightUnit, Reps     (weight exercises; empty weight = bodyweight, may be negative)
                    Duration                     (time exercises; from the stopwatch or typed)
+                   HitGoal                      (checked on the break after an exercise's last set)
 HeartRateSample    SessionId, At, Bpm
 FoodEntry          Id, At, Calories
 BodyWeightEntry    Id, At, Weight, WeightUnit
@@ -235,8 +239,5 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 
 ## Open questions
 
-1. **Between sets:** Stop → log → Next → Break is two taps. Should logging the set live on the Break screen instead (Stop → Break with the fields → Start next)? Probably a field-test call.
-2. **Superset breaks:** after pull-ups, go straight to the dips' Break screen as usual, or skip the break and start dips immediately?
-3. **Leaving simple mode:** once out, can I switch back to simple for the rest of the session?
-4. **Pre-filled fields:** from the previous set, and for an exercise's first set, from last time's first set?
-5. **Today screen:** is gym today, calories and body weight, plus the big Start button, the right home screen?
+1. **Hit goal step:** how much heavier is the suggestion: a fixed +5 lb, or a step I set per exercise (machines and dumbbells jump differently)?
+2. **Hit goal timing:** only on an exercise's last set, or on any set?
