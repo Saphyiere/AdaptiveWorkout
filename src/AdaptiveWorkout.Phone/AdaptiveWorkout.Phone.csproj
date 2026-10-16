@@ -32,7 +32,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\AdaptiveWorkout.Core\AdaptiveWorkout.Core.csproj" />
+        <ProjectReference Include="..\AdaptiveWorkout.UI\AdaptiveWorkout.UI.csproj" />
     </ItemGroup>
 
 </Project>

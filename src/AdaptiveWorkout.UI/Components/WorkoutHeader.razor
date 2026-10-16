@@ -1,0 +1,38 @@
+@* Session name and time, the view switch, and Finish, which is always reachable. *@
+<header class="spread">
+    <div class="row-text">
+        <span class="body strong">@State.Name</span>
+        @{ var setsDone = State.Sets.Count(s => s.StoppedAt is not null); }
+        <span class="caption"><Clock Since="State.Session.StartedAt" /> · @setsDone @(setsDone == 1 ? "set" : "sets")</span>
+    </div>
+    <div class="inline">
+        @if (Advanced)
+        {
+            <a class="btn accent" href="workout">Simple view</a>
+        }
+        else
+        {
+            <a class="btn" href="workout/advanced">Advanced view</a>
+        }
+        <button type="button" class="btn" @onclick="() => confirming = true">Finish</button>
+    </div>
+</header>
+
+@if (confirming)
+{
+    <div class="card">
+        <p class="body strong">Finish this workout?</p>
+        <div class="grid-2">
+            <button type="button" class="btn tall" @onclick="() => confirming = false">Keep going</button>
+            <button type="button" class="btn tall accent" @onclick="OnFinish">Finish workout</button>
+        </div>
+    </div>
+}
+
+@code {
+    private bool confirming;
+
+    [Parameter, EditorRequired] public WorkoutState State { get; set; } = default!;
+    [Parameter] public bool Advanced { get; set; }
+    [Parameter] public EventCallback OnFinish { get; set; }
+}

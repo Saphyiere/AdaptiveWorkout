@@ -1,0 +1,30 @@
+@inject WorkoutFlow Flow
+@* The big button on the break screen: the next set, the next exercise, or Finish when the plan is done. *@
+
+@if (State.Next is { } next)
+{
+    var exercise = State.Exercises[next.ExerciseId];
+    var sameExercise = State.ToLog?.ExerciseId == next.ExerciseId;
+    <p class="caption center">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+    <button type="button" class="btn-primary big" @onclick="() => StartAsync(exercise)">@(sameExercise ? $"Start set {next.SetNumber}" : $"Start {exercise.Name}")</button>
+}
+else
+{
+    <p class="caption center">Every planned exercise is done.</p>
+    <button type="button" class="btn-primary big" @onclick="OnFinish">Finish workout</button>
+}
+
+@code {
+    [Parameter, EditorRequired] public WorkoutState State { get; set; } = default!;
+
+    /// <summary>Called after a set starts, so the page can reload.</summary>
+    [Parameter] public EventCallback OnStarted { get; set; }
+
+    [Parameter] public EventCallback OnFinish { get; set; }
+
+    private async Task StartAsync(Exercise exercise)
+    {
+        await Flow.StartSetAsync(State, exercise);
+        await OnStarted.InvokeAsync();
+    }
+}

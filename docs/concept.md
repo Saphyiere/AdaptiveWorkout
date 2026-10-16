@@ -75,7 +75,10 @@ It ignores weekdays: skip three days and it still suggests Legs after Pull. Noth
 
 ### Listing a session's exercises
 
-When creating a session template, I add exercises one by one: type a name and tap **Add**, or pick an existing exercise from the dropdown to link it. Each entry has an optional **set counter** (a + button); entries can be grouped into a superset.
+When creating a session template, I add exercises one by one: type a name and tap **Add**, or pick a matching exercise I've done before to link it. Each entry has:
+- a **Sets** counter (− and +). "Auto" means as many sets as last time.
+- up and down buttons to reorder, and a remove button.
+- **Superset with the next exercise**, which joins it to the one below. The first exercise of a superset counts **Rounds** for all of them.
 
 **(later)** With many exercises, a picker grouped into categories.
 
@@ -111,7 +114,7 @@ No rest countdown for now; a rest target may come later.
 
 The app is suggestive, especially in simple mode:
 - Weight and reps pre-fill from the previous set in this session; the first set of an exercise pre-fills from the first set the last time I did it.
-- **Hit goal:** the break screen after an exercise's last set has a **Hit goal** checkbox (e.g. I did 10, 10, 10). Next time, that exercise's first set suggests a higher weight instead of repeating the old one; once I confirm it, the following sets pre-fill from it as usual.
+- **Hit goal:** every break screen has a **Hit goal** checkbox. Next time, that exercise's first set suggests the weight of the set I marked plus 5 (in that set's unit), and the following sets pre-fill from it as usual. Assisted weights move toward less assistance (−40 becomes −35); bodyweight stays bodyweight.
 
 ### Next-step rules
 
@@ -209,7 +212,7 @@ Set                Id, SessionId, ExerciseId, Order,
                    StartedAt, StoppedAt         (empty when logged afterward)
                    Weight, WeightUnit, Reps     (weight exercises; empty weight = bodyweight, may be negative)
                    Duration                     (time exercises; from the stopwatch or typed)
-                   HitGoal                      (checked on the break after an exercise's last set)
+                   HitGoal                      (checked on any break screen)
 HeartRateSample    SessionId, At, Bpm
 FoodEntry          Id, At, Calories
 BodyWeightEntry    Id, At, Weight, WeightUnit
@@ -218,12 +221,12 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 
 **(proposed)** Stored locally on the phone (SQLite). Backup or Google sync later.
 
-## Build order (proposed)
+## Build order
 
-1. **Today:** calories, weigh-ins and the gym-day check, with storage on the phone. Useful every day, no watch needed.
-2. **Sessions in simple mode:** routines, templates, the set loop, the last three times, supersets.
-3. **Live heart rate** from the watch during sessions.
-4. **Advanced mode** and logging after the fact.
+1. **Today:** calories, weigh-ins and the gym-day check, with storage on the phone. *Built.*
+2. **Sessions in simple mode:** routines, templates, the set loop, the last three times, supersets, Hit goal. *Built.*
+3. **Live heart rate** from the watch during sessions. *Next.* Screens show a placeholder until then.
+4. **Advanced mode** and logging after the fact. *Advanced view built (add a set, different exercise, skip); reordering mid-workout and logging after the fact not yet.*
 5. **Adaptive comparisons** and charts.
 
 ## Later
@@ -239,5 +242,4 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 
 ## Open questions
 
-1. **Hit goal step:** how much heavier is the suggestion: a fixed +5 lb, or a step I set per exercise (machines and dumbbells jump differently)?
-2. **Hit goal timing:** only on an exercise's last set, or on any set?
+None right now.

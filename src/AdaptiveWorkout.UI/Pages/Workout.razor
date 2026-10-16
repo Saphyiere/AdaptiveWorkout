@@ -1,0 +1,163 @@
+@page "/workout"
+@inject WorkoutFlow Flow
+@inject AppSettings Settings
+@inject NavigationManager Nav
+
+<PageTitle>@(state?.Name ?? "Workout")</PageTitle>
+
+@if (state is not null)
+{
+    <div class="screen">
+        <WorkoutHeader State="state" OnFinish="FinishAsync" />
+
+        @if (state.Running is { } running)
+        {
+            var exercise = state.Exercises[running.ExerciseId];
+            var step = state.Describe(running);
+            var history = state.History(running.ExerciseId, 3);
+            var firstToday = state.Sets.First(s => s.ExerciseId == running.ExerciseId);
+            <div class="stack">
+                <p class="label @(step.SupersetRound is null ? "" : "live")">@WorkoutState.StepLabel(step)</p>
+                <h1 class="title">@exercise.Name</h1>
+                @if (state.SuggestionFor(firstToday)?.RaisedForGoal == true)
+                {
+                    <span class="note-accent">@SetSummary.WeightText(firstToday.Weight) @Unit(firstToday.WeightUnit) today · you hit your goal last time</span>
+                }
+            </div>
+
+            <div class="stack">
+                <p class="label">@(exercise.Measure == ExerciseMeasure.Time ? "Time" : "Set time")</p>
+                <Clock Since="running.StartedAt!.Value" Class="number xl" />
+                <HeartRate />
+            </div>
+
+            <section class="card" aria-labelledby="history-heading">
+                <h2 id="history-heading" class="label">Last 3 times</h2>
+                @if (history.Count == 0)
+                {
+                    <p class="caption">First time doing this one.</p>
+                }
+                @foreach (var past in history)
+                {
+                    <div class="spread">
+                        <span class="caption">@past.Session.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</span>
+                        <span class="body tabular">@SetSummary.Format(past.Sets, exercise.Measure)</span>
+                    </div>
+                }
+            </section>
+
+            <div class="push-down">
+                <button type="button" class="btn-primary big" @onclick="StopAsync">Stop</button>
+            </div>
+        }
+        else if (state.ToLog is { } logged)
+        {
+            var exercise = state.Exercises[logged.ExerciseId];
+            var step = state.Describe(logged);
+            var handoff = state.Next is { AfterBreak: false };
+            @if (handoff)
+            {
+                <div class="stack">
+                    <p class="label live">@WorkoutState.StepLabel(step)</p>
+                    <h1 class="title">@exercise.Name done</h1>
+                    <p class="caption">No break inside a superset. Rest comes after the round.</p>
+                </div>
+            }
+            else
+            {
+                <div class="stack">
+                    <p class="label">Rest</p>
+                    <Clock Since="logged.StoppedAt!.Value" Class="number lg" />
+                    <HeartRate />
+                </div>
+            }
+
+            <section class="card" aria-labelledby="log-heading">
+                <h2 id="log-heading" class="label">@exercise.Name · @WorkoutState.StepLabel(step)</h2>
+                @if (exercise.Measure == ExerciseMeasure.Weight)
+                {
+                    <div class="grid-2">
+                        <div class="field-group">
+                            <label class="field-label" for="weight">Weight (@Unit(logged.WeightUnit))</label>
+                            <input id="weight" class="field number-field" type="number" inputmode="decimal" step="any" placeholder="Bodyweight" @bind="logged.Weight" @bind:after="SaveAsync" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="reps">Reps</label>
+                            <input id="reps" class="field number-field" type="number" inputmode="numeric" min="0" @bind="logged.Reps" @bind:after="SaveAsync" />
+                        </div>
+                    </div>
+                    <div class="spread">
+                        <p class="caption">Empty weight is bodyweight. Negative is assisted.</p>
+                        <button type="button" class="btn" disabled="@(logged.Weight is null)" @onclick="FlipSignAsync">+/−</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="spread baseline">
+                        <span class="field-label">Time</span>
+                        <span class="number sm">@TimeText.Format(TimeSpan.FromSeconds(logged.DurationSeconds ?? 0))</span>
+                    </div>
+                }
+                <div class="goal">
+                    <input id="hit-goal" type="checkbox" @bind="logged.HitGoal" @bind:after="SaveAsync" />
+                    <label for="hit-goal" class="row-text">
+                        <span class="body strong">Hit goal</span>
+                        <span class="caption">@(exercise.Measure == ExerciseMeasure.Weight && logged.Weight is double weight ? $"Next time this exercise starts at {SetSummary.WeightText(weight + Settings.HitGoalStep)} {Unit(logged.WeightUnit)}." : "Marks this set as a goal hit.")</span>
+                    </label>
+                </div>
+            </section>
+
+            @if (handoff && state.Next is { } next)
+            {
+                var nextExercise = state.Exercises[next.ExerciseId];
+                var last = state.History(next.ExerciseId, 1).FirstOrDefault();
+                <section class="card" aria-labelledby="next-heading">
+                    <h2 id="next-heading" class="label">Up next</h2>
+                    <div class="spread baseline">
+                        <span class="body strong">@nextExercise.Name</span>
+                        <span class="caption tabular">@(last is null ? "First time" : $"Last: {SetSummary.Format(last.Sets, nextExercise.Measure)}")</span>
+                    </div>
+                </section>
+            }
+
+            <div class="push-down">
+                <NextStepButton State="state" OnStarted="LoadAsync" OnFinish="FinishAsync" />
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private WorkoutState? state;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        state = await Flow.LoadAsync();
+        if (state is null) Nav.NavigateTo("", replace: true);
+        else if (state.Sets.Count == 0) Nav.NavigateTo("workout/exercise", replace: true);
+    }
+
+    private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";
+
+    private async Task StopAsync()
+    {
+        await Flow.StopSetAsync(state!);
+        await LoadAsync();
+    }
+
+    private Task SaveAsync() => Flow.SaveSetAsync(state!.ToLog!);
+
+    private async Task FlipSignAsync()
+    {
+        state!.ToLog!.Weight = -state.ToLog.Weight;
+        await SaveAsync();
+    }
+
+    private async Task FinishAsync()
+    {
+        await Flow.FinishAsync(state!);
+        Nav.NavigateTo("");
+    }
+}

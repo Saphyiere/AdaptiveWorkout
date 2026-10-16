@@ -11,8 +11,9 @@ build/
                             Put local-dev files here.
 docs/                       The app concept and data model (concept.md).
 src/
-  AdaptiveWorkout.Core/     Shared business logic (plain .NET 10). Used by both apps, covered by tests.
-  AdaptiveWorkout.Phone/    Phone app: .NET MAUI Blazor Hybrid, Android only.
+  AdaptiveWorkout.Core/     Business logic (plain .NET 10): rotation, next step, suggestions, history, consistency.
+  AdaptiveWorkout.UI/       The app's screens (Razor) and storage (SQLite via Dapper). Any host can show them.
+  AdaptiveWorkout.Phone/    Phone app: .NET MAUI Blazor Hybrid host for the UI, Android only.
   AdaptiveWorkout.Watch/    Watch app: .NET for Android targeting Wear OS.
 tests/
   AdaptiveWorkout.Core.Tests/   xUnit v3 tests for Core. Business logic only.
@@ -65,7 +66,7 @@ If an Android build ever fails over output paths, temporarily remove the two art
 - Design system (colors, type, spacing, the mark and app icon): https://claude.ai/artifact/H9wJAoBQE834PEQ9qG4wmq
 - First-launch mockups (splash, first screen, app icon): https://claude.ai/artifact/EwspcKFgzTGB9FsPDC4RdC
 
-Black with one hot pink accent. The app icon and splash live in `src/AdaptiveWorkout.Phone/Resources` (SVG) and `src/AdaptiveWorkout.Watch/Resources/drawable` (vector drawables); the phone's CSS tokens are in `wwwroot/app.css`.
+Black with one hot pink accent. The app icon and splash live in `src/AdaptiveWorkout.Phone/Resources` (SVG) and `src/AdaptiveWorkout.Watch/Resources/drawable` (vector drawables); the screens' CSS tokens are in `src/AdaptiveWorkout.UI/wwwroot/app.css`.
 
 ## Tests
 
@@ -73,7 +74,7 @@ Black with one hot pink accent. The app icon and splash live in `src/AdaptiveWor
 dotnet test --project tests/AdaptiveWorkout.Core.Tests
 ```
 
-Tests are only for business logic in `Core`: no UI, wording, or plumbing tests. `HeartRateZones` is a placeholder example; replace it once the real workout rules are decided.
+Tests are only for business logic in `Core`: no UI, wording, or plumbing tests.
 
 ## Why these choices
 

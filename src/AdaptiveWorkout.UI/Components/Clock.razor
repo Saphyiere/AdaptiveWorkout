@@ -1,0 +1,28 @@
+@implements IDisposable
+@* Time since a moment, ticking once a second. Only this text re-renders. *@
+<span class="@Class">@TimeText.Format(DateTimeOffset.Now - Since)</span>
+
+@code {
+    private readonly CancellationTokenSource stop = new();
+
+    [Parameter, EditorRequired] public DateTimeOffset Since { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    protected override void OnInitialized() => _ = Task.Run(async () =>
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stop.Token)) await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    });
+
+    public void Dispose()
+    {
+        stop.Cancel();
+        stop.Dispose();
+    }
+}

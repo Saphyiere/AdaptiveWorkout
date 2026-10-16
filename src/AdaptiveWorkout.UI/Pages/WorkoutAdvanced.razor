@@ -1,0 +1,137 @@
+@page "/workout/advanced"
+@inject WorkoutFlow Flow
+@inject NavigationManager Nav
+
+<PageTitle>@(state?.Name ?? "Workout")</PageTitle>
+
+@if (state is not null)
+{
+    var next = state.Next;
+    var running = state.Running;
+    var stopped = state.Sets.Where(s => s.StoppedAt is not null).ToList();
+    var planIds = state.Plan.Select(e => e.ExerciseId).ToHashSet();
+    var extraIds = stopped.Select(s => s.ExerciseId).Where(id => !planIds.Contains(id)).Distinct().ToList();
+    <div class="screen tight">
+        <WorkoutHeader State="state" Advanced="true" OnFinish="FinishAsync" />
+
+        @if (state.Plan.Count > 0)
+        {
+            <section class="list" aria-label="Plan">
+                @foreach (var block in WorkoutPlan.Blocks(state.Plan))
+                {
+                    <div>
+                        @if (block.Count > 1)
+                        {
+                            <p class="label live group-label">Superset@(block[0].PlannedSets is int rounds ? $" · {rounds} rounds" : "")</p>
+                        }
+                        @foreach (var entry in block)
+                        {
+                            var exercise = state.Exercises[entry.ExerciseId];
+                            var done = stopped.Where(s => s.ExerciseId == entry.ExerciseId).ToList();
+                            var isCurrent = (running?.ExerciseId ?? next?.ExerciseId) == entry.ExerciseId;
+                            var last = done.Count == 0 ? state.History(entry.ExerciseId, 1).FirstOrDefault() : null;
+                            <div class="row">
+                                <span class="status @(isCurrent ? "current" : "")">
+                                    @if (done.Count > 0 && !isCurrent)
+                                    {
+                                        <Icon Name="check" Size="16" Stroke="2" />
+                                    }
+                                </span>
+                                <span class="row-text">
+                                    <span class="body strong">@exercise.Name</span>
+                                    <span class="caption tabular">
+                                        @if (state.Skipped.Contains(entry.ExerciseId))
+                                        {
+                                            @("Skipped")
+                                        }
+                                        else if (done.Count > 0)
+                                        {
+                                            @($"{SetSummary.Format(done, exercise.Measure)}{(isCurrent ? " · now" : "")}")
+                                        }
+                                        else
+                                        {
+                                            @(last is null ? "Not done before" : $"Last: {SetSummary.Format(last.Sets, exercise.Measure)}")
+                                        }
+                                    </span>
+                                </span>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+        }
+
+        @if (extraIds.Count > 0)
+        {
+            <h2 class="label">@(state.Plan.Count > 0 ? "Also done" : "Done so far")</h2>
+            <section class="list">
+                @foreach (var id in extraIds)
+                {
+                    var exercise = state.Exercises[id];
+                    <div class="row">
+                        <span class="status"><Icon Name="check" Size="16" Stroke="2" /></span>
+                        <span class="row-text">
+                            <span class="body strong">@exercise.Name</span>
+                            <span class="caption tabular">@SetSummary.Format([.. stopped.Where(s => s.ExerciseId == id)], exercise.Measure)</span>
+                        </span>
+                    </div>
+                }
+            </section>
+        }
+
+        <div class="grid-2">
+            <button type="button" class="btn tall" disabled="@(running is not null || stopped.Count == 0)" @onclick="AddSetAsync">Add a set</button>
+            <button type="button" class="btn tall" disabled="@(running is not null)" @onclick="@(() => Nav.NavigateTo("workout/exercise"))">Different exercise</button>
+            <button type="button" class="btn tall" disabled="@(running is not null || next is null || state.Plan.Count == 0)" @onclick="SkipAsync">Skip @(next is null ? "exercise" : state.Exercises[next.ExerciseId].Name)</button>
+            <a class="btn tall" href="workout">Back to simple</a>
+        </div>
+
+        <div class="push-down">
+            @if (running is not null)
+            {
+                <button type="button" class="btn-primary big" @onclick="StopAsync">Stop @state.Exercises[running.ExerciseId].Name</button>
+            }
+            else
+            {
+                <NextStepButton State="state" OnStarted="@(() => Nav.NavigateTo("workout"))" OnFinish="FinishAsync" />
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private WorkoutState? state;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        state = await Flow.LoadAsync();
+        if (state is null) Nav.NavigateTo("", replace: true);
+    }
+
+    private async Task AddSetAsync()
+    {
+        var lastExercise = state!.Exercises[state.Sets[^1].ExerciseId];
+        await Flow.StartSetAsync(state, lastExercise);
+        Nav.NavigateTo("workout");
+    }
+
+    private async Task SkipAsync()
+    {
+        if (state?.Next is { } next) Flow.Skip(state, next.ExerciseId);
+        await LoadAsync();
+    }
+
+    private async Task StopAsync()
+    {
+        await Flow.StopSetAsync(state!);
+        Nav.NavigateTo("workout");
+    }
+
+    private async Task FinishAsync()
+    {
+        await Flow.FinishAsync(state!);
+        Nav.NavigateTo("");
+    }
+}

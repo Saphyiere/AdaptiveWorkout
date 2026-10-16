@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using AdaptiveWorkout.UI;
+using Microsoft.Extensions.Logging;
 
 namespace AdaptiveWorkout.Phone;
 
@@ -10,6 +11,7 @@ public static class MauiProgram
 		builder.UseMauiApp<App>();
 
 		builder.Services.AddMauiBlazorWebView();
+		builder.Services.AddAdaptiveWorkout(Path.Combine(FileSystem.AppDataDirectory, "adaptiveworkout.db"));
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();

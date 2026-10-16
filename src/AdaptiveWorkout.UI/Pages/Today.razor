@@ -1,0 +1,209 @@
+@page "/"
+@inject WorkoutStore Store
+@inject WorkoutFlow Flow
+@inject AppSettings Settings
+@inject NavigationManager Nav
+
+<PageTitle>Today</PageTitle>
+
+@if (loaded)
+{
+    <div class="screen tight">
+        <header class="spread">
+            <div class="row-text">
+                <p class="label">@today.ToString("dddd, MMM d", CultureInfo.CurrentCulture)</p>
+                <h1 class="title">Today</h1>
+            </div>
+            <Icon Name="mark" Size="28" Color="var(--accent)" Stroke="1.8" />
+        </header>
+
+        <section class="card" aria-labelledby="gym-heading">
+            <div class="spread">
+                <h2 id="gym-heading" class="label">Gym today</h2>
+                <span class="pill @(wentToday ? "accent" : "")">@(openSession is not null ? "In progress" : wentToday ? "Done" : "Not yet")</span>
+            </div>
+            <div class="week">
+                @for (var i = 0; i < 7; i++)
+                {
+                    var date = monday.AddDays(i);
+                    var isToday = date == today;
+                    <div class="day @(isToday ? "today" : "")">
+                        <span class="dot @(week[i] ? "done" : isToday ? "ring" : "")">
+                            @if (week[i])
+                            {
+                                <Icon Name="check" Size="16" Color="var(--on-accent)" Stroke="2.5" />
+                            }
+                        </span>
+                        <span>@date.ToString("ddd", CultureInfo.CurrentCulture)[..1]<span class="sr-only">@date.ToString("dddd", CultureInfo.CurrentCulture)@(week[i] ? ", gym day" : "")</span></span>
+                    </div>
+                }
+            </div>
+            <p class="caption">@weekText</p>
+        </section>
+
+        <section class="card" aria-labelledby="calories-heading">
+            <div class="spread">
+                <h2 id="calories-heading" class="label">Calories eaten</h2>
+                @if (!addingFood)
+                {
+                    <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="18" />Add</button>
+                }
+            </div>
+            <div class="inline baseline">
+                <span class="number md">@eaten.ToString("N0", CultureInfo.CurrentCulture)</span>
+                <span class="unit">of @Settings.CalorieGoal.ToString("N0", CultureInfo.CurrentCulture) goal</span>
+            </div>
+            <div class="bar"><span style="width: @(Math.Min(100, eaten * 100 / Settings.CalorieGoal))%"></span></div>
+            <p class="caption">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over") · maintenance @Settings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)</p>
+            @if (addingFood)
+            {
+                <form class="inline" @onsubmit="AddFoodAsync">
+                    <label class="sr-only" for="calories">Calories to add</label>
+                    <input id="calories" class="field" type="number" inputmode="numeric" min="0" placeholder="Calories to add" @bind="foodAmount" />
+                    <button type="submit" class="btn tall">Save</button>
+                    <button type="button" class="icon-btn plain" aria-label="Cancel" @onclick="() => addingFood = false"><Icon Name="close" /></button>
+                </form>
+            }
+        </section>
+
+        <section class="card" aria-labelledby="weight-heading">
+            <div class="spread">
+                <h2 id="weight-heading" class="label">Body weight</h2>
+                @if (!weighing)
+                {
+                    <button type="button" class="btn" @onclick="() => weighing = true">Weigh in</button>
+                }
+            </div>
+            <div class="spread end">
+                @if (latestWeight is not null)
+                {
+                    <div class="inline baseline">
+                        <span class="number md">@latestWeight.Weight.ToString("0.#", CultureInfo.CurrentCulture)</span>
+                        <span class="unit">@UnitText</span>
+                    </div>
+                }
+                @if (sparkline is not null)
+                {
+                    <svg aria-hidden="true" viewBox="0 0 120 40" width="120" height="40">
+                        <polyline points="@sparkline.Value.Points" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linejoin="miter"></polyline>
+                        <circle cx="118" cy="@sparkline.Value.LastY" r="3.5" fill="var(--accent)"></circle>
+                    </svg>
+                }
+            </div>
+            <p class="caption">@weightChangeText</p>
+            @if (weighing)
+            {
+                <form class="inline" @onsubmit="WeighInAsync">
+                    <label class="sr-only" for="body-weight">Body weight in @UnitText</label>
+                    <input id="body-weight" class="field" type="number" inputmode="decimal" step="any" min="0" placeholder="Weight (@UnitText)" @bind="weightAmount" />
+                    <button type="submit" class="btn tall">Save</button>
+                    <button type="button" class="icon-btn plain" aria-label="Cancel" @onclick="() => weighing = false"><Icon Name="close" /></button>
+                </form>
+            }
+        </section>
+
+        <div class="push-down">
+            <button type="button" class="btn-primary" @onclick="StartAsync">@startLabel</button>
+            <a class="btn-ghost" href="sessions">@(routine is null ? "Set up a routine" : "Other session")</a>
+        </div>
+    </div>
+}
+
+@code {
+    private bool loaded;
+    private DateOnly today;
+    private DateOnly monday;
+    private bool[] week = new bool[7];
+    private bool wentToday;
+    private Routine? routine;
+    private SessionTemplate? nextTemplate;
+    private WorkoutSession? openSession;
+    private int eaten;
+    private int left;
+    private BodyWeightEntry? latestWeight;
+    private (string Points, double LastY)? sparkline;
+    private bool addingFood;
+    private int? foodAmount;
+    private bool weighing;
+    private double? weightAmount;
+
+    private string weekText = "";
+    private string weightChangeText = "";
+    private string startLabel = "";
+
+    private string UnitText => (latestWeight?.WeightUnit ?? Settings.Unit) == WeightUnit.Kilograms ? "kg" : "lb";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var now = DateTimeOffset.Now;
+        today = DateOnly.FromDateTime(now.DateTime);
+        monday = Consistency.WeekStart(today);
+
+        var sessions = await Store.GetSessionsAsync();
+        var gymDays = sessions.Select(s => DateOnly.FromDateTime(s.StartedAt.DateTime)).ToList();
+        week = Consistency.Week(gymDays, today);
+        var streak = Consistency.WeekStreak(gymDays, today);
+        var gymDaysThisWeek = week.Count(d => d);
+        weekText = gymDaysThisWeek == 0 ? "No gym days yet this week" : $"{gymDaysThisWeek} gym {(gymDaysThisWeek == 1 ? "day" : "days")} this week";
+        if (streak > 0) weekText += $" · {streak}-week streak";
+        wentToday = gymDays.Contains(today);
+        openSession = await Store.GetOpenSessionAsync();
+
+        routine = await Store.GetRoutineAsync();
+        IReadOnlyList<SessionTemplate> templates = routine is null ? [] : await Store.GetTemplatesAsync(routine.Id);
+        nextTemplate = Rotation.Next(templates, sessions);
+        var openName = templates.FirstOrDefault(t => t.Id == openSession?.TemplateId)?.Name ?? "workout";
+        startLabel = openSession is not null ? $"Resume {openName}" : nextTemplate is not null ? $"Start {nextTemplate.Name}" : "Start workout";
+
+        var food = await Store.GetFoodSinceAsync(now.AddDays(-2));
+        eaten = food.Where(f => DateOnly.FromDateTime(f.At.DateTime) == today).Sum(f => f.Calories);
+        left = Settings.CalorieGoal - eaten;
+
+        var weights = await Store.GetBodyWeightsAsync();
+        latestWeight = weights.MaxBy(w => w.At);
+        var weightChange = BodyWeight.Change(weights, now, 30);
+        weightChangeText = weightChange switch
+        {
+            null when latestWeight is null => "Weigh in to start your trend.",
+            null => "Weigh in again to see your trend.",
+            0 => "No change in 30 days",
+            var change => $"{(change < 0 ? "−" : "+")}{Math.Abs(change.Value).ToString("0.#", CultureInfo.CurrentCulture)} {UnitText} in 30 days",
+        };
+        var recent = weights.Where(w => w.At >= now.AddDays(-30)).OrderBy(w => w.At).ToList();
+        if (recent.Count >= 2)
+        {
+            var (min, max) = (recent.Min(w => w.Weight), recent.Max(w => w.Weight));
+            var ys = recent.Select(w => max == min ? 20 : 4 + (max - w.Weight) / (max - min) * 32).ToList();
+            var points = string.Join(' ', ys.Select((y, i) => $"{(2 + i * 116.0 / (ys.Count - 1)).ToString("0.#", CultureInfo.InvariantCulture)},{y.ToString("0.#", CultureInfo.InvariantCulture)}"));
+            sparkline = (points, ys[^1]);
+        }
+
+        loaded = true;
+    }
+
+    private async Task AddFoodAsync()
+    {
+        if (foodAmount is not > 0) return;
+
+        await Store.AddFoodAsync(foodAmount.Value, DateTimeOffset.Now);
+        (addingFood, foodAmount) = (false, null);
+        await LoadAsync();
+    }
+
+    private async Task WeighInAsync()
+    {
+        if (weightAmount is not > 0) return;
+
+        await Store.AddBodyWeightAsync(weightAmount.Value, latestWeight?.WeightUnit ?? Settings.Unit, DateTimeOffset.Now);
+        (weighing, weightAmount) = (false, null);
+        await LoadAsync();
+    }
+
+    private async Task StartAsync()
+    {
+        if (openSession is null) await Flow.StartSessionAsync(nextTemplate?.Id);
+        Nav.NavigateTo("workout");
+    }
+}

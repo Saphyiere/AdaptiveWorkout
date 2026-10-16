@@ -1,0 +1,125 @@
+@page "/sessions"
+@inject WorkoutStore Store
+@inject WorkoutFlow Flow
+@inject NavigationManager Nav
+
+<PageTitle>Choose session</PageTitle>
+
+@if (loaded)
+{
+    <div class="screen tight">
+        <header class="inline">
+            <a class="icon-btn" href="" aria-label="Back to Today"><Icon Name="back" /></a>
+            <div class="row-text">
+                @if (routine is not null)
+                {
+                    <p class="label">@routine.Name</p>
+                }
+                <h1 class="title small">@(routine is null ? "Set up a routine" : "Choose session")</h1>
+            </div>
+        </header>
+
+        @if (routine is null)
+        {
+            <section class="card">
+                <h2 class="body strong">Name your routine</h2>
+                <p class="caption">A routine is the rotation of sessions you repeat, like Push, Back and Legs. Start workout always suggests the one after the last you finished.</p>
+                <form class="inline" @onsubmit="CreateRoutineAsync">
+                    <label class="sr-only" for="routine-name">Routine name</label>
+                    <input id="routine-name" class="field" placeholder="Standard workout" @bind="routineName" />
+                    <button type="submit" class="btn tall" disabled="@string.IsNullOrWhiteSpace(routineName)">Create</button>
+                </form>
+            </section>
+        }
+        else
+        {
+            @if (openSession is not null)
+            {
+                <section class="card">
+                    <p class="body"><strong>@(templates.FirstOrDefault(t => t.Id == openSession.TemplateId)?.Name ?? "A workout")</strong> is in progress. Finish it before starting another.</p>
+                    <a class="btn tall accent" href="workout">Resume</a>
+                </section>
+            }
+
+            @if (templates.Count == 0)
+            {
+                <p class="caption">No sessions yet. Add the first one below.</p>
+            }
+            else
+            {
+                <section class="list" aria-label="Sessions in @routine.Name">
+                    @foreach (var template in templates)
+                    {
+                        var lastDone = sessions.Where(s => s.TemplateId == template.Id && s.FinishedAt is not null).MaxBy(s => s.StartedAt);
+                        <div class="row">
+                            <button type="button" class="row-main" disabled="@(openSession is not null)" @onclick="() => StartAsync(template.Id)">
+                                <span class="row-text">
+                                    <span class="body strong">@template.Name</span>
+                                    <span class="caption">@(lastDone is null ? "Not done yet" : $"Last done {lastDone.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)}")</span>
+                                </span>
+                                @if (template.Id == nextTemplate?.Id)
+                                {
+                                    <span class="pill accent">Next</span>
+                                }
+                            </button>
+                            <a class="icon-btn plain" href="sessions/@template.Id" aria-label="Edit @template.Name"><Icon Name="edit" /></a>
+                        </div>
+                    }
+                </section>
+            }
+
+            <section class="list">
+                <button type="button" class="row" disabled="@(openSession is not null)" @onclick="() => StartAsync(null)">
+                    <span class="icon-btn"><Icon Name="mark" /></span>
+                    <span class="row-text">
+                        <span class="body strong">Just track</span>
+                        <span class="caption">No plan. Add exercises as you go.</span>
+                    </span>
+                </button>
+                <a class="row" href="sessions/new">
+                    <span class="icon-btn"><Icon Name="plus" /></span>
+                    <span class="row-text">
+                        <span class="body strong">New session</span>
+                        <span class="caption">Add a session to @routine.Name</span>
+                    </span>
+                </a>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private bool loaded;
+    private Routine? routine;
+    private IReadOnlyList<SessionTemplate> templates = [];
+    private IReadOnlyList<WorkoutSession> sessions = [];
+    private SessionTemplate? nextTemplate;
+    private WorkoutSession? openSession;
+    private string routineName = "";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        routine = await Store.GetRoutineAsync();
+        templates = routine is null ? [] : await Store.GetTemplatesAsync(routine.Id);
+        sessions = await Store.GetSessionsAsync();
+        nextTemplate = Rotation.Next(templates, sessions);
+        openSession = await Store.GetOpenSessionAsync();
+        loaded = true;
+    }
+
+    private async Task CreateRoutineAsync()
+    {
+        if (string.IsNullOrWhiteSpace(routineName)) return;
+
+        await Store.CreateRoutineAsync(routineName.Trim());
+        await LoadAsync();
+    }
+
+    private async Task StartAsync(long? templateId)
+    {
+        await Flow.StartSessionAsync(templateId);
+        Nav.NavigateTo("workout");
+    }
+}

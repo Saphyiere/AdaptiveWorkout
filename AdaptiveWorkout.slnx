@@ -4,6 +4,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AdaptiveWorkout.Core/AdaptiveWorkout.Core.csproj" />
+    <Project Path="src/AdaptiveWorkout.UI/AdaptiveWorkout.UI.csproj" />
     <Project Path="src/AdaptiveWorkout.Phone/AdaptiveWorkout.Phone.csproj">
       <Deploy />
     </Project>
