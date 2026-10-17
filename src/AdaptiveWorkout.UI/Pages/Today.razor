@@ -17,10 +17,14 @@
             <Icon Name="mark" Size="28" Color="var(--accent)" Stroke="1.8" />
         </header>
 
-        <section class="card" aria-labelledby="gym-heading">
+        @* Opens the history of finished workouts. *@
+        <a class="card" href="history" aria-labelledby="gym-heading">
             <div class="spread">
                 <h2 id="gym-heading" class="label">Gym today</h2>
-                <span class="pill @(wentToday ? "accent" : "")">@(openSession is not null ? "In progress" : wentToday ? "Done" : "Not yet")</span>
+                <span class="inline">
+                    <span class="pill @(wentToday ? "accent" : "")">@(openSession is not null ? "In progress" : wentToday ? "Done" : "Not yet")</span>
+                    <Icon Name="forward" Size="18" Color="var(--ink-muted)" />
+                </span>
             </div>
             <div class="week">
                 @for (var i = 0; i < 7; i++)
@@ -39,15 +43,21 @@
                 }
             </div>
             <p class="caption">@weekText</p>
-        </section>
+        </a>
 
         <section class="card" aria-labelledby="calories-heading">
             <div class="spread">
                 <h2 id="calories-heading" class="label">Calories eaten</h2>
-                @if (!addingFood)
-                {
-                    <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="18" />Add</button>
-                }
+                <span class="inline">
+                    @if (todayFood.Count > 0)
+                    {
+                        <button type="button" class="btn @(editingFood ? "accent" : "")" @onclick="() => editingFood = !editingFood">@(editingFood ? "Done" : "Edit")</button>
+                    }
+                    @if (!addingFood)
+                    {
+                        <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="18" />Add</button>
+                    }
+                </span>
             </div>
             <div class="inline baseline">
                 <span class="number md">@eaten.ToString("N0", CultureInfo.CurrentCulture)</span>
@@ -64,15 +74,36 @@
                     <button type="button" class="icon-btn plain" aria-label="Cancel" @onclick="() => addingFood = false"><Icon Name="close" /></button>
                 </form>
             }
+            @if (editingFood && todayFood.Count > 0)
+            {
+                <div class="entries" aria-label="Today's entries">
+                    @foreach (var entry in todayFood)
+                    {
+                        <div @key="entry.Id">
+                            <span class="inline baseline">
+                                <span class="body strong tabular">@entry.Calories.ToString("N0", CultureInfo.CurrentCulture)</span>
+                                <span class="caption">@entry.At.ToString("h:mm tt", CultureInfo.CurrentCulture)</span>
+                            </span>
+                            <ConfirmDelete Label="@($"Delete {entry.Calories} calories at {entry.At.ToString("h:mm tt", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteFoodAsync(entry)" />
+                        </div>
+                    }
+                </div>
+            }
         </section>
 
         <section class="card" aria-labelledby="weight-heading">
             <div class="spread">
                 <h2 id="weight-heading" class="label">Body weight</h2>
-                @if (!weighing)
-                {
-                    <button type="button" class="btn" @onclick="() => weighing = true">Weigh in</button>
-                }
+                <span class="inline">
+                    @if (weights.Count > 0)
+                    {
+                        <button type="button" class="btn @(editingWeights ? "accent" : "")" @onclick="() => editingWeights = !editingWeights">@(editingWeights ? "Done" : "Edit")</button>
+                    }
+                    @if (!weighing)
+                    {
+                        <button type="button" class="btn" @onclick="() => weighing = true">Weigh in</button>
+                    }
+                </span>
             </div>
             <div class="spread end">
                 @if (latestWeight is not null)
@@ -100,6 +131,22 @@
                     <button type="button" class="icon-btn plain" aria-label="Cancel" @onclick="() => weighing = false"><Icon Name="close" /></button>
                 </form>
             }
+            @if (editingWeights && weights.Count > 0)
+            {
+                <div class="entries" aria-label="Recent weigh-ins">
+                    @foreach (var entry in weights.OrderByDescending(w => w.At).Take(10))
+                    {
+                        var unit = entry.WeightUnit == WeightUnit.Kilograms ? "kg" : "lb";
+                        <div @key="entry.Id">
+                            <span class="inline baseline">
+                                <span class="body strong tabular">@entry.Weight.ToString("0.#", CultureInfo.CurrentCulture) @unit</span>
+                                <span class="caption">@entry.At.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</span>
+                            </span>
+                            <ConfirmDelete Label="@($"Delete {entry.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {unit} on {entry.At.ToString("MMM d", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteWeightAsync(entry)" />
+                        </div>
+                    }
+                </div>
+            }
         </section>
 
         <div class="push-down">
@@ -126,6 +173,10 @@
     private int? foodAmount;
     private bool weighing;
     private double? weightAmount;
+    private List<FoodEntry> todayFood = [];
+    private bool editingFood;
+    private List<BodyWeightEntry> weights = [];
+    private bool editingWeights;
 
     private string weekText = "";
     private string weightChangeText = "";
@@ -158,10 +209,11 @@
         startLabel = openSession is not null ? $"Resume {openName}" : nextTemplate is not null ? $"Start {nextTemplate.Name}" : "Start workout";
 
         var food = await Store.GetFoodSinceAsync(now.AddDays(-2));
-        eaten = food.Where(f => DateOnly.FromDateTime(f.At.DateTime) == today).Sum(f => f.Calories);
+        todayFood = [.. food.Where(f => DateOnly.FromDateTime(f.At.DateTime) == today)];
+        eaten = todayFood.Sum(f => f.Calories);
         left = Settings.CalorieGoal - eaten;
 
-        var weights = await Store.GetBodyWeightsAsync();
+        weights = await Store.GetBodyWeightsAsync();
         latestWeight = weights.MaxBy(w => w.At);
         var weightChange = BodyWeight.Change(weights, now, 30);
         weightChangeText = weightChange switch
@@ -179,6 +231,7 @@
             var points = string.Join(' ', ys.Select((y, i) => $"{(2 + i * 116.0 / (ys.Count - 1)).ToString("0.#", CultureInfo.InvariantCulture)},{y.ToString("0.#", CultureInfo.InvariantCulture)}"));
             sparkline = (points, ys[^1]);
         }
+        else sparkline = null;
 
         loaded = true;
     }
@@ -198,6 +251,18 @@
 
         await Store.AddBodyWeightAsync(weightAmount.Value, latestWeight?.WeightUnit ?? Settings.Unit, DateTimeOffset.Now);
         (weighing, weightAmount) = (false, null);
+        await LoadAsync();
+    }
+
+    private async Task DeleteFoodAsync(FoodEntry entry)
+    {
+        await Store.DeleteFoodAsync(entry);
+        await LoadAsync();
+    }
+
+    private async Task DeleteWeightAsync(BodyWeightEntry entry)
+    {
+        await Store.DeleteBodyWeightAsync(entry);
         await LoadAsync();
     }
 

@@ -1,0 +1,19 @@
+@* A delete button that asks once: the first tap turns it into Keep and Delete. *@
+@if (asking)
+{
+    <div class="inline">
+        <button type="button" class="btn" @onclick="() => asking = false">Keep</button>
+        <button type="button" class="btn accent" @onclick="OnDelete">Delete</button>
+    </div>
+}
+else
+{
+    <button type="button" class="icon-btn plain" aria-label="@Label" @onclick="() => asking = true"><Icon Name="trash" /></button>
+}
+
+@code {
+    private bool asking;
+
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public EventCallback OnDelete { get; set; }
+}

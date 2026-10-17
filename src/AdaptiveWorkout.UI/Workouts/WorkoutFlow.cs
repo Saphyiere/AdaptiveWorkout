@@ -98,14 +98,23 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         watch.Close();
     }
 
-    /// <summary>Throws away a session that has no sets yet.</summary>
+    /// <summary>Throws away the open session and its sets, e.g. one started by mistake.</summary>
     public void Cancel()
     {
-        if (Current is not { Sets.Count: 0 } state) return;
+        if (Current is not { } state) return;
 
         Save(store.DeleteSessionAsync(state.Session));
         Current = null;
         watch.Close();
+    }
+
+    /// <summary>Deletes a finished session and its sets, so history and suggestions forget it.</summary>
+    public async Task DeleteSessionAsync(WorkoutSession session)
+    {
+        await LoadAsync();
+        pastSessions.RemoveAll(s => s.Id == session.Id);
+        pastSets.RemoveAll(s => s.SessionId == session.Id);
+        Save(store.DeleteSessionAsync(session));
     }
 
     /// <summary>Creates (or links to) an exercise picked by name mid-workout.</summary>

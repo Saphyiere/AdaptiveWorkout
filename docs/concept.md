@@ -41,10 +41,16 @@ Build the foundation first, then add on.
 
 The home screen answers the three questions at a glance. **(proposed)**
 
-- **Gym today:** done or not yet, plus this week's gym days (e.g. Mon, Wed, Thu).
-- **Calories:** eaten today against 1,800, with a quick add.
-- **Body weight:** the latest weigh-in and its trend, with a quick add.
+- **Gym today:** done or not yet, plus this week's gym days (e.g. Mon, Wed, Thu). Tapping it opens **History**.
+- **Calories:** eaten today against 1,800, with a quick add. **Edit** lists today's entries, each deletable.
+- **Body weight:** the latest weigh-in and its trend, with a quick add. **Edit** lists the last 10 weigh-ins, each deletable.
 - The big button: **Start Back day** (the next session in the rotation).
+
+Every delete asks once (Keep or Delete) before anything is gone.
+
+### History
+
+Every finished workout, newest first and grouped by month: its name, date, length and set count, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
 
 ## Flows
 
@@ -60,6 +66,8 @@ Next to it, one step away:
 With no routine yet, the button reads **Start workout** and starts a "just track" session; creating a routine is offered alongside.
 
 The session's clock starts the moment I tap it. With a template, it goes straight to the first exercise (e.g. "Overhand rows") and its first set starts.
+
+While a workout is open, the session picker shows it at the top with **Resume**, **Finish** and **Cancel session**. Cancel deletes the workout and its sets, after asking once.
 
 ### Rotation
 
@@ -130,7 +138,7 @@ When nothing planned is left, the big button is **Finish workout**. When just tr
 
 ### Speed
 
-Every tap has to feel instant. The open workout lives in memory: Stop, Start and the break screen change on the spot, and saving happens in the background, one write at a time and in order. Buttons react the moment they're pressed, and each step slides in.
+Every tap has to feel instant. The open workout lives in memory: Stop, Start and the break screen change on the spot, and saving happens in the background, one write at a time and in order. Buttons react the moment they're pressed, and each step slides in, already mostly visible so the slide never reads as waiting. Debug builds run compiled code too (the Android interpreter is off), so testing feels like the real thing.
 
 ### Supersets
 

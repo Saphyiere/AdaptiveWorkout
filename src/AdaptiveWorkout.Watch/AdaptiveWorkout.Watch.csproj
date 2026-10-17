@@ -12,6 +12,8 @@
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);XA4218</MSBuildWarningsAsMessages>
     <TrimMode>full</TrimMode>
+    <!-- Debug builds otherwise run on Mono's interpreter (for Hot Reload): slow, and harder on the battery. -->
+    <UseInterpreter>false</UseInterpreter>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.Wear" Version="1.3.0.10" />

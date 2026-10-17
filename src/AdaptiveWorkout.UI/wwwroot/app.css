@@ -386,6 +386,38 @@ h1:focus {
     color: var(--accent);
 }
 
+/* A card that opens another screen. */
+a.card:active {
+    background-color: var(--surface-raised);
+}
+
+/* Entries listed inside a card, each with its own delete. */
+.entries {
+    display: flex;
+    flex-direction: column;
+}
+
+.entries > * {
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.entries > * + * {
+    border-top: 1px solid var(--hairline);
+}
+
+/* A finished workout's sets: number, weight × reps, time, heart rate. */
+.set-grid {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    column-gap: var(--space-2);
+    row-gap: 6px;
+    align-items: baseline;
+}
+
 /* Live heart rate and its "Open on watch" fallback take the same height, so the screen doesn't jump when readings start. */
 .heart-rate {
     min-height: 44px;
@@ -567,12 +599,13 @@ h1:focus {
     box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-/* Motion: buttons react the moment they're pressed, and each screen and workout step slides in. */
+/* Motion: buttons react the moment they're pressed, and each screen and workout step slides in.
+   The new content starts mostly visible, so the slide never reads as waiting. */
 
 @keyframes enter {
     from {
-        opacity: 0;
-        transform: translateY(12px);
+        opacity: 0.4;
+        transform: translateY(8px);
     }
 
     to {
@@ -590,10 +623,10 @@ h1:focus {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    animation: enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: enter 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.btn, .btn-primary, .btn-ghost, .icon-btn, .row, .row-main, .segmented button {
+.btn, .btn-primary, .btn-ghost, .icon-btn, .row, .row-main, .segmented button, a.card {
     transition: transform 120ms ease, background-color 120ms ease, filter 120ms ease;
 }
 

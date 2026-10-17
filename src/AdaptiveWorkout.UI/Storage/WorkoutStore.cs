@@ -112,11 +112,15 @@ public sealed class WorkoutStore(string databasePath)
     public Task<List<FoodEntry>> GetFoodSinceAsync(DateTimeOffset since) => RunAsync(async c =>
         (await c.QueryAsync<FoodEntry>("SELECT Id, At, Calories FROM FoodEntry ORDER BY Id")).Where(e => e.At >= since).ToList());
 
+    public Task DeleteFoodAsync(FoodEntry entry) => RunAsync(c => c.ExecuteAsync("DELETE FROM FoodEntry WHERE Id = @Id", entry));
+
     public Task AddBodyWeightAsync(double weight, WeightUnit unit, DateTimeOffset at) => RunAsync(c =>
         c.ExecuteAsync("INSERT INTO BodyWeightEntry (At, Weight, WeightUnit) VALUES (@at, @weight, @unit)", new { at, weight, unit }));
 
     public Task<List<BodyWeightEntry>> GetBodyWeightsAsync() => RunAsync(async c =>
         (await c.QueryAsync<BodyWeightEntry>("SELECT Id, At, Weight, WeightUnit FROM BodyWeightEntry ORDER BY Id")).AsList());
+
+    public Task DeleteBodyWeightAsync(BodyWeightEntry entry) => RunAsync(c => c.ExecuteAsync("DELETE FROM BodyWeightEntry WHERE Id = @Id", entry));
 
     public Task AddHeartRateAsync(IReadOnlyList<HeartRateSample> samples) => RunAsync(async c =>
     {
@@ -124,6 +128,10 @@ public sealed class WorkoutStore(string databasePath)
         await c.ExecuteAsync("INSERT INTO HeartRateSample (At, Bpm) VALUES (@At, @Bpm)", samples, transaction);
         await transaction.CommitAsync();
     });
+
+    /// <summary>Readings in a stretch of time. Times are text with an offset, so SQL narrows with a day of slack and the exact range is checked in memory.</summary>
+    public Task<List<HeartRateSample>> GetHeartRateAsync(DateTimeOffset from, DateTimeOffset to) => RunAsync(async c =>
+        (await c.QueryAsync<HeartRateSample>("SELECT At, Bpm FROM HeartRateSample WHERE At >= @start AND At <= @end", new { start = from.AddDays(-1), end = to.AddDays(1) })).Where(s => s.At >= from && s.At <= to).ToList());
 
     /// <summary>Queues work behind everything started before it and runs it on a background thread with its own connection.</summary>
     private Task<T> RunAsync<T>(Func<SqliteConnection, Task<T>> work)

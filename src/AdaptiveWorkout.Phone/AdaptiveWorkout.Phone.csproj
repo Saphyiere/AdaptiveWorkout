@@ -18,6 +18,8 @@
         <ApplicationId>com.saphyiere.adaptiveworkout</ApplicationId>
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
+        <!-- Debug builds otherwise run on Mono's interpreter (for Hot Reload), which makes every tap visibly slow. -->
+        <UseInterpreter>false</UseInterpreter>
     </PropertyGroup>
 
     <ItemGroup>

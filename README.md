@@ -39,7 +39,7 @@ What the app does and how its data is shaped: [docs/concept.md](docs/concept.md)
 3. Visual Studio: set **AdaptiveWorkout.Phone** as the startup project, pick the phone in the device dropdown, and press F5.
    CLI: `dotnet build src/AdaptiveWorkout.Phone -t:Run`
 
-The app opens on Today. For everyday use, deploy the **Release** configuration (Visual Studio's configuration dropdown, or `-c Release`): Debug builds run noticeably slower on Android.
+The app opens on Today. Debug builds run compiled code (`UseInterpreter` is off in both apps, which gives up C# Hot Reload on the devices), so they're quick enough to use. **Release** (Visual Studio's configuration dropdown, or `-c Release`) is still a little faster for everyday use.
 
 ## Hello world on the watch (no USB needed)
 

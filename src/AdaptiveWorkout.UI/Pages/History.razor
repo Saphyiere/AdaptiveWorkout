@@ -1,0 +1,71 @@
+@page "/history"
+@inject WorkoutStore Store
+@inject WorkoutFlow Flow
+
+<PageTitle>History</PageTitle>
+
+@if (loaded)
+{
+    <div class="screen tight">
+        <header class="inline">
+            <a class="icon-btn" href="" aria-label="Back to Today"><Icon Name="back" /></a>
+            <div class="row-text">
+                <p class="label">@sessions.Count @(sessions.Count == 1 ? "workout" : "workouts")</p>
+                <h1 class="title small">History</h1>
+            </div>
+        </header>
+
+        @if (sessions.Count == 0)
+        {
+            <p class="caption">No finished workouts yet. Each one shows up here after Finish workout.</p>
+        }
+
+        @foreach (var month in sessions.GroupBy(s => s.StartedAt.ToString("MMMM yyyy", CultureInfo.CurrentCulture)))
+        {
+            <section class="stack" aria-label="@month.Key">
+                <h2 class="label">@month.Key</h2>
+                <div class="list">
+                    @foreach (var session in month)
+                    {
+                        var name = NameOf(session);
+                        var sets = setCounts.GetValueOrDefault(session.Id);
+                        @* Keyed, so a deleted row's "Delete?" doesn't carry over to the row that takes its place. *@
+                        <div class="row" @key="session.Id">
+                            <a class="row-main" href="history/@session.Id">
+                                <span class="row-text">
+                                    <span class="body strong">@name</span>
+                                    <span class="caption tabular">@session.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture) · @TimeText.Format(session.FinishedAt!.Value - session.StartedAt) · @sets @(sets == 1 ? "set" : "sets")</span>
+                                </span>
+                            </a>
+                            <ConfirmDelete Label="@($"Delete {name} on {session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteAsync(session)" />
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private bool loaded;
+    private List<WorkoutSession> sessions = [];
+    private Dictionary<long, int> setCounts = [];
+    private Dictionary<long, string> templateNames = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        sessions = [.. (await Store.GetSessionsAsync()).Where(s => s.FinishedAt is not null).OrderByDescending(s => s.StartedAt)];
+        setCounts = (await Store.GetSetsAsync()).GroupBy(s => s.SessionId).ToDictionary(g => g.Key, g => g.Count());
+        var routine = await Store.GetRoutineAsync();
+        templateNames = routine is null ? [] : (await Store.GetTemplatesAsync(routine.Id)).ToDictionary(t => t.Id, t => t.Name);
+        loaded = true;
+    }
+
+    private string NameOf(WorkoutSession session) => session.TemplateId is long id && templateNames.TryGetValue(id, out var name) ? name : "Workout";
+
+    private async Task DeleteAsync(WorkoutSession session)
+    {
+        sessions.Remove(session);
+        await Flow.DeleteSessionAsync(session);
+    }
+}
