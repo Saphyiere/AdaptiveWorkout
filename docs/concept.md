@@ -194,6 +194,15 @@ The watch streams heart rate (about once a second) for the whole session, sets a
 - heart rate while resting (readings between sets)
 - the whole session's curve
 
+How it runs:
+
+- **Start** on the phone opens the heart rate screen on the watch; I never touch the watch. If the watch can't be opened directly, it gets a "Workout started" notification instead. With the watch screen off, that notification opens the heart rate screen on its own.
+- **The watch screen:** the time up top, heart rate big in the middle, how long the workout has run below. When the watch screen times out, the app stays up, dimmed, instead of going back to the watch face. **(later)** A small graph or a zone scale under the number.
+- The watch keeps reading with its screen off, and holds readings while the phone is out of reach, then sends them all.
+- **The phone** shows the live number on the set and break screens, and saves every reading, even with the phone app in the background. Without a recent reading it says it's waiting and offers **Open on watch**.
+- **Finish** (or cancelling an empty session) closes the watch app. If that message doesn't arrive, the next reading the phone gets for a finished workout sends it again, and the watch stops on its own after 4 hours.
+- Opening the watch app by hand works too: it reads until I close it.
+
 ## Calories
 
 - Just what I ate. Not tied to sessions.
@@ -219,7 +228,7 @@ Set                Id, SessionId, ExerciseId, Order,
                    Weight, WeightUnit, Reps     (weight exercises; empty weight = bodyweight, may be negative)
                    Duration                     (time exercises; from the stopwatch or typed)
                    HitGoal                      (checked on any break screen)
-HeartRateSample    SessionId, At, Bpm
+HeartRateSample    At, Bpm                      (matched to sessions, sets and rests by time)
 FoodEntry          Id, At, Calories
 BodyWeightEntry    Id, At, Weight, WeightUnit
 Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Unit lb
@@ -231,7 +240,7 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 
 1. **Today:** calories, weigh-ins and the gym-day check, with storage on the phone. *Built.*
 2. **Sessions in simple mode:** routines, templates, the set loop, the last three times, supersets, Hit goal. *Built.*
-3. **Live heart rate** from the watch during sessions. *Next.* Screens show a placeholder until then.
+3. **Live heart rate** from the watch during sessions. *Built; needs its first run on the real watch.*
 4. **Advanced mode** and logging after the fact. *Advanced view built (add a set, different exercise, skip); reordering mid-workout and logging after the fact not yet.*
 5. **Adaptive comparisons** and charts.
 

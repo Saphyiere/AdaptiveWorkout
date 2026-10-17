@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AdaptiveWorkout</string>
-    <string name="app_text">Hello from AdaptiveWorkout</string>
+    <string name="bpm">bpm</string>
+    <string name="no_reading">--</string>
+    <string name="phone_unreachable">Not reaching the phone</string>
+    <string name="permission_needed">Allow heart rate in Settings, Apps</string>
+    <string name="workout_channel">Workout</string>
+    <string name="workout_notification">Reading heart rate</string>
+    <string name="start_channel">Workout started</string>
+    <string name="start_notification">Tap for heart rate</string>
 </resources>

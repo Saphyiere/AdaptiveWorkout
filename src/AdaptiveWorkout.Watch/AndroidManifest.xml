@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="1" android:versionName="1.0">
 	<uses-feature android:name="android.hardware.type.watch" />
+	<!-- Heart rate: BODY_SENSORS up to Wear OS 5, its own permission from Wear OS 6 (API 36). -->
+	<uses-permission android:name="android.permission.BODY_SENSORS" android:maxSdkVersion="35" />
+	<uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+	<!-- Keeps reading with the screen off during a workout. -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
+	<!-- The workout notice, and the backup "workout started" notification that opens the screen. -->
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:label="@string/app_name" android:supportsRtl="true" android:theme="@android:style/Theme.DeviceDefault">
 		<uses-library android:name="com.google.android.wearable" android:required="true" />
 		<!-- Runs on its own; the phone app is not required to be installed. -->

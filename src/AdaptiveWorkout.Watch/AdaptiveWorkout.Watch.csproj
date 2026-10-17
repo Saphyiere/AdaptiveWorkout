@@ -15,6 +15,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.Wear" Version="1.3.0.10" />
+    <!-- Same version as the phone app. -->
+    <PackageReference Include="Xamarin.GooglePlayServices.Wearable" Version="119.0.0.4" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AdaptiveWorkout.Core\AdaptiveWorkout.Core.csproj" />

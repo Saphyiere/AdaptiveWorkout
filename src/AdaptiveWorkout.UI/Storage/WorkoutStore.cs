@@ -22,6 +22,7 @@ public sealed class WorkoutStore(string databasePath)
         CREATE TABLE IF NOT EXISTS WorkoutSet (Id INTEGER PRIMARY KEY AUTOINCREMENT, SessionId INTEGER NOT NULL REFERENCES WorkoutSession (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, StartedAt TEXT, StoppedAt TEXT, Weight REAL, WeightUnit INTEGER NOT NULL, Reps INTEGER, DurationSeconds INTEGER, HitGoal INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS FoodEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Calories INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS BodyWeightEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Weight REAL NOT NULL, WeightUnit INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS HeartRateSample (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Bpm INTEGER NOT NULL);
         """;
 
     private readonly string connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString();
@@ -116,6 +117,13 @@ public sealed class WorkoutStore(string databasePath)
 
     public Task<List<BodyWeightEntry>> GetBodyWeightsAsync() => RunAsync(async c =>
         (await c.QueryAsync<BodyWeightEntry>("SELECT Id, At, Weight, WeightUnit FROM BodyWeightEntry ORDER BY Id")).AsList());
+
+    public Task AddHeartRateAsync(IReadOnlyList<HeartRateSample> samples) => RunAsync(async c =>
+    {
+        await using var transaction = (SqliteTransaction)await c.BeginTransactionAsync();
+        await c.ExecuteAsync("INSERT INTO HeartRateSample (At, Bpm) VALUES (@At, @Bpm)", samples, transaction);
+        await transaction.CommitAsync();
+    });
 
     /// <summary>Queues work behind everything started before it and runs it on a background thread with its own connection.</summary>
     private Task<T> RunAsync<T>(Func<SqliteConnection, Task<T>> work)

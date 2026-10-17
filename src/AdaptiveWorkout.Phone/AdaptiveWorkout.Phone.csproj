@@ -29,6 +29,9 @@
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+        <!-- Wear OS Data Layer: opens the watch app and takes its heart rate.
+             119.0.0.4 asks for the same AndroidX versions as MAUI 10; newer ones pull in a Fragment that clashes with MAUI's Fragment.Ktx. -->
+        <PackageReference Include="Xamarin.GooglePlayServices.Wearable" Version="119.0.0.4" />
     </ItemGroup>
 
     <ItemGroup>

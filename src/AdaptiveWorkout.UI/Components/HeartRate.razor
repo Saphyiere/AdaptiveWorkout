@@ -1,5 +1,60 @@
-@* Live heart rate from the watch. Until the watch connection is built, it says so. *@
-<span class="caption inline">
-    <Icon Name="mark" Size="16" />
-    Heart rate shows here once the watch is connected
-</span>
+@implements IDisposable
+@inject WatchLink Watch
+@inject WorkoutFlow Flow
+@* Live heart rate from the watch. Without a recent reading, it offers to open the watch app again. *@
+@if (Watch.Latest is { } latest && DateTimeOffset.Now - latest.At < Recent)
+{
+    <span class="inline baseline heart-rate">
+        <Icon Name="mark" Size="18" Color="var(--accent)" />
+        <span class="number sm">@latest.Bpm</span>
+        <span class="unit">bpm</span>
+    </span>
+}
+else
+{
+    <div class="spread heart-rate">
+        <span class="caption inline">
+            <Icon Name="mark" Size="16" />
+            Waiting for the watch
+        </span>
+        <button type="button" class="btn" @onclick="OpenOnWatch">Open on watch</button>
+    </div>
+}
+
+@code {
+    // Readings come about once a second, so anything older means the watch stopped sending.
+    private static readonly TimeSpan Recent = TimeSpan.FromSeconds(15);
+    private readonly CancellationTokenSource stop = new();
+
+    protected override void OnInitialized()
+    {
+        Watch.Changed += OnChanged;
+
+        // New readings re-render on their own; this notices when they stop.
+        _ = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(stop.Token)) await InvokeAsync(StateHasChanged);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        });
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void OpenOnWatch()
+    {
+        if (Flow.Current is { } state) Watch.Open(state.Session);
+    }
+
+    public void Dispose()
+    {
+        Watch.Changed -= OnChanged;
+        stop.Cancel();
+        stop.Dispose();
+    }
+}

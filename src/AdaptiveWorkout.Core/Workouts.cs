@@ -105,6 +105,13 @@ public sealed class BodyWeightEntry
     public WeightUnit WeightUnit { get; set; }
 }
 
+/// <summary>One heart rate reading from the watch. Sessions, sets and rests find theirs by time.</summary>
+public sealed class HeartRateSample
+{
+    public DateTimeOffset At { get; set; }
+    public int Bpm { get; set; }
+}
+
 public sealed class AppSettings
 {
     public int CalorieGoal { get; set; } = 1800;

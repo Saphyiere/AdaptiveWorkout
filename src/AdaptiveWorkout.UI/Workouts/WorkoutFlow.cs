@@ -1,14 +1,15 @@
 using System.Diagnostics;
 using AdaptiveWorkout.Core;
 using AdaptiveWorkout.UI.Storage;
+using AdaptiveWorkout.UI.Watch;
 
 namespace AdaptiveWorkout.UI.Workouts;
 
 /// <summary>
 /// Starting, stopping and finishing. Every change updates the in-memory workout first, so the screen moves on at once,
-/// then saves in the background; the store keeps those saves in order.
+/// then saves in the background; the store keeps those saves in order. The watch app opens with a new workout and closes when it ends.
 /// </summary>
-public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings)
+public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchLink watch)
 {
     private Task? loading;
     private List<WorkoutSession> pastSessions = [];
@@ -32,6 +33,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings)
         var session = new WorkoutSession { TemplateId = templateId, StartedAt = DateTimeOffset.Now };
         Save(store.StartSessionAsync(session));
         Current = await CreateStateAsync(session, []);
+        watch.Open(session);
         if (Current.Next is { } first) StartSet(Current.Exercises[first.ExerciseId]);
     }
 
@@ -93,6 +95,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings)
         pastSessions.Add(state.Session);
         pastSets.AddRange(state.Sets);
         Current = null;
+        watch.Close();
     }
 
     /// <summary>Throws away a session that has no sets yet.</summary>
@@ -102,6 +105,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings)
 
         Save(store.DeleteSessionAsync(state.Session));
         Current = null;
+        watch.Close();
     }
 
     /// <summary>Creates (or links to) an exercise picked by name mid-workout.</summary>

@@ -14,7 +14,7 @@ src/
   AdaptiveWorkout.Core/     Business logic (plain .NET 10): rotation, next step, suggestions, history, consistency.
   AdaptiveWorkout.UI/       The app's screens (Razor) and storage (SQLite via Dapper). Any host can show them.
   AdaptiveWorkout.Phone/    Phone app: .NET MAUI Blazor Hybrid host for the UI, Android only.
-  AdaptiveWorkout.Watch/    Watch app: .NET for Android targeting Wear OS.
+  AdaptiveWorkout.Watch/    Watch app: .NET for Android targeting Wear OS. Shows heart rate and sends it to the phone.
 tests/
   AdaptiveWorkout.Core.Tests/   xUnit v3 tests for Core. Business logic only.
 artifacts/                  All bin/obj output (git-ignored, set in Directory.Build.props).
@@ -59,6 +59,17 @@ Galaxy Watch4 and newer run Wear OS, so they install apps over Wi-Fi with `adb`.
 
 Pairing is a one-time step. The connect port usually changes when the watch reboots or Wireless debugging is toggled, so check the screen and repeat `adb connect` when that happens.
 
+## Heart rate: first run
+
+The phone opens the watch app when a workout starts, and the watch sends heart rate back over the Wear OS Data Layer.
+
+1. Deploy both apps from the same PC. The Data Layer only connects apps with the same id and signing key, and Debug and Release builds on one PC both use its debug key. If you ever set up a release keystore, sign both apps with it.
+2. Turn Bluetooth back on on the phone after deploying to the watch: the watch and phone talk over that link.
+3. Open **AdaptiveWorkout** on the watch once by hand and allow heart rate and notifications. It shows your heart rate right away. Swipe it away when done.
+4. Start a workout on the phone. The watch wakes up on the heart rate screen, and within a few seconds the phone shows the bpm under the timer. **Finish** closes the watch app.
+
+If the watch doesn't open, it should at least show a "Workout started" notification; tap it. Then check the phone's log with `adb logcat -s AdaptiveWorkout`: `Opening the watch app: done` or `failed (n)` says what the watch's companion app answered. **Open on watch** on the phone tries again.
+
 If an Android build ever fails over output paths, temporarily remove the two artifacts lines in `Directory.Build.props` to rule out the `artifacts/` output folder.
 
 ## Design
@@ -66,7 +77,7 @@ If an Android build ever fails over output paths, temporarily remove the two art
 - Design system (colors, type, spacing, the mark and app icon): https://claude.ai/artifact/H9wJAoBQE834PEQ9qG4wmq
 - First-launch mockups (splash, first screen, app icon): https://claude.ai/artifact/EwspcKFgzTGB9FsPDC4RdC
 
-Black with one hot pink accent. The app icon and splash live in `src/AdaptiveWorkout.Phone/Resources` (SVG) and `src/AdaptiveWorkout.Watch/Resources/drawable` (vector drawables); the screens' CSS tokens are in `src/AdaptiveWorkout.UI/wwwroot/app.css`.
+Black with one hot pink accent. The app icon and splash live in `src/AdaptiveWorkout.Phone/Resources` (SVG) and `src/AdaptiveWorkout.Watch/Resources/drawable` (vector drawables); the screens' CSS tokens are in `src/AdaptiveWorkout.UI/wwwroot/app.css`. The watch screen uses the same colors (`Resources/values/colors.xml`) and display font, Archivo Expanded (SIL Open Font License, `src/AdaptiveWorkout.UI/wwwroot/fonts/OFL.txt`).
 
 ## Tests
 
@@ -86,17 +97,15 @@ Tests are only for business logic in `Core`: no UI, wording, or plumbing tests.
 
 | Option | Live? | Watch code? | Notes |
 |---|---|---|---|
-| Own watch app reads the HR sensor and sends it to the phone over the Wear OS Data Layer | Yes, about 1/sec | Yes (small) | The plan. Sensor via Android `SensorManager` (or the Health Services API, whose .NET binding is still prerelease); phone link via `Xamarin.GooglePlayServices.Wearable`. Both apps share an `ApplicationId` and signing key, which the Data Layer requires. |
+| Own watch app reads the HR sensor and sends it to the phone over the Wear OS Data Layer | Yes, about 1/sec | Yes (small) | **Built.** Sensor via Android `SensorManager` in a foreground service (Health Services' .NET binding is still prerelease); phone link via `Xamarin.GooglePlayServices.Wearable`. Both apps share an `ApplicationId` and signing key, which the Data Layer requires. The phone opens the watch app the way `RemoteActivityHelper` does (no .NET binding for it): a broadcast to the watch's companion app on the phone. |
 | Third-party watch app (e.g. *Heart for Bluetooth*) that makes the watch act like a Bluetooth chest strap; phone reads the standard BLE Heart Rate service | Yes | No | Fastest "just a connector". The phone code would also work with any HR strap. Depends on someone else's app. |
 | Health Connect on the phone (Samsung Health syncs into it) | No | No | Data arrives in batches, often roughly per minute and only after Samsung Health syncs. Fine for history, not for a live workout. |
 | Samsung Health Sensor SDK | Yes | Yes | Needs Samsung partner approval. Skip. |
 
-Heart rate permissions: Wear OS 6 (Android 16) replaces `BODY_SENSORS` with `android.permission.health.READ_HEART_RATE` for apps targeting API 36. This matters when the watch app starts reading heart rate.
+Heart rate permissions: Wear OS 6 (Android 16) replaces `BODY_SENSORS` with `android.permission.health.READ_HEART_RATE` for apps targeting API 36. The watch app declares both and asks for whichever the watch uses.
+
+`Xamarin.GooglePlayServices.Wearable` is pinned to 119.0.0.4 in both apps: newer versions pull in AndroidX libraries newer than MAUI 10's, and the phone build fails on duplicate classes.
 
 ## Next steps
 
-1. Get both hello worlds running on the real devices.
-2. Watch: read live heart rate and show it on the watch.
-3. Watch → phone: send readings over the Data Layer; phone shows them live.
-4. Decide what the workout logic actually is, and put it in `Core` with tests.
-5. Later: storage (local SQLite first; Google sign-in plus Firebase or Google Drive if cloud sync is wanted).
+See **Build order** in [docs/concept.md](docs/concept.md).

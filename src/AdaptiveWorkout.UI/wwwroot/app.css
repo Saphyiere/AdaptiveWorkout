@@ -386,6 +386,11 @@ h1:focus {
     color: var(--accent);
 }
 
+/* Live heart rate and its "Open on watch" fallback take the same height, so the screen doesn't jump when readings start. */
+.heart-rate {
+    min-height: 44px;
+}
+
 .note-accent {
     align-self: flex-start;
     padding: 6px 12px;
