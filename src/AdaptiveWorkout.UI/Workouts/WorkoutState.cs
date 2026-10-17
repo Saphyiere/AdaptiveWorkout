@@ -27,6 +27,18 @@ public sealed class WorkoutState
 
     public HashSet<long> Skipped { get; } = [];
 
+    /// <summary>Sets up to this order were entered at an earlier rest, or before the workout was reopened.</summary>
+    public int LoggedThrough { get; set; }
+
+    /// <summary>Sets saved on the current rest screen, by order.</summary>
+    public HashSet<int> Confirmed { get; } = [];
+
+    /// <summary>
+    /// What the rest screen asks for: weight sets stopped since the last rest and not saved yet. A superset round's sets
+    /// all wait for the rest after the round. Time sets need nothing; the stopwatch was the entry.
+    /// </summary>
+    public List<WorkoutSet> ToConfirm => [.. Sets.Where(s => s.StoppedAt is not null && s.Order > LoggedThrough && !Confirmed.Contains(s.Order) && Exercises[s.ExerciseId].Measure == ExerciseMeasure.Weight)];
+
     public string Name => Template?.Name ?? "Workout";
 
     public WorkoutSet? Running => Sets.Count > 0 && Sets[^1].StoppedAt is null ? Sets[^1] : null;

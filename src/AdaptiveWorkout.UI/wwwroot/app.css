@@ -525,6 +525,14 @@ a.card:active {
     accent-color: var(--accent);
 }
 
+/* Hit goal beside the +/− button on a rest screen entry. */
+.goal.compact {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    align-items: center;
+}
+
 /* Today */
 
 .week {
@@ -616,6 +624,11 @@ a.card:active {
 
 .screen {
     animation: enter 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* A card that takes another's place on the same screen, like the summary once every entry is saved. */
+.appear {
+    animation: enter 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .step {

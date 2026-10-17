@@ -1,0 +1,47 @@
+@inject WorkoutFlow Flow
+@inject AppSettings Settings
+@* One stopped set on the rest screen: weight, reps and Hit goal, pre-filled. Save (or Enter) tucks it into today's summary. *@
+
+@{
+    var exercise = State.Exercises[Set.ExerciseId];
+    var id = $"set-{Set.Order}";
+    var unit = Set.WeightUnit == WeightUnit.Kilograms ? "kg" : "lb";
+}
+<form class="card appear" aria-labelledby="@id-heading" @onsubmit="SaveAsync">
+    <h2 id="@id-heading" class="label">@exercise.Name · @WorkoutState.StepLabel(State.Describe(Set))</h2>
+    <div class="grid-2">
+        <div class="field-group">
+            <label class="field-label" for="@id-weight">Weight (@unit)</label>
+            <input id="@id-weight" class="field number-field" type="number" inputmode="decimal" step="any" placeholder="Bodyweight" @bind="Set.Weight" @bind:after="() => Flow.SaveSet(Set)" />
+        </div>
+        <div class="field-group">
+            <label class="field-label" for="@id-reps">Reps</label>
+            <input id="@id-reps" class="field number-field" type="number" inputmode="numeric" min="0" @bind="Set.Reps" @bind:after="() => Flow.SaveSet(Set)" />
+        </div>
+    </div>
+    <div class="inline">
+        <label class="goal compact">
+            <input type="checkbox" @bind="Set.HitGoal" @bind:after="() => Flow.SaveSet(Set)" />
+            <span class="row-text">
+                <span class="body strong">Hit goal</span>
+                <span class="caption">@(Set.Weight is double weight ? $"Next time starts at {SetSummary.WeightText(weight + Settings.HitGoalStep)} {unit}" : "Next time stays bodyweight")</span>
+            </span>
+        </label>
+        <button type="button" class="btn tall" aria-label="Switch between added and assisted weight" disabled="@(Set.Weight is null)" @onclick="() => { Set.Weight = -Set.Weight; Flow.SaveSet(Set); }">+/−</button>
+    </div>
+    <button type="submit" class="btn tall accent"><Icon Name="check" Size="18" Stroke="2" />Save</button>
+</form>
+
+@code {
+    [Parameter, EditorRequired] public WorkoutState State { get; set; } = default!;
+    [Parameter, EditorRequired] public WorkoutSet Set { get; set; } = default!;
+
+    /// <summary>Called after Save, so the rest screen re-renders without this entry.</summary>
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private Task SaveAsync()
+    {
+        Flow.ConfirmSet(Set);
+        return OnSaved.InvokeAsync();
+    }
+}

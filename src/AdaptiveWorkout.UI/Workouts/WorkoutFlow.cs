@@ -43,6 +43,14 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         if (Current is not { } state) return;
         if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
 
+        // Starting from a rest closes that rest's entries. The second half of a superset round doesn't, so the round is entered together.
+        var midRound = state.Next is { AfterBreak: false } next && next.ExerciseId == exercise.Id;
+        if (!midRound)
+        {
+            state.LoggedThrough = state.Sets.Count;
+            state.Confirmed.Clear();
+        }
+
         var thisSession = state.Sets.Where(s => s.ExerciseId == exercise.Id).ToList();
         var lastTime = state.History(exercise.Id).FirstOrDefault()?.Sets ?? [];
         var values = exercise.Measure == ExerciseMeasure.Weight ? SetSuggestion.For(thisSession, lastTime, settings.HitGoalStep) : null;
@@ -74,6 +82,24 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
 
     /// <summary>Saves edits to a set (weight, reps, hit goal).</summary>
     public void SaveSet(WorkoutSet set) => Save(store.UpdateSetAsync(set));
+
+    /// <summary>Saves a set entered on the rest screen; once every set there is saved, the rest screen shows today's summary.</summary>
+    public void ConfirmSet(WorkoutSet set)
+    {
+        if (Current is not { } state) return;
+
+        state.Confirmed.Add(set.Order);
+        Save(store.UpdateSetAsync(set));
+    }
+
+    /// <summary>Reopens this rest's entries. After a reopened workout, when nothing was entered at this rest, reopens the last set.</summary>
+    public void EditRound()
+    {
+        if (Current is not { } state) return;
+
+        if (state.Sets.All(s => s.Order <= state.LoggedThrough)) state.LoggedThrough = state.Sets.Count - 1;
+        state.Confirmed.Clear();
+    }
 
     public void Skip(long exerciseId)
     {
@@ -143,6 +169,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
             PastSessions = pastSessions,
             PastSets = pastSets,
             HitGoalStep = settings.HitGoalStep,
+            LoggedThrough = sets.Count,
         };
         state.Refresh();
         return state;

@@ -113,7 +113,7 @@ I can leave simple mode at any moment, like leaving full screen. **Advanced mode
      - `8 at 100 · 8 at 105 · 8 at 110`
    - the big **Stop** button
 2. **Stop** ends the set, and rest starts counting.
-3. **Break.** The rest timer, live heart rate, and the set's fields: weight and reps, pre-filled, both changeable on every set. Time exercises need nothing: the stopwatch was the duration. One big button names what's next: **Start set 3**, or **Start pull-ups**. Tapping it saves the set and starts the next one.
+3. **Break.** The rest timer, live heart rate, and an entry for each set since the last rest (one, or both halves of a superset round): weight, reps and **Hit goal**, pre-filled, each with its own **Save** (Enter works too). Time exercises need nothing: the stopwatch was the duration. Once every entry is saved, the break becomes a plain rest screen: **Today so far**, every exercise done in this workout in short form (`3 × 10 at 100`), with **Edit** to reopen the entries. One big button at the bottom names what's next: **Start set 3**, or **Start pull-ups**. It only starts the next set; anything not saved yet keeps what's in its fields.
 4. **Finish workout** is always reachable, in every state.
 
 No rest countdown for now; a rest target may come later.
@@ -122,7 +122,7 @@ No rest countdown for now; a rest target may come later.
 
 The app is suggestive, especially in simple mode:
 - Weight and reps pre-fill from the previous set in this session; the first set of an exercise pre-fills from the first set the last time I did it.
-- **Hit goal:** every break screen has a **Hit goal** checkbox. Next time, that exercise's first set suggests the weight of the set I marked plus 5 (in that set's unit), and the following sets pre-fill from it as usual. Assisted weights move toward less assistance (−40 becomes −35); bodyweight stays bodyweight.
+- **Hit goal:** every set's entry on the break screen has a **Hit goal** checkbox. Next time, that exercise's first set suggests the weight of the set I marked plus 5 (in that set's unit), and the following sets pre-fill from it as usual. Assisted weights move toward less assistance (−40 becomes −35); bodyweight stays bodyweight.
 
 ### Next-step rules
 
@@ -142,7 +142,7 @@ Every tap has to feel instant. The open workout lives in memory: Stop, Start and
 
 ### Supersets
 
-My back days are almost all supersets: a back exercise paired with a triceps exercise, like pull-ups and dips. Inside a superset there is no break: Stop on pull-ups goes straight to logging them and **Start dips**. The break comes after each round. The sets are stored like any other, in the order I did them; only the template knows which exercises are grouped. The gap between the two halves is still measured.
+My back days are almost all supersets: a back exercise paired with a triceps exercise, like pull-ups and dips. Inside a superset there is no break and nothing to fill in: Stop on pull-ups shows **Start dips** and what dips were last time. The break comes after each round, and that's where both halves are entered. The sets are stored like any other, in the order I did them; only the template knows which exercises are grouped. The gap between the two halves is still measured.
 
 **(later)** Other patterns, like many sets of one rep, are just many sets; nothing special is needed.
 

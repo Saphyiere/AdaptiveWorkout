@@ -1,6 +1,5 @@
 @page "/workout"
 @inject WorkoutFlow Flow
-@inject AppSettings Settings
 @inject NavigationManager Nav
 
 <PageTitle>@(state?.Name ?? "Workout")</PageTitle>
@@ -55,17 +54,29 @@
         }
         else if (state.ToLog is { } logged)
         {
-            var exercise = state.Exercises[logged.ExerciseId];
-            var step = state.Describe(logged);
             var handoff = state.Next is { AfterBreak: false };
+            var toConfirm = state.ToConfirm;
             <div class="step" @key="@($"break-{logged.Order}")">
-                @if (handoff)
+                @if (handoff && state.Next is { } next)
                 {
+                    @* Mid-superset: straight on to the other half. Both are entered at the rest after the round. *@
+                    var exercise = state.Exercises[logged.ExerciseId];
+                    var nextExercise = state.Exercises[next.ExerciseId];
+                    var last = state.History(next.ExerciseId).FirstOrDefault();
                     <div class="stack">
-                        <p class="label live">@WorkoutState.StepLabel(step)</p>
+                        <p class="label live">@WorkoutState.StepLabel(state.Describe(logged))</p>
                         <h1 class="title">@exercise.Name done</h1>
-                        <p class="caption">No break inside a superset. Rest comes after the round.</p>
+                        <p class="caption">@TimeText.Format(logged.StoppedAt!.Value - logged.StartedAt!.Value) · No break inside a superset. You'll enter the round at the rest.</p>
+                        <HeartRate />
                     </div>
+
+                    <section class="card" aria-labelledby="next-heading">
+                        <h2 id="next-heading" class="label">Up next</h2>
+                        <div class="spread baseline">
+                            <span class="body strong">@nextExercise.Name</span>
+                            <span class="caption tabular">@(last is null ? "First time" : $"Last: {SetSummary.Format(last.Sets, nextExercise.Measure)}")</span>
+                        </div>
+                    </section>
                 }
                 else
                 {
@@ -74,54 +85,36 @@
                         <Clock Since="logged.StoppedAt!.Value" Class="number lg" />
                         <HeartRate />
                     </div>
-                }
 
-                <section class="card" aria-labelledby="log-heading">
-                    <h2 id="log-heading" class="label">@exercise.Name · @WorkoutState.StepLabel(step)</h2>
-                    @if (exercise.Measure == ExerciseMeasure.Weight)
+                    @foreach (var set in toConfirm)
                     {
-                        <div class="grid-2">
-                            <div class="field-group">
-                                <label class="field-label" for="weight">Weight (@Unit(logged.WeightUnit))</label>
-                                <input id="weight" class="field number-field" type="number" inputmode="decimal" step="any" placeholder="Bodyweight" @bind="logged.Weight" @bind:after="() => Flow.SaveSet(logged)" />
-                            </div>
-                            <div class="field-group">
-                                <label class="field-label" for="reps">Reps</label>
-                                <input id="reps" class="field number-field" type="number" inputmode="numeric" min="0" @bind="logged.Reps" @bind:after="() => Flow.SaveSet(logged)" />
-                            </div>
-                        </div>
-                        <div class="spread">
-                            <p class="caption">Empty weight is bodyweight. Negative is assisted.</p>
-                            <button type="button" class="btn" disabled="@(logged.Weight is null)" @onclick="() => { logged.Weight = -logged.Weight; Flow.SaveSet(logged); }">+/−</button>
-                        </div>
+                        <SetEntry State="state" Set="set" OnSaved="() => { }" @key="set.Order" />
                     }
-                    else
-                    {
-                        <div class="spread baseline">
-                            <span class="field-label">Time</span>
-                            <span class="number sm">@TimeText.Format(TimeSpan.FromSeconds(logged.DurationSeconds ?? 0))</span>
-                        </div>
-                    }
-                    <div class="goal">
-                        <input id="hit-goal" type="checkbox" @bind="logged.HitGoal" @bind:after="() => Flow.SaveSet(logged)" />
-                        <label for="hit-goal" class="row-text">
-                            <span class="body strong">Hit goal</span>
-                            <span class="caption">@(exercise.Measure == ExerciseMeasure.Weight && logged.Weight is double weight ? $"Next time this exercise starts at {SetSummary.WeightText(weight + Settings.HitGoalStep)} {Unit(logged.WeightUnit)}." : "Marks this set as a goal hit.")</span>
-                        </label>
-                    </div>
-                </section>
 
-                @if (handoff && state.Next is { } next)
-                {
-                    var nextExercise = state.Exercises[next.ExerciseId];
-                    var last = state.History(next.ExerciseId).FirstOrDefault();
-                    <section class="card" aria-labelledby="next-heading">
-                        <h2 id="next-heading" class="label">Up next</h2>
-                        <div class="spread baseline">
-                            <span class="body strong">@nextExercise.Name</span>
-                            <span class="caption tabular">@(last is null ? "First time" : $"Last: {SetSummary.Format(last.Sets, nextExercise.Measure)}")</span>
-                        </div>
-                    </section>
+                    @if (toConfirm.Count == 0)
+                    {
+                        @* Everything entered: the rest screen becomes a look at the whole workout so far. *@
+                        <section class="card appear" aria-labelledby="today-heading">
+                            <div class="spread">
+                                <h2 id="today-heading" class="label">Today so far</h2>
+                                <button type="button" class="btn" @onclick="Flow.EditRound">Edit</button>
+                            </div>
+                            @foreach (var exerciseSets in state.Sets.Where(s => s.StoppedAt is not null).GroupBy(s => s.ExerciseId))
+                            {
+                                var exercise = state.Exercises[exerciseSets.Key];
+                                <div class="row-text">
+                                    <span class="body strong inline">
+                                        @exercise.Name
+                                        @if (exerciseSets.Any(s => s.HitGoal))
+                                        {
+                                            <Icon Name="check" Size="16" Stroke="2" Color="var(--accent)" />
+                                        }
+                                    </span>
+                                    <span class="caption tabular">@SetSummary.Format([.. exerciseSets], exercise.Measure)</span>
+                                </div>
+                            }
+                        </section>
+                    }
                 }
 
                 <div class="push-down">
