@@ -28,7 +28,7 @@ public sealed class SessionTemplate
     public int Order { get; set; }
 }
 
-/// <summary>One exercise in a session template, in order.</summary>
+/// <summary>One exercise in a plan, in order: a session template's, or one workout's own copy of it.</summary>
 public sealed class TemplateExercise
 {
     public long Id { get; set; }

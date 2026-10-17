@@ -130,11 +130,23 @@ What the big button offers after each set:
 
 1. If the template entry has a set count, move on after that many sets.
 2. Else, if I've done this exercise before, move on after as many sets as last time.
-3. Else, offer another set, with a second button to **move on to the next exercise**, or to **finish the workout** when it's the last one.
+3. Else, offer another set, with a second button to **move on to the next exercise**, or to **finish the workout** when it's the last one. Such an exercise is done once a later one in the plan had a set after its last.
 
 In a superset, the next step alternates through its exercises (pull-ups, dips, pull-ups, dips…) and a round counts as one set of each.
 
-When nothing planned is left, the big button is **Finish workout**. When just tracking, the break screen always offers **Different exercise** and **Finish workout** under the big button.
+When nothing planned is left, the big button is **Finish workout**, with **Add more** under it. When just tracking, the break screen always offers **Different exercise** and **Finish workout** under the big button.
+
+### Changing today's workout
+
+Machines are taken all the time, so a workout never has to follow its session exactly. Each workout gets its own copy of the session's exercises when it starts; changing it never touches the session.
+
+**Change** sits on the set screen and next to "Next:" on the break screen. It opens for that exercise:
+
+- **Do another one first:** any exercise still to do. The changed one waits and comes right after (the bench is taken, so incline first; the pulldown is taken, so skull crushers, then back to the pulldown). A superset moves as a whole, and at the start of a round either half can go first.
+- **Swap it for** any other exercise, today only, keeping its spot, sets and superset.
+- **Drop it today** (no dip station at this gym: the superset becomes just pull-ups, with the same rounds). There's no skip button anywhere else; changing the plan should take a deliberate step.
+
+From the set screen, the running set starts over as the new exercise. **Add more**, once everything planned is done, adds a whole other session (an ab session after the bike) or one exercise after everything else.
 
 ### Speed
 
@@ -229,6 +241,7 @@ A weigh-in whenever I step on the scale, charted over time.
 Routine            Id, Name
 SessionTemplate    Id, RoutineId, Name, Order
 TemplateExercise   TemplateId, ExerciseId, Order, PlannedSets (optional), SupersetGroup (optional)
+SessionExercise    SessionId, ExerciseId, Order, PlannedSets, SupersetGroup   (the workout's own copy, changed as it goes)
 Session            Id, TemplateId (empty = just tracking), StartedAt, FinishedAt, LoggedAfterward
 Exercise           Id, Name (unique, ignoring case and extra spaces), Measure (Weight | Time)
 Set                Id, SessionId, ExerciseId, Order,

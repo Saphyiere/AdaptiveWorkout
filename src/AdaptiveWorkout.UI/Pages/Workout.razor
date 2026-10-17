@@ -18,7 +18,10 @@
             @* Keyed by the set, so each new step is a fresh element and its entrance animation plays. *@
             <div class="step" @key="@($"running-{running.Order}")">
                 <div class="stack">
-                    <p class="label @(step.SupersetRound is null ? "" : "live")">@WorkoutState.StepLabel(step)</p>
+                    <div class="spread">
+                        <p class="label @(step.SupersetRound is null ? "" : "live")">@WorkoutState.StepLabel(step)</p>
+                        <a class="btn" href="workout/change">Change</a>
+                    </div>
                     <h1 class="title">@exercise.Name</h1>
                     @if (state.SuggestionFor(firstToday)?.RaisedForGoal == true)
                     {

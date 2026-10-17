@@ -6,12 +6,7 @@
 
 @if (state is not null)
 {
-    var key = ExerciseNames.Key(query);
-    var sessionStarts = state.PastSessions.ToDictionary(s => s.Id, s => s.StartedAt);
-    var remainingPlan = state.Plan.Select(e => state.Exercises[e.ExerciseId]).Where(e => state.Sets.All(s => s.ExerciseId != e.Id)).ToList();
-    var doneBefore = state.PastSets.Where(s => s.SessionId != state.Session.Id && remainingPlan.All(e => e.Id != s.ExerciseId)).GroupBy(s => s.ExerciseId)
-        .OrderByDescending(g => g.Max(s => sessionStarts[s.SessionId])).Select(g => state.Exercises[g.Key]).ToList();
-    var isNew = key.Length > 0 && state.Exercises.Values.All(e => ExerciseNames.Key(e.Name) != key);
+    var stillToDo = state.StillToDo().Select(id => state.Exercises[id]).ToList();
     <div class="screen tight">
         <header class="inline">
             @if (state.Sets.Count == 0)
@@ -25,62 +20,27 @@
             <h1 class="title small">@(state.Sets.Count == 0 ? "First exercise" : "Different exercise")</h1>
         </header>
 
-        <div class="field-group">
-            <label class="field-label" for="exercise-name">Exercise</label>
-            <input id="exercise-name" class="field" placeholder="Type a name" autocomplete="off" @bind="query" @bind:event="oninput" />
-        </div>
+        <ExercisePicker State="state" OnPick="Start" Exclude="@stillToDo.Select(e => e.Id).ToHashSet()" NewAction="Start set">
+            <BeforeTyping>
+                @if (stillToDo.Count > 0)
+                {
+                    <h2 class="label">Still to do in @state.Name</h2>
+                    <ExerciseList Exercises="stillToDo" State="state" OnPick="Start" />
+                }
+            </BeforeTyping>
+        </ExercisePicker>
 
-        @if (key.Length == 0)
+        @if (state.Sets.Count == 0)
         {
-            @if (remainingPlan.Count > 0)
-            {
-                <h2 class="label">Still to do in @state.Name</h2>
-                <ExerciseList Exercises="remainingPlan" State="state" OnPick="Start" />
-            }
-            @if (doneBefore.Count > 0)
-            {
-                <h2 class="label">Done before</h2>
-                <ExerciseList Exercises="doneBefore.Take(8).ToList()" State="state" OnPick="Start" />
-            }
-        }
-        else
-        {
-            var matches = state.Exercises.Values.Where(e => ExerciseNames.Key(e.Name).Contains(key)).OrderBy(e => e.Name).Take(8).ToList();
-            @if (matches.Count > 0)
-            {
-                <h2 class="label">Matches</h2>
-                <ExerciseList Exercises="matches" State="state" OnPick="Start" />
-            }
-            @if (isNew)
-            {
-                <h2 class="label">New exercise</h2>
-                <section class="card">
-                    <p class="body strong">“@ExerciseNames.Clean(query)”</p>
-                    <div class="segmented" role="group" aria-label="Track by">
-                        <button type="button" aria-pressed="@(measure == ExerciseMeasure.Weight ? "true" : "false")" @onclick="() => measure = ExerciseMeasure.Weight">Weight and reps</button>
-                        <button type="button" aria-pressed="@(measure == ExerciseMeasure.Time ? "true" : "false")" @onclick="() => measure = ExerciseMeasure.Time">Time</button>
-                    </div>
-                </section>
-            }
-        }
-
-        <div class="push-down">
-            @if (isNew)
-            {
-                <button type="button" class="btn-primary big" @onclick="StartNewAsync">Start set</button>
-            }
-            @if (state.Sets.Count == 0)
-            {
+            <div class="push-down">
                 <button type="button" class="btn-ghost" @onclick="Cancel">Cancel workout</button>
-            }
-        </div>
+            </div>
+        }
     </div>
 }
 
 @code {
     private WorkoutState? state;
-    private string query = "";
-    private ExerciseMeasure measure = ExerciseMeasure.Weight;
 
     protected override async Task OnInitializedAsync()
     {
@@ -94,8 +54,6 @@
         Flow.StartSet(exercise);
         Nav.NavigateTo("workout");
     }
-
-    private async Task StartNewAsync() => Start(await Flow.GetOrCreateExerciseAsync(query, measure));
 
     private void Cancel()
     {

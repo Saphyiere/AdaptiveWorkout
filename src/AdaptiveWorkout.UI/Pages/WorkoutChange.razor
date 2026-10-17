@@ -1,0 +1,75 @@
+@page "/workout/change"
+@inject WorkoutFlow Flow
+@inject NavigationManager Nav
+
+<PageTitle>Change</PageTitle>
+
+@if (state?.ChangeTarget is long targetId)
+{
+    var target = state.Exercises[targetId];
+    // Mid-round, the rest of the superset was just done, so starting the round with one of them is no longer a choice.
+    var midRound = state.Running is null && state.Next is { AfterBreak: false };
+    var partners = WorkoutPlan.Blocks(state.Plan).Find(b => b.Any(e => e.ExerciseId == targetId))?.Select(e => e.ExerciseId).ToHashSet() ?? [];
+    var others = state.StillToDo().Where(id => id != targetId && !(midRound && partners.Contains(id))).Select(id => state.Exercises[id]).ToList();
+    <div class="screen tight">
+        <header class="inline">
+            <a class="icon-btn" href="workout" aria-label="Close"><Icon Name="close" /></a>
+            <div class="row-text">
+                <p class="label">Today only</p>
+                <h1 class="title small">Change @target.Name</h1>
+            </div>
+        </header>
+        <p class="caption">@(state.Running is null ? "The session itself stays as it is." : "The running set starts over as whatever you pick. The session itself stays as it is.")</p>
+
+        @if (others.Count > 0)
+        {
+            <section class="stack" aria-labelledby="first-heading">
+                <div class="row-text">
+                    <h2 id="first-heading" class="label">Do another one first</h2>
+                    <p class="caption">@target.Name waits until it's done.</p>
+                </div>
+                <ExerciseList Exercises="others" State="state" OnPick="DoFirst" />
+            </section>
+        }
+
+        <section class="stack" aria-labelledby="swap-heading">
+            <h2 id="swap-heading" class="label">Swap @target.Name for</h2>
+            <ExercisePicker State="state" OnPick="Swap" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="swap-name" Label="Another exercise" NewAction="Swap it in" />
+        </section>
+
+        @if (state.Plan.Any(e => e.ExerciseId == targetId))
+        {
+            <div class="push-down">
+                <button type="button" class="btn-ghost" @onclick="Drop">Drop @target.Name today</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private WorkoutState? state;
+
+    protected override async Task OnInitializedAsync()
+    {
+        state = Flow.Current ?? await Flow.LoadAsync();
+        if (state?.ChangeTarget is null) Nav.NavigateTo(state is null ? "" : "workout", replace: true);
+    }
+
+    private void DoFirst(Exercise exercise)
+    {
+        Flow.DoFirst(exercise);
+        Nav.NavigateTo("workout");
+    }
+
+    private void Swap(Exercise exercise)
+    {
+        Flow.SwapFor(exercise);
+        Nav.NavigateTo("workout");
+    }
+
+    private void Drop()
+    {
+        Flow.Drop();
+        Nav.NavigateTo("workout");
+    }
+}

@@ -23,6 +23,7 @@ public sealed class WorkoutStore(string databasePath)
         CREATE TABLE IF NOT EXISTS FoodEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Calories INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS BodyWeightEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Weight REAL NOT NULL, WeightUnit INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS HeartRateSample (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Bpm INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS SessionExercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, SessionId INTEGER NOT NULL REFERENCES WorkoutSession (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, PlannedSets INTEGER, SupersetGroup INTEGER);
         """;
 
     private readonly string connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString();
@@ -102,6 +103,22 @@ public sealed class WorkoutStore(string databasePath)
     {
         set.SessionId = session.Id;
         set.Id = await c.ExecuteScalarAsync<long>("""INSERT INTO WorkoutSet (SessionId, ExerciseId, "Order", StartedAt, StoppedAt, Weight, WeightUnit, Reps, DurationSeconds, HitGoal) VALUES (@SessionId, @ExerciseId, @Order, @StartedAt, @StoppedAt, @Weight, @WeightUnit, @Reps, @DurationSeconds, @HitGoal); SELECT last_insert_rowid();""", set);
+    });
+
+    /// <summary>Removes a set, e.g. one started on an exercise that was changed before it was done. Its Id is read when this runs.</summary>
+    public Task DeleteSetAsync(WorkoutSet set) => RunAsync(c => c.ExecuteAsync("DELETE FROM WorkoutSet WHERE Id = @Id", set));
+
+    /// <summary>A workout's own plan, copied from its template when it started and changed as it went; empty when none was saved.</summary>
+    public Task<List<TemplateExercise>> GetSessionPlanAsync(long sessionId) => RunAsync(async c =>
+        (await c.QueryAsync<TemplateExercise>("""SELECT ExerciseId, "Order", PlannedSets, SupersetGroup FROM SessionExercise WHERE SessionId = @sessionId ORDER BY "Order" """, new { sessionId })).AsList());
+
+    /// <summary>Replaces a workout's own plan. The session may still be waiting to be saved; its Id is read when this runs.</summary>
+    public Task SaveSessionPlanAsync(WorkoutSession session, IReadOnlyList<TemplateExercise> plan) => RunAsync(async c =>
+    {
+        await using var transaction = (SqliteTransaction)await c.BeginTransactionAsync();
+        await c.ExecuteAsync("DELETE FROM SessionExercise WHERE SessionId = @Id", session, transaction);
+        await c.ExecuteAsync("""INSERT INTO SessionExercise (SessionId, ExerciseId, "Order", PlannedSets, SupersetGroup) VALUES (@SessionId, @ExerciseId, @Order, @PlannedSets, @SupersetGroup)""", plan.Select(e => new { SessionId = session.Id, e.ExerciseId, e.Order, e.PlannedSets, e.SupersetGroup }), transaction);
+        await transaction.CommitAsync();
     });
 
     public Task UpdateSetAsync(WorkoutSet set) => RunAsync(c =>

@@ -32,7 +32,9 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
 
         var session = new WorkoutSession { TemplateId = templateId, StartedAt = DateTimeOffset.Now };
         Save(store.StartSessionAsync(session));
-        Current = await CreateStateAsync(session, []);
+        var plan = templateId is long id ? PlanEdits.Copy(await store.GetTemplateExercisesAsync(id)) : [];
+        Save(store.SaveSessionPlanAsync(session, plan));
+        Current = await CreateStateAsync(session, [], plan);
         watch.Open(session);
         if (Current.Next is { } first) StartSet(Current.Exercises[first.ExerciseId]);
     }
@@ -143,6 +145,51 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Save(store.DeleteSessionAsync(session));
     }
 
+    /// <summary>Does another exercise first; the one Change was opened on waits until it's done. Today's plan only.</summary>
+    public void DoFirst(Exercise exercise)
+    {
+        if (Current is not { ChangeTarget: long target } state) return;
+
+        ChangePlan(state, PlanEdits.DoFirst(state.Plan, exercise.Id, target), exercise);
+    }
+
+    /// <summary>Puts another exercise in place of the one Change was opened on, today only. One already further on in the plan moves up instead.</summary>
+    public void SwapFor(Exercise exercise)
+    {
+        if (Current is not { ChangeTarget: long target } state) return;
+
+        state.Exercises.TryAdd(exercise.Id, exercise);
+        var inPlan = state.Plan.Any(e => e.ExerciseId == exercise.Id);
+        ChangePlan(state, inPlan ? PlanEdits.Drop(PlanEdits.DoFirst(state.Plan, exercise.Id, target), target) : PlanEdits.Swap(state.Plan, target, exercise.Id), exercise);
+    }
+
+    /// <summary>Leaves the exercise Change was opened on out of today's workout.</summary>
+    public void Drop()
+    {
+        if (Current is not { ChangeTarget: long target } state) return;
+
+        ChangePlan(state, PlanEdits.Drop(state.Plan, target), null);
+    }
+
+    /// <summary>Adds an exercise after everything else in today's plan.</summary>
+    public void AddExercise(Exercise exercise)
+    {
+        if (Current is not { } state) return;
+
+        state.Exercises.TryAdd(exercise.Id, exercise);
+        ChangePlan(state, PlanEdits.Append(state.Plan, [new TemplateExercise { ExerciseId = exercise.Id }]), null);
+    }
+
+    /// <summary>Adds a whole session's exercises after everything else in today's plan; the workout keeps its name.</summary>
+    public async Task AddSessionAsync(long templateId)
+    {
+        if (Current is not { } state) return;
+
+        var entries = await store.GetTemplateExercisesAsync(templateId);
+        foreach (var exercise in await store.GetExercisesAsync()) state.Exercises.TryAdd(exercise.Id, exercise);
+        ChangePlan(state, PlanEdits.Append(state.Plan, entries), null);
+    }
+
     /// <summary>Creates (or links to) an exercise picked by name mid-workout.</summary>
     public Task<Exercise> GetOrCreateExerciseAsync(string name, ExerciseMeasure measure) => store.GetOrCreateExerciseAsync(name, measure);
 
@@ -153,17 +200,42 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         var open = sessions.LastOrDefault(s => s.FinishedAt is null);
         pastSessions = [.. sessions.Where(s => s != open)];
         pastSets = [.. sets.Where(s => s.SessionId != open?.Id)];
-        if (open is not null) Current = await CreateStateAsync(open, [.. sets.Where(s => s.SessionId == open.Id)]);
+        if (open is null) return;
+
+        // A workout started before workouts kept their own plan follows its template.
+        var plan = await store.GetSessionPlanAsync(open.Id);
+        if (plan.Count == 0 && open.TemplateId is long templateId) plan = PlanEdits.Copy(await store.GetTemplateExercisesAsync(templateId));
+        Current = await CreateStateAsync(open, [.. sets.Where(s => s.SessionId == open.Id)], plan);
     }
 
-    private async Task<WorkoutState> CreateStateAsync(WorkoutSession session, List<WorkoutSet> sets)
+    // Replaces today's plan and saves it. A running set belonged to the exercise that changed, so it's thrown away and
+    // `startNow` (or, after Drop, whatever comes next) starts in its place.
+    private void ChangePlan(WorkoutState state, List<TemplateExercise> plan, Exercise? startNow)
+    {
+        var running = state.Running;
+        if (running is not null)
+        {
+            state.Sets.Remove(running);
+            Save(store.DeleteSetAsync(running));
+        }
+
+        state.Plan = plan;
+        state.Refresh();
+        Save(store.SaveSessionPlanAsync(state.Session, plan));
+        if (running is null) return;
+
+        var next = startNow ?? (state.Next is { } step ? state.Exercises[step.ExerciseId] : null);
+        if (next is not null) StartSet(next);
+    }
+
+    private async Task<WorkoutState> CreateStateAsync(WorkoutSession session, List<WorkoutSet> sets, List<TemplateExercise> plan)
     {
         var template = session.TemplateId is long templateId ? await store.GetTemplateAsync(templateId) : null;
         var state = new WorkoutState
         {
             Session = session,
             Template = template,
-            Plan = template is null ? [] : await store.GetTemplateExercisesAsync(template.Id),
+            Plan = plan,
             Exercises = (await store.GetExercisesAsync()).ToDictionary(e => e.Id),
             Sets = sets,
             PastSessions = pastSessions,

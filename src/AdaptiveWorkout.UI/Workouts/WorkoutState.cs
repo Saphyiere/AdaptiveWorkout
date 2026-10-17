@@ -11,8 +11,8 @@ public sealed class WorkoutState
     public required WorkoutSession Session { get; init; }
     public SessionTemplate? Template { get; init; }
 
-    /// <summary>The template's exercises; empty when just tracking.</summary>
-    public required IReadOnlyList<TemplateExercise> Plan { get; init; }
+    /// <summary>This workout's own plan: a copy of the template's exercises, changed as it goes. Empty when just tracking.</summary>
+    public required List<TemplateExercise> Plan { get; set; }
 
     public required Dictionary<long, Exercise> Exercises { get; init; }
 
@@ -57,6 +57,13 @@ public sealed class WorkoutState
 
     /// <summary>True when <see cref="Next"/> is open-ended and starts a new round, so the screen also offers to move on.</summary>
     public bool CanMoveOn { get; private set; }
+
+    /// <summary>The exercise Change applies to: the running set's, else the next step's.</summary>
+    public long? ChangeTarget => Running?.ExerciseId ?? Next?.ExerciseId;
+
+    /// <summary>Exercises still to do in the plan, in order, supersets together.</summary>
+    public List<long> StillToDo() =>
+        [.. WorkoutPlan.Open(Plan, [.. Sets.Where(s => s.StoppedAt is not null)], setsLastTime, Skipped).SelectMany(o => o.Members).Select(e => e.ExerciseId)];
 
     /// <summary>Recomputes what comes next. Called after every change.</summary>
     public void Refresh()

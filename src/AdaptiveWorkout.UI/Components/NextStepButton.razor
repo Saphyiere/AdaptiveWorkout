@@ -6,7 +6,17 @@
 {
     var exercise = State.Exercises[next.ExerciseId];
     var sameExercise = State.ToLog?.ExerciseId == next.ExerciseId;
-    <p class="caption center">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+    @if (State.Plan.Count > 0)
+    {
+        <div class="spread">
+            <p class="caption">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+            <a class="btn" href="workout/change">Change</a>
+        </div>
+    }
+    else
+    {
+        <p class="caption center">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+    }
     <button type="button" class="btn-primary big" @onclick="() => Start(exercise)">@(sameExercise ? $"Start set {next.SetNumber}" : $"Start {exercise.Name}")</button>
 
     @if (State.Plan.Count == 0)
@@ -23,13 +33,17 @@
     }
     else if (State.CanMoveOn)
     {
-        <button type="button" class="btn tall" @onclick="OnFinish">Finish workout</button>
+        <div class="grid-2">
+            <a class="btn tall" href="workout/add">Add more</a>
+            <button type="button" class="btn tall" @onclick="OnFinish">Finish workout</button>
+        </div>
     }
 }
 else
 {
     <p class="caption center">Every planned exercise is done.</p>
     <button type="button" class="btn-primary big" @onclick="OnFinish">Finish workout</button>
+    <a class="btn tall" href="workout/add">Add more</a>
 }
 
 @code {

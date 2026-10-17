@@ -1,0 +1,71 @@
+@inject WorkoutFlow Flow
+@* Finding an exercise by name: recent ones until I type, then matches, and a new one when nothing has that name. *@
+
+@{
+    var key = ExerciseNames.Key(query);
+}
+<div class="field-group">
+    <label class="field-label" for="@Id">@Label</label>
+    <input id="@Id" class="field" placeholder="Type a name" autocomplete="off" @bind="query" @bind:event="oninput" />
+</div>
+
+@if (key.Length == 0)
+{
+    @BeforeTyping
+    @if (recent.Count > 0)
+    {
+        <h2 class="label">Done before</h2>
+        <ExerciseList Exercises="recent" State="State" OnPick="OnPick" />
+    }
+}
+else
+{
+    var matches = State.Exercises.Values.Where(e => ExerciseNames.Key(e.Name).Contains(key)).OrderBy(e => e.Name).Take(8).ToList();
+    @if (matches.Count > 0)
+    {
+        <h2 class="label">Matches</h2>
+        <ExerciseList Exercises="matches" State="State" OnPick="OnPick" />
+    }
+    @if (State.Exercises.Values.All(e => ExerciseNames.Key(e.Name) != key))
+    {
+        <h2 class="label">New exercise</h2>
+        <section class="card">
+            <p class="body strong">“@ExerciseNames.Clean(query)”</p>
+            <div class="segmented" role="group" aria-label="Track by">
+                <button type="button" aria-pressed="@(measure == ExerciseMeasure.Weight ? "true" : "false")" @onclick="() => measure = ExerciseMeasure.Weight">Weight and reps</button>
+                <button type="button" aria-pressed="@(measure == ExerciseMeasure.Time ? "true" : "false")" @onclick="() => measure = ExerciseMeasure.Time">Time</button>
+            </div>
+            <button type="button" class="btn tall accent" @onclick="PickNewAsync">@NewAction</button>
+        </section>
+    }
+}
+
+@code {
+    private string query = "";
+    private ExerciseMeasure measure = ExerciseMeasure.Weight;
+    private List<Exercise> recent = [];
+
+    [Parameter, EditorRequired] public WorkoutState State { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCallback<Exercise> OnPick { get; set; }
+
+    /// <summary>Exercises left out of the recent list, e.g. ones the page lists above it.</summary>
+    [Parameter] public IReadOnlyCollection<long> Exclude { get; set; } = [];
+
+    [Parameter] public string Id { get; set; } = "exercise-name";
+    [Parameter] public string Label { get; set; } = "Exercise";
+
+    /// <summary>The button that creates a new exercise and picks it, e.g. "Start set".</summary>
+    [Parameter] public string NewAction { get; set; } = "Pick";
+
+    /// <summary>Shown above the recent exercises until something is typed.</summary>
+    [Parameter] public RenderFragment? BeforeTyping { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var sessionStarts = State.PastSessions.ToDictionary(s => s.Id, s => s.StartedAt);
+        recent = [.. State.PastSets.Where(s => !Exclude.Contains(s.ExerciseId) && sessionStarts.ContainsKey(s.SessionId)).GroupBy(s => s.ExerciseId)
+            .OrderByDescending(g => g.Max(s => sessionStarts[s.SessionId])).Select(g => State.Exercises[g.Key]).Take(8)];
+    }
+
+    private async Task PickNewAsync() => await OnPick.InvokeAsync(await Flow.GetOrCreateExerciseAsync(query, measure));
+}

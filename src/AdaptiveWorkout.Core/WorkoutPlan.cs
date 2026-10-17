@@ -15,27 +15,31 @@ public static class WorkoutPlan
     /// An exercise moves on after its planned sets, else after as many sets as last time; without either it offers another set
     /// until I move past it. Superset members alternate, and a round counts as one set of each.
     /// </summary>
-    /// <param name="plan">The session template's exercises; empty when just tracking.</param>
+    /// <param name="plan">The workout's plan: its own copy of the session template, changed as it goes. Empty when just tracking.</param>
     /// <param name="done">This session's finished sets, in order.</param>
     /// <param name="setsLastTime">Per exercise, how many sets I did the last time.</param>
     /// <param name="skipped">Exercises skipped in advanced mode.</param>
     public static PlanStep? Next(IReadOnlyList<TemplateExercise> plan, IReadOnlyList<WorkoutSet> done, IReadOnlyDictionary<long, int> setsLastTime, IReadOnlyCollection<long> skipped)
     {
+        if (plan.Count > 0) return Open(plan, done, setsLastTime, skipped).Select(o => o.Step).FirstOrDefault();
+        if (done.Count == 0) return null;
+
+        // Last time's count is shown only until I pass it; without a plan there's nothing to move on to.
+        var lastExerciseId = done[^1].ExerciseId;
+        var setNumber = done.Count(s => s.ExerciseId == lastExerciseId) + 1;
+        int? lastTimeCount = setsLastTime.GetValueOrDefault(lastExerciseId) is var count && count >= setNumber ? count : null;
+        return new PlanStep(lastExerciseId, setNumber, lastTimeCount, null, true);
+    }
+
+    /// <summary>The plan's blocks that aren't done yet, in order, each with its next step: everything still to do, by <see cref="Next"/>'s rules.</summary>
+    public static IEnumerable<(List<TemplateExercise> Members, PlanStep Step)> Open(IReadOnlyList<TemplateExercise> plan, IReadOnlyList<WorkoutSet> done, IReadOnlyDictionary<long, int> setsLastTime, IReadOnlyCollection<long> skipped)
+    {
         var doneCounts = done.GroupBy(s => s.ExerciseId).ToDictionary(g => g.Key, g => g.Count());
-
-        if (plan.Count == 0)
-        {
-            if (done.Count == 0) return null;
-
-            // Last time's count is shown only until I pass it; without a plan there's nothing to move on to.
-            var lastExerciseId = done[^1].ExerciseId;
-            var setNumber = doneCounts[lastExerciseId] + 1;
-            int? lastTimeCount = setsLastTime.GetValueOrDefault(lastExerciseId) is var count && count >= setNumber ? count : null;
-            return new PlanStep(lastExerciseId, setNumber, lastTimeCount, null, true);
-        }
+        var lastDone = new Dictionary<long, int>();
+        for (var k = 0; k < done.Count; k++) lastDone[done[k].ExerciseId] = k;
 
         var blocks = Blocks(plan);
-        var furthestStarted = blocks.FindLastIndex(b => b.Any(e => doneCounts.ContainsKey(e.ExerciseId)));
+        var blockLastDone = blocks.Select(b => b.Max(e => lastDone.GetValueOrDefault(e.ExerciseId, -1))).ToList();
         for (var i = 0; i < blocks.Count; i++)
         {
             var members = blocks[i].Where(e => !skipped.Contains(e.ExerciseId)).ToList();
@@ -46,16 +50,14 @@ public static class WorkoutPlan
             int? target = blocks[i][0].PlannedSets ?? (mostLastTime > 0 ? mostLastTime : null);
             if (target is int planned && counts.All(c => c >= planned)) continue;
 
-            // Without a count, an exercise is done once I've moved on to a later one.
-            if (target is null && counts.Any(c => c > 0) && i < furthestStarted) continue;
+            // Without a count, an exercise is done once I've moved on: a later one in the plan had a set after its last.
+            if (target is null && blockLastDone[i] >= 0 && blockLastDone.Skip(i + 1).Any(k => k > blockLastDone[i])) continue;
 
             var fewest = counts.Min();
             var nextIndex = counts.IndexOf(fewest);
             var isSuperset = blocks[i].Count > 1;
-            return new PlanStep(members[nextIndex].ExerciseId, fewest + 1, target, isSuperset ? fewest + 1 : null, !isSuperset || nextIndex == 0);
+            yield return (members, new PlanStep(members[nextIndex].ExerciseId, fewest + 1, target, isSuperset ? fewest + 1 : null, !isSuperset || nextIndex == 0));
         }
-
-        return null;
     }
 
     /// <summary>The plan in order, one block per exercise or superset.</summary>
