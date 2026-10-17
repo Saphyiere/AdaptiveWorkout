@@ -194,6 +194,23 @@ h1:focus {
     letter-spacing: -0.04em;
 }
 
+/* "Rest 0:48": the word sits on the timer's baseline. */
+.rest-time {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 12px;
+}
+
+.rest-label {
+    font-family: var(--font-display);
+    font-size: 32px;
+    line-height: 36px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink-muted);
+}
+
 .number.md {
     font-size: 40px;
     line-height: 44px;

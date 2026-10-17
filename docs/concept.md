@@ -116,7 +116,7 @@ I can leave simple mode at any moment, like leaving full screen. **Advanced mode
 3. **Break.** The rest timer, live heart rate, and an entry for each set since the last rest (one, or both halves of a superset round): weight, reps and **Hit goal**, pre-filled, each with its own **Save** (Enter works too). Time exercises need nothing: the stopwatch was the duration. Once every entry is saved, the break becomes a plain rest screen: **Today so far**, every exercise done in this workout in short form (`3 × 10 at 100`), with **Edit** to reopen the entries. One big button at the bottom names what's next: **Start set 3**, or **Start pull-ups**. It only starts the next set; anything not saved yet keeps what's in its fields.
 4. **Finish workout** is always reachable, in every state.
 
-No rest countdown for now; a rest target may come later.
+The break screen reads **Rest 0:48**: the word big beside the timer, counting up. **(later)** An optional rest target turns it into a countdown that alerts me when it's up and moves on to the next set by itself.
 
 ### Pre-filled and suggested values
 
@@ -257,7 +257,7 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 - Goals and suggestions: a target per exercise (sets × reps), "try 105 today".
 - Choosing which "better" signal leads.
 - Weekday schedules for routines.
-- Rest timer targets.
+- Rest timer targets: an option that counts down, alerts, and starts the next set.
 - More exercise measures (distance, reps only).
 - A categorized exercise picker.
 - Macros.

@@ -81,8 +81,10 @@
                 else
                 {
                     <div class="stack">
-                        <p class="label">Rest</p>
-                        <Clock Since="logged.StoppedAt!.Value" Class="number lg" />
+                        <div class="rest-time">
+                            <span class="rest-label">Rest</span>
+                            <Clock Since="logged.StoppedAt!.Value" Class="number lg" />
+                        </div>
                         <HeartRate />
                     </div>
 
