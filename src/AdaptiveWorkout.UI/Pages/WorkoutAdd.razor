@@ -56,8 +56,7 @@
             return;
         }
 
-        var routine = await Store.GetRoutineAsync();
-        foreach (var template in routine is null ? [] : await Store.GetTemplatesAsync(routine.Id)) sessions.Add((template, (await Store.GetTemplateExercisesAsync(template.Id)).Count));
+        foreach (var template in await Store.GetTemplatesAsync()) sessions.Add((template, (await Store.GetTemplateExercisesAsync(template.Id)).Count));
     }
 
     private async Task AddSessionAsync(SessionTemplate template)

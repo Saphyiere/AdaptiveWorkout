@@ -28,8 +28,8 @@ Build the foundation first, then add on.
 
 | Word | Meaning |
 |---|---|
-| Routine | A named rotation of sessions, e.g. "Standard workout". |
-| Session template | One named day in a routine, e.g. "Back day", with its exercises in order. |
+| Routine | A named week, e.g. "Six-day split": a session or a rest day for each day. One is in use, or none. |
+| Session template | A named list of exercises in order, e.g. "Back day". Any routine can use it on any days. |
 | Session | One actual workout, from tapping Start to Finish workout. May come from a template or be "just tracking". |
 | Exercise | A name I've typed, measured by **weight** (weight × reps) or by **time**. Variations are separate exercises: "flat chest press", "flat chest press dumbbells", "flat chest press machine". More measures can come later. |
 | Set | One bout of an exercise: when it started and stopped, and what I did (weight × reps, or a duration). A 20-minute bike ride without stopping is one set. |
@@ -41,10 +41,10 @@ Build the foundation first, then add on.
 
 The home screen answers the three questions at a glance. **(proposed)**
 
-- **Gym today:** done or not yet, plus this week's gym days (e.g. Mon, Wed, Thu). Tapping it opens **History**.
+- **Gym today:** done, not yet, or **rest day**, plus this week's gym days (e.g. Mon, Wed, Thu) with the routine's rest days marked, and the streak. Tapping it opens **History**.
 - **Calories:** eaten today against 1,800, with a quick add. **Edit** lists today's entries, each deletable.
 - **Body weight:** the latest weigh-in and its trend, with a quick add. **Edit** lists the last 10 weigh-ins, each deletable.
-- The big button: **Start Back day** (the next session in the rotation).
+- The big button: **Start Back day** (today's session in the routine). On a rest day, or once today is done, it reads **Start a workout** and opens the session picker.
 
 Every delete asks once (Keep or Delete) before anything is gone.
 
@@ -56,30 +56,28 @@ Every finished workout, newest first and grouped by month: its name, date, lengt
 
 ### Start workout
 
-The big button names the next session in the rotation: **Start Back day**. One tap starts it.
+The big button names today's session in the routine: **Start Back day**. One tap starts it.
 
-Next to it, one step away:
-- **Pick a different session** from the routine.
+Next to it, one step away (**Other session**), the session picker:
+- **The routine in use** at the top, with its week; tap it to switch routines or edit one.
+- **Any session**, whatever the routine says (today's is marked).
 - **Just track:** a session with no template; pick or create exercises as I go.
-- **New routine or session:** type the routine's name, add sessions by name, and list each session's exercises (below).
+- **New session:** name it and list its exercises (below).
 
-With no routine yet, the button reads **Start workout** and starts a "just track" session; creating a routine is offered alongside.
+With no routine, the button reads **Start a workout** and opens the picker, and **Set up a routine** sits under it.
 
 The session's clock starts the moment I tap it. With a template, it goes straight to the first exercise (e.g. "Overhand rows") and its first set starts.
 
 While a workout is open, the session picker shows it at the top with **Resume**, **Finish** and **Cancel session**. Cancel deletes the workout and its sets, after asking once.
 
-### Rotation
+### Routines
 
-A routine is an ordered list of sessions, for example Push, Pull, Legs. The big button suggests the one after the last session I **finished**, wrapping around:
+A routine plans the week: each day has a session or is a rest day. Monday to Saturday with a different session each day and Sunday off is one routine; a five-day week is another. Sessions don't belong to a routine, so the same Chest day can sit in several, on any days.
 
-| Last finished | Suggested next |
-|---|---|
-| Push | Pull |
-| Pull | Legs |
-| Legs | Push |
-
-It ignores weekdays: skip three days and it still suggests Legs after Pull. Nothing is ever "missed"; the next session simply waits. Doing a different session is always allowed, and the next suggestion follows whatever I actually finished.
+- One routine is **in use**, or none. Switching is one tap in the routines list; editing a routine changes its name and days, and can put it in use.
+- Today's session comes from the routine in use. Doing a different session is always allowed.
+- **Rest days are part of the plan:** Today says so, and they never break the streak.
+- **No routine** is fine too: any day can be a gym day, and the streak counts weeks.
 
 ### Listing a session's exercises
 
@@ -195,8 +193,8 @@ Sets vary (3 × 10 one day, 5 × 5 another, 2 × 6 then 2 × 12 at a lower weigh
 ## Consistency
 
 Derived from session dates alone:
-- gym days per week, and weeks in a row with at least one gym day
-- for a routine, how many of its sessions I did each week
+- gym days per week, out of the routine's planned days
+- the streak: with a routine, gym days in a row, where a planned day I skipped ends it, rest days never do, a workout on one still counts, and today only counts once I've been; with no routine, weeks in a row with at least one gym day
 - for time exercises like walking: total time per day and per week
 
 ## Weight
@@ -239,7 +237,9 @@ A weigh-in whenever I step on the scale, charted over time.
 
 ```
 Routine            Id, Name
-SessionTemplate    Id, RoutineId, Name, Order
+RoutineDay         RoutineId, Day (Monday 0 to Sunday 6), TemplateId (empty = rest day)
+SessionTemplate    Id, Name, Order
+Setting            Key, Value                    (the routine in use)
 TemplateExercise   TemplateId, ExerciseId, Order, PlannedSets (optional), SupersetGroup (optional)
 SessionExercise    SessionId, ExerciseId, Order, PlannedSets, SupersetGroup   (the workout's own copy, changed as it goes)
 Session            Id, TemplateId (empty = just tracking), StartedAt, FinishedAt, LoggedAfterward
@@ -269,7 +269,6 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 
 - Goals and suggestions: a target per exercise (sets × reps), "try 105 today".
 - Choosing which "better" signal leads.
-- Weekday schedules for routines.
 - Rest timer targets: an option that counts down, alerts, and starts the next set.
 - More exercise measures (distance, reps only).
 - A categorized exercise picker.

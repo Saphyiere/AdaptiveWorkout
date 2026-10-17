@@ -12,18 +12,17 @@ public enum WeightUnit
     Kilograms = 1,
 }
 
-/// <summary>A named rotation of session templates, e.g. "Standard workout".</summary>
+/// <summary>A named week of sessions, e.g. "Six-day split": each day has a session or is a rest day. Swap routines any time, or follow none.</summary>
 public sealed class Routine
 {
     public long Id { get; set; }
     public string Name { get; set; } = "";
 }
 
-/// <summary>One named day in a routine, e.g. "Back day".</summary>
+/// <summary>A named list of exercises, e.g. "Back day". Any number of routines can use it, on any days.</summary>
 public sealed class SessionTemplate
 {
     public long Id { get; set; }
-    public long RoutineId { get; set; }
     public string Name { get; set; } = "";
     public int Order { get; set; }
 }

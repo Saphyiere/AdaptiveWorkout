@@ -5,13 +5,13 @@
 
 <PageTitle>@(Id is null ? "New session" : "Edit session")</PageTitle>
 
-@if (routine is not null)
+@if (loaded)
 {
     <div class="screen tight">
         <header class="inline">
             <a class="icon-btn" href="sessions" aria-label="Back to sessions"><Icon Name="back" /></a>
             <div class="row-text">
-                <p class="label">@routine.Name</p>
+                <p class="label">Session</p>
                 <h1 class="title small">@(Id is null ? "New session" : "Edit session")</h1>
             </div>
         </header>
@@ -124,7 +124,7 @@
 }
 
 @code {
-    private Routine? routine;
+    private bool loaded;
     private SessionTemplate template = new();
     private string name = "";
     private List<Entry> entries = [];
@@ -136,12 +136,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        routine = await Store.GetRoutineAsync();
-        if (routine is null) { Nav.NavigateTo("sessions", replace: true); return; }
-
         exercises = await Store.GetExercisesAsync();
         template = Id is long id ? await Store.GetTemplateAsync(id) ?? new() : new();
-        template.RoutineId = routine.Id;
         name = template.Name;
 
         IReadOnlyList<TemplateExercise> saved = template.Id == 0 ? [] : await Store.GetTemplateExercisesAsync(template.Id);
@@ -151,6 +147,7 @@
             PlannedSets = e.PlannedSets,
             LinkedToNext = e.SupersetGroup is not null && i < saved.Count - 1 && saved[i + 1].SupersetGroup == e.SupersetGroup,
         })];
+        loaded = true;
     }
 
     private void Move(int index, int offset)

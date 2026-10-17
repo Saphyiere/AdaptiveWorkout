@@ -1,0 +1,121 @@
+@page "/routines/new"
+@page "/routines/{Id:long}"
+@inject WorkoutStore Store
+@inject NavigationManager Nav
+
+<PageTitle>@(Id is null ? "New routine" : "Edit routine")</PageTitle>
+
+@if (loaded)
+{
+    <div class="screen tight">
+        <header class="inline">
+            <a class="icon-btn" href="routines" aria-label="Back to routines"><Icon Name="back" /></a>
+            <h1 class="title small">@(Id is null ? "New routine" : "Edit routine")</h1>
+        </header>
+
+        <div class="field-group">
+            <label class="field-label" for="routine-name">Routine name</label>
+            <input id="routine-name" class="field" placeholder="Six-day split" @bind="name" @bind:event="oninput" />
+        </div>
+
+        <section class="stack" aria-labelledby="week-heading">
+            <h2 id="week-heading" class="label">The week</h2>
+            @if (templates.Count == 0)
+            {
+                <p class="caption">No sessions yet. <a class="link" href="sessions/new">Make one first</a>, then pick it for its days here.</p>
+            }
+            <div class="list">
+                @for (var i = 0; i < 7; i++)
+                {
+                    var day = i;
+                    <div class="row">
+                        <label class="row-text" for="day-@day"><span class="body strong">@Schedule.Name(day)</span></label>
+                        <select id="day-@day" class="field" @bind="week[day]">
+                            <option value="">Rest day</option>
+                            @foreach (var template in templates)
+                            {
+                                <option value="@template.Id">@template.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+            </div>
+            <p class="caption">The same session can be on several days, and in other routines too.</p>
+        </section>
+
+        <label class="goal">
+            <input type="checkbox" @bind="use" />
+            <span class="row-text">
+                <span class="body strong">Use this routine</span>
+                <span class="caption">Today, its Start button and the streak follow it.</span>
+            </span>
+        </label>
+
+        <div class="push-down">
+            <button type="button" class="btn-primary" disabled="@string.IsNullOrWhiteSpace(name)" @onclick="SaveAsync">Save routine</button>
+            @if (routine.Id != 0)
+            {
+                @if (deleting)
+                {
+                    <div class="card">
+                        <p class="body strong">Delete @routine.Name?</p>
+                        <p class="caption">Its sessions and your workouts stay.</p>
+                        <div class="grid-2">
+                            <button type="button" class="btn tall" @onclick="() => deleting = false">Keep it</button>
+                            <button type="button" class="btn tall accent" @onclick="DeleteAsync">Delete</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <button type="button" class="btn-ghost" @onclick="() => deleting = true">Delete routine</button>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool loaded;
+    private Routine routine = new();
+    private string name = "";
+    private long?[] week = new long?[7];
+    private bool use;
+    private bool deleting;
+    private IReadOnlyList<SessionTemplate> templates = [];
+
+    [Parameter] public long? Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        templates = await Store.GetTemplatesAsync();
+        var active = await Store.GetActiveRoutineAsync();
+        if (Id is long id)
+        {
+            routine = (await Store.GetRoutinesAsync()).FirstOrDefault(r => r.Id == id) ?? new();
+            week = routine.Id == 0 ? week : await Store.GetRoutineWeekAsync(routine.Id);
+        }
+
+        name = routine.Name;
+        // A new routine is usually meant to be followed; an existing one is in use if it already was.
+        use = routine.Id == 0 || active?.Id == routine.Id || active is null;
+        loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        routine.Name = name.Trim();
+        await Store.SaveRoutineAsync(routine, week);
+        if (use) await Store.SetActiveRoutineAsync(routine.Id);
+        else if ((await Store.GetActiveRoutineAsync())?.Id == routine.Id) await Store.SetActiveRoutineAsync(null);
+        Nav.NavigateTo("routines");
+    }
+
+    private async Task DeleteAsync()
+    {
+        await Store.DeleteRoutineAsync(routine);
+        Nav.NavigateTo("routines");
+    }
+}

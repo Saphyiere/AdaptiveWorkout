@@ -22,7 +22,7 @@
             <div class="spread">
                 <h2 id="gym-heading" class="label">Gym today</h2>
                 <span class="inline">
-                    <span class="pill @(wentToday ? "accent" : "")">@(openSession is not null ? "In progress" : wentToday ? "Done" : "Not yet")</span>
+                    <span class="pill @(wentToday ? "accent" : "")">@(openSession is not null ? "In progress" : wentToday ? "Done" : restDay ? "Rest day" : "Not yet")</span>
                     <Icon Name="forward" Size="18" Color="var(--ink-muted)" />
                 </span>
             </div>
@@ -31,11 +31,16 @@
                 {
                     var date = monday.AddDays(i);
                     var isToday = date == today;
+                    var isRest = planned && routineWeek![i] is null;
                     <div class="day @(isToday ? "today" : "")">
-                        <span class="dot @(week[i] ? "done" : isToday ? "ring" : "")">
+                        <span class="dot @(week[i] ? "done" : isRest ? "rest" : isToday ? "ring" : "")">
                             @if (week[i])
                             {
                                 <Icon Name="check" Size="16" Color="var(--on-accent)" Stroke="2.5" />
+                            }
+                            else if (isRest)
+                            {
+                                <Icon Name="minus" Size="14" Color="var(--ink-muted)" />
                             }
                         </span>
                         <span>@date.ToString("ddd", CultureInfo.CurrentCulture)[..1]<span class="sr-only">@date.ToString("dddd", CultureInfo.CurrentCulture)@(week[i] ? ", gym day" : "")</span></span>
@@ -150,8 +155,23 @@
         </section>
 
         <div class="push-down">
+            @if (openSession is null && (wentToday || restDay))
+            {
+                <p class="caption center">@(wentToday ? "Done for today." : "Rest day. The streak keeps going.")</p>
+            }
             <button type="button" class="btn-primary" @onclick="StartAsync">@startLabel</button>
-            <a class="btn-ghost" href="sessions">@(routine is null ? "Set up a routine" : "Other session")</a>
+            @if (routine is null)
+            {
+                <a class="btn-ghost" href="routines">Set up a routine</a>
+            }
+            else if (!planned)
+            {
+                <a class="btn-ghost" href="routines/@routine.Id">Plan your week</a>
+            }
+            else if (openSession is null && todayTemplate is not null && !wentToday)
+            {
+                <a class="btn-ghost" href="sessions">Other session</a>
+            }
         </div>
     </div>
 }
@@ -163,7 +183,10 @@
     private bool[] week = new bool[7];
     private bool wentToday;
     private Routine? routine;
-    private SessionTemplate? nextTemplate;
+    private long?[]? routineWeek;
+    private bool planned;
+    private bool restDay;
+    private SessionTemplate? todayTemplate;
     private WorkoutSession? openSession;
     private int eaten;
     private int left;
@@ -195,18 +218,25 @@
         var sessions = await Store.GetSessionsAsync();
         var gymDays = sessions.Select(s => DateOnly.FromDateTime(s.StartedAt.DateTime)).ToList();
         week = Consistency.Week(gymDays, today);
-        var streak = Consistency.WeekStreak(gymDays, today);
-        var gymDaysThisWeek = week.Count(d => d);
-        weekText = gymDaysThisWeek == 0 ? "No gym days yet this week" : $"{gymDaysThisWeek} gym {(gymDaysThisWeek == 1 ? "day" : "days")} this week";
-        if (streak > 0) weekText += $" · {streak}-week streak";
         wentToday = gymDays.Contains(today);
         openSession = (await Flow.LoadAsync())?.Session;
 
-        routine = await Store.GetRoutineAsync();
-        IReadOnlyList<SessionTemplate> templates = routine is null ? [] : await Store.GetTemplatesAsync(routine.Id);
-        nextTemplate = Rotation.Next(templates, sessions);
-        var openName = templates.FirstOrDefault(t => t.Id == openSession?.TemplateId)?.Name ?? "workout";
-        startLabel = openSession is not null ? $"Resume {openName}" : nextTemplate is not null ? $"Start {nextTemplate.Name}" : "Start workout";
+        // The routine in use plans each day; without one (or with an empty week) any day is a gym day, counted by weeks.
+        routine = await Store.GetActiveRoutineAsync();
+        routineWeek = routine is null ? null : await Store.GetRoutineWeekAsync(routine.Id);
+        planned = routineWeek?.Any(d => d is not null) == true;
+        var templates = (await Store.GetTemplatesAsync()).ToDictionary(t => t.Id);
+        todayTemplate = planned && Schedule.On(routineWeek!, today) is long todayId ? templates.GetValueOrDefault(todayId) : null;
+        restDay = planned && Schedule.On(routineWeek!, today) is null;
+
+        var gymDaysThisWeek = week.Count(d => d);
+        var streak = planned ? Consistency.DayStreak(gymDays, routineWeek!, today) : Consistency.WeekStreak(gymDays, today);
+        var plannedDays = routineWeek?.Count(d => d is not null) ?? 0;
+        weekText = planned ? $"{gymDaysThisWeek} of {plannedDays} gym days this week" : gymDaysThisWeek == 0 ? "No gym days yet this week" : $"{gymDaysThisWeek} gym {(gymDaysThisWeek == 1 ? "day" : "days")} this week";
+        if (streak > 0) weekText += planned ? $" · {streak}-day streak" : $" · {streak}-week streak";
+
+        var openName = openSession?.TemplateId is long openId ? templates.GetValueOrDefault(openId)?.Name : null;
+        startLabel = openSession is not null ? $"Resume {openName ?? "workout"}" : todayTemplate is not null && !wentToday ? $"Start {todayTemplate.Name}" : "Start a workout";
 
         var food = await Store.GetFoodSinceAsync(now.AddDays(-2));
         todayFood = [.. food.Where(f => DateOnly.FromDateTime(f.At.DateTime) == today)];
@@ -268,7 +298,13 @@
 
     private async Task StartAsync()
     {
-        if (openSession is null) await Flow.StartSessionAsync(nextTemplate?.Id);
+        if (openSession is null && (todayTemplate is null || wentToday))
+        {
+            Nav.NavigateTo("sessions");
+            return;
+        }
+
+        if (openSession is null) await Flow.StartSessionAsync(todayTemplate!.Id);
         Nav.NavigateTo("workout");
     }
 }

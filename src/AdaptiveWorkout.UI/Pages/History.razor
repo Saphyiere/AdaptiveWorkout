@@ -56,8 +56,7 @@
     {
         sessions = [.. (await Store.GetSessionsAsync()).Where(s => s.FinishedAt is not null).OrderByDescending(s => s.StartedAt)];
         setCounts = (await Store.GetSetsAsync()).GroupBy(s => s.SessionId).ToDictionary(g => g.Key, g => g.Count());
-        var routine = await Store.GetRoutineAsync();
-        templateNames = routine is null ? [] : (await Store.GetTemplatesAsync(routine.Id)).ToDictionary(t => t.Id, t => t.Name);
+        templateNames = (await Store.GetTemplatesAsync()).ToDictionary(t => t.Id, t => t.Name);
         loaded = true;
     }
 

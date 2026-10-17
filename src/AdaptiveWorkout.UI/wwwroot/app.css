@@ -404,6 +404,32 @@ h1:focus {
     color: var(--accent);
 }
 
+/* A routine's week on the session picker: each day, then its session. */
+.week-plan {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: var(--space-2);
+    row-gap: 4px;
+    align-items: baseline;
+}
+
+.week-plan .today {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* A day of the week and what's planned for it, in the routine editor. */
+.row select.field {
+    width: 60%;
+    flex-shrink: 0;
+}
+
+/* A link inside text. */
+a.link {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 /* A card that opens another screen. */
 a.card:active {
     background-color: var(--surface-raised);
@@ -586,6 +612,11 @@ a.card:active {
 
 .dot.done {
     background: var(--accent);
+}
+
+/* A rest day in the routine: nothing to miss. */
+.dot.rest {
+    background: transparent;
 }
 
 .dot.ring {

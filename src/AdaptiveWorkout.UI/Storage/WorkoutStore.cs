@@ -15,7 +15,9 @@ public sealed class WorkoutStore(string databasePath)
 {
     private const string Schema = """
         CREATE TABLE IF NOT EXISTS Routine (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS SessionTemplate (Id INTEGER PRIMARY KEY AUTOINCREMENT, RoutineId INTEGER NOT NULL REFERENCES Routine (Id), Name TEXT NOT NULL, "Order" INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS SessionTemplate (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, "Order" INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS RoutineDay (RoutineId INTEGER NOT NULL REFERENCES Routine (Id) ON DELETE CASCADE, Day INTEGER NOT NULL, TemplateId INTEGER REFERENCES SessionTemplate (Id), PRIMARY KEY (RoutineId, Day));
+        CREATE TABLE IF NOT EXISTS Setting (Key TEXT PRIMARY KEY, Value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS Exercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, NameKey TEXT NOT NULL UNIQUE, Measure INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS TemplateExercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, TemplateId INTEGER NOT NULL REFERENCES SessionTemplate (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, PlannedSets INTEGER, SupersetGroup INTEGER);
         CREATE TABLE IF NOT EXISTS WorkoutSession (Id INTEGER PRIMARY KEY AUTOINCREMENT, TemplateId INTEGER REFERENCES SessionTemplate (Id), StartedAt TEXT NOT NULL, FinishedAt TEXT, LoggedAfterward INTEGER NOT NULL DEFAULT 0);
@@ -25,6 +27,21 @@ public sealed class WorkoutStore(string databasePath)
         CREATE TABLE IF NOT EXISTS HeartRateSample (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Bpm INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS SessionExercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, SessionId INTEGER NOT NULL REFERENCES WorkoutSession (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, PlannedSets INTEGER, SupersetGroup INTEGER);
         """;
+
+    // Sessions used to belong to one routine; now a routine's days point at them. SQLite can't drop a column a foreign key
+    // uses, so the table is rebuilt with foreign keys off for the copy (ids stay, so everything pointing at sessions still does).
+    private const string SessionsWithoutRoutine = """
+        PRAGMA foreign_keys = OFF;
+        BEGIN;
+        CREATE TABLE SessionTemplate_new (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, "Order" INTEGER NOT NULL);
+        INSERT INTO SessionTemplate_new (Id, Name, "Order") SELECT Id, Name, "Order" FROM SessionTemplate;
+        DROP TABLE SessionTemplate;
+        ALTER TABLE SessionTemplate_new RENAME TO SessionTemplate;
+        COMMIT;
+        PRAGMA foreign_keys = ON;
+        """;
+
+    private const string ActiveRoutineKey = "ActiveRoutineId";
 
     private readonly string connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString();
     private readonly Lock laneGate = new();
@@ -39,28 +56,59 @@ public sealed class WorkoutStore(string databasePath)
         SqlMapper.AddTypeHandler(new DateTimeOffsetHandler());
     }
 
-    public Task<Routine?> GetRoutineAsync() => RunAsync(c => c.QueryFirstOrDefaultAsync<Routine?>("SELECT Id, Name FROM Routine ORDER BY Id LIMIT 1"));
+    public Task<List<Routine>> GetRoutinesAsync() => RunAsync(async c => (await c.QueryAsync<Routine>("SELECT Id, Name FROM Routine ORDER BY Name")).AsList());
 
-    public Task<Routine> CreateRoutineAsync(string name) => RunAsync(async c =>
+    /// <summary>The routine in use, or null when I'm not following one.</summary>
+    public Task<Routine?> GetActiveRoutineAsync() => RunAsync(c =>
+        c.QueryFirstOrDefaultAsync<Routine?>("SELECT r.Id, r.Name FROM Routine r JOIN Setting s ON s.Key = @ActiveRoutineKey AND CAST(s.Value AS INTEGER) = r.Id", new { ActiveRoutineKey }));
+
+    /// <summary>Follows a routine from now on; null follows none.</summary>
+    public Task SetActiveRoutineAsync(long? routineId) => RunAsync(c => routineId is long id
+        ? c.ExecuteAsync("INSERT INTO Setting (Key, Value) VALUES (@ActiveRoutineKey, @id) ON CONFLICT (Key) DO UPDATE SET Value = excluded.Value", new { ActiveRoutineKey, id })
+        : c.ExecuteAsync("DELETE FROM Setting WHERE Key = @ActiveRoutineKey", new { ActiveRoutineKey }));
+
+    /// <summary>A routine's week, Monday first: each day's session, or null for a rest day.</summary>
+    public Task<long?[]> GetRoutineWeekAsync(long routineId) => RunAsync(async c =>
     {
-        var id = await c.ExecuteScalarAsync<long>("INSERT INTO Routine (Name) VALUES (@name); SELECT last_insert_rowid();", new { name });
-        return new Routine { Id = id, Name = name };
+        var week = new long?[7];
+        foreach (var (day, templateId) in await c.QueryAsync<(int, long?)>("SELECT Day, TemplateId FROM RoutineDay WHERE RoutineId = @routineId", new { routineId })) week[day] = templateId;
+        return week;
     });
 
-    public Task<List<SessionTemplate>> GetTemplatesAsync(long routineId) => RunAsync(async c =>
-        (await c.QueryAsync<SessionTemplate>("""SELECT Id, RoutineId, Name, "Order" FROM SessionTemplate WHERE RoutineId = @routineId ORDER BY "Order" """, new { routineId })).AsList());
+    /// <summary>Saves a routine's name and week (Monday first, null for rest days); a new routine gets its Id.</summary>
+    public Task SaveRoutineAsync(Routine routine, IReadOnlyList<long?> week) => RunAsync(async c =>
+    {
+        await using var transaction = (SqliteTransaction)await c.BeginTransactionAsync();
+        if (routine.Id == 0) routine.Id = await c.ExecuteScalarAsync<long>("INSERT INTO Routine (Name) VALUES (@Name); SELECT last_insert_rowid();", routine, transaction);
+        else await c.ExecuteAsync("UPDATE Routine SET Name = @Name WHERE Id = @Id", routine, transaction);
+
+        await c.ExecuteAsync("DELETE FROM RoutineDay WHERE RoutineId = @Id", routine, transaction);
+        await c.ExecuteAsync("INSERT INTO RoutineDay (RoutineId, Day, TemplateId) VALUES (@RoutineId, @Day, @TemplateId)", week.Select((templateId, day) => new { RoutineId = routine.Id, Day = day, TemplateId = templateId }), transaction);
+        await transaction.CommitAsync();
+    });
+
+    /// <summary>Deletes a routine; its sessions stay. If it was in use, no routine is.</summary>
+    public Task DeleteRoutineAsync(Routine routine) => RunAsync(async c =>
+    {
+        await c.ExecuteAsync("DELETE FROM Setting WHERE Key = @ActiveRoutineKey AND CAST(Value AS INTEGER) = @Id", new { ActiveRoutineKey, routine.Id });
+        await c.ExecuteAsync("DELETE FROM Routine WHERE Id = @Id", routine);
+    });
+
+    /// <summary>Every session, whichever routines use them.</summary>
+    public Task<List<SessionTemplate>> GetTemplatesAsync() => RunAsync(async c =>
+        (await c.QueryAsync<SessionTemplate>("""SELECT Id, Name, "Order" FROM SessionTemplate ORDER BY "Order", Id""")).AsList());
 
     public Task<SessionTemplate?> GetTemplateAsync(long id) => RunAsync(c =>
-        c.QueryFirstOrDefaultAsync<SessionTemplate?>("""SELECT Id, RoutineId, Name, "Order" FROM SessionTemplate WHERE Id = @id""", new { id }));
+        c.QueryFirstOrDefaultAsync<SessionTemplate?>("""SELECT Id, Name, "Order" FROM SessionTemplate WHERE Id = @id""", new { id }));
 
     public Task<List<TemplateExercise>> GetTemplateExercisesAsync(long templateId) => RunAsync(async c =>
         (await c.QueryAsync<TemplateExercise>("""SELECT Id, TemplateId, ExerciseId, "Order", PlannedSets, SupersetGroup FROM TemplateExercise WHERE TemplateId = @templateId ORDER BY "Order" """, new { templateId })).AsList());
 
-    /// <summary>Saves a template's name and replaces its exercise list. A new template goes last in its routine.</summary>
+    /// <summary>Saves a template's name and replaces its exercise list. A new template goes last.</summary>
     public Task SaveTemplateAsync(SessionTemplate template, IReadOnlyList<TemplateExercise> entries) => RunAsync(async c =>
     {
         await using var transaction = (SqliteTransaction)await c.BeginTransactionAsync();
-        if (template.Id == 0) template.Id = await c.ExecuteScalarAsync<long>("""INSERT INTO SessionTemplate (RoutineId, Name, "Order") VALUES (@RoutineId, @Name, (SELECT COALESCE(MAX("Order"), -1) + 1 FROM SessionTemplate WHERE RoutineId = @RoutineId)); SELECT last_insert_rowid();""", template, transaction);
+        if (template.Id == 0) template.Id = await c.ExecuteScalarAsync<long>("""INSERT INTO SessionTemplate (Name, "Order") VALUES (@Name, (SELECT COALESCE(MAX("Order"), -1) + 1 FROM SessionTemplate)); SELECT last_insert_rowid();""", template, transaction);
         else await c.ExecuteAsync("UPDATE SessionTemplate SET Name = @Name WHERE Id = @Id", template, transaction);
 
         foreach (var entry in entries) entry.TemplateId = template.Id;
@@ -160,8 +208,13 @@ public sealed class WorkoutStore(string databasePath)
             {
                 await using var connection = new SqliteConnection(connectionString);
                 await connection.OpenAsync();
-                if (!schemaReady) await connection.ExecuteAsync(Schema);
-                schemaReady = true;
+                if (!schemaReady)
+                {
+                    await connection.ExecuteAsync(Schema);
+                    if (await connection.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM pragma_table_info('SessionTemplate') WHERE name = 'RoutineId'") > 0) await connection.ExecuteAsync(SessionsWithoutRoutine);
+                    schemaReady = true;
+                }
+
                 return await work(connection);
             }, CancellationToken.None, TaskContinuationOptions.DenyChildAttach, TaskScheduler.Default).Unwrap();
             lane = next;
