@@ -195,12 +195,21 @@ h1:focus {
     letter-spacing: -0.04em;
 }
 
-/* "Rest 0:48": the word sits on the timer's baseline. */
+/* "Rest 0:48": the word sits on the timer's baseline. Tapping it switches between counting up and counting down. */
 .rest-time {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     column-gap: 12px;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+}
+
+/* The last seconds of a rest countdown. */
+.number.live {
+    color: var(--accent);
 }
 
 .rest-label {

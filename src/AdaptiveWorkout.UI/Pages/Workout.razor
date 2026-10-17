@@ -84,10 +84,7 @@
                 else
                 {
                     <div class="stack">
-                        <div class="rest-time">
-                            <span class="rest-label">Rest</span>
-                            <Clock Since="logged.StoppedAt!.Value" Class="number lg" />
-                        </div>
+                        <RestTimer Since="logged.StoppedAt!.Value" ExerciseId="logged.ExerciseId" NextName="@(state.Next is { } upNext ? state.Exercises[upNext.ExerciseId].Name : null)" OnZero="StartNext" />
                         <HeartRate />
                     </div>
 
@@ -141,6 +138,12 @@
     }
 
     private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";
+
+    // The rest countdown reached zero: on to the next set.
+    private void StartNext()
+    {
+        if (state?.Next is { } next) Flow.StartSet(state.Exercises[next.ExerciseId]);
+    }
 
     private void Finish()
     {

@@ -63,9 +63,16 @@ public sealed class WorkoutStore(string databasePath)
         c.QueryFirstOrDefaultAsync<Routine?>("SELECT r.Id, r.Name FROM Routine r JOIN Setting s ON s.Key = @ActiveRoutineKey AND CAST(s.Value AS INTEGER) = r.Id", new { ActiveRoutineKey }));
 
     /// <summary>Follows a routine from now on; null follows none.</summary>
-    public Task SetActiveRoutineAsync(long? routineId) => RunAsync(c => routineId is long id
-        ? c.ExecuteAsync("INSERT INTO Setting (Key, Value) VALUES (@ActiveRoutineKey, @id) ON CONFLICT (Key) DO UPDATE SET Value = excluded.Value", new { ActiveRoutineKey, id })
-        : c.ExecuteAsync("DELETE FROM Setting WHERE Key = @ActiveRoutineKey", new { ActiveRoutineKey }));
+    public Task SetActiveRoutineAsync(long? routineId) => SetSettingAsync(ActiveRoutineKey, routineId?.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>Every saved setting, e.g. the routine in use and rest countdowns.</summary>
+    public Task<Dictionary<string, string>> GetSettingsAsync() => RunAsync(async c =>
+        (await c.QueryAsync<(string Key, string Value)>("SELECT Key, Value FROM Setting")).ToDictionary(s => s.Key, s => s.Value));
+
+    /// <summary>Saves a setting; null removes it.</summary>
+    public Task SetSettingAsync(string key, string? value) => RunAsync(c => value is null
+        ? c.ExecuteAsync("DELETE FROM Setting WHERE Key = @key", new { key })
+        : c.ExecuteAsync("INSERT INTO Setting (Key, Value) VALUES (@key, @value) ON CONFLICT (Key) DO UPDATE SET Value = excluded.Value", new { key, value }));
 
     /// <summary>A routine's week, Monday first: each day's session, or null for a rest day.</summary>
     public Task<long?[]> GetRoutineWeekAsync(long routineId) => RunAsync(async c =>

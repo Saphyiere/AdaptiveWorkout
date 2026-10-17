@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using AdaptiveWorkout.Core;
 using AdaptiveWorkout.UI.Storage;
 using AdaptiveWorkout.UI.Watch;
@@ -11,9 +12,12 @@ namespace AdaptiveWorkout.UI.Workouts;
 /// </summary>
 public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchLink watch)
 {
+    private const string RestCountdownKey = "RestCountdown";
+
     private Task? loading;
     private List<WorkoutSession> pastSessions = [];
     private List<WorkoutSet> pastSets = [];
+    private Dictionary<string, string> preferences = [];
 
     /// <summary>The open workout, or null when there is none (or nothing has loaded yet).</summary>
     public WorkoutState? Current { get; private set; }
@@ -190,11 +194,33 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         ChangePlan(state, PlanEdits.Append(state.Plan, entries), null);
     }
 
+    /// <summary>Whether a rest counts down to the next set, and starts it at zero, instead of counting up.</summary>
+    public bool RestCountdown => preferences.GetValueOrDefault(RestCountdownKey) == "on";
+
+    /// <summary>True until the rest countdown has been tried, so the break screen can say how.</summary>
+    public bool RestCountdownUntried => !preferences.ContainsKey(RestCountdownKey);
+
+    public void SetRestCountdown(bool on) => SetPreference(RestCountdownKey, on ? "on" : "off");
+
+    /// <summary>The countdown for a rest after this exercise: the one I set last time, else my typical rest after it last time, else 1:30.</summary>
+    public TimeSpan RestTarget(long exerciseId)
+    {
+        if (preferences.GetValueOrDefault(RestTargetKey(exerciseId)) is string saved) return TimeSpan.FromSeconds(int.Parse(saved, CultureInfo.InvariantCulture));
+
+        var last = Current?.History(exerciseId).FirstOrDefault();
+        return (last is null ? null : Rest.Typical([.. pastSets.Where(s => s.SessionId == last.Session.Id)], exerciseId)) ?? Rest.Default;
+    }
+
+    /// <summary>Moves this exercise's rest countdown by some seconds; it's remembered for next time.</summary>
+    public void AdjustRestTarget(long exerciseId, int seconds) =>
+        SetPreference(RestTargetKey(exerciseId), Math.Clamp((int)RestTarget(exerciseId).TotalSeconds + seconds, 15, 600).ToString(CultureInfo.InvariantCulture));
+
     /// <summary>Creates (or links to) an exercise picked by name mid-workout.</summary>
     public Task<Exercise> GetOrCreateExerciseAsync(string name, ExerciseMeasure measure) => store.GetOrCreateExerciseAsync(name, measure);
 
     private async Task LoadHistoryAsync()
     {
+        preferences = await store.GetSettingsAsync();
         var sessions = await store.GetSessionsAsync();
         var sets = await store.GetSetsAsync();
         var open = sessions.LastOrDefault(s => s.FinishedAt is null);
@@ -245,6 +271,14 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         };
         state.Refresh();
         return state;
+    }
+
+    private static string RestTargetKey(long exerciseId) => $"RestTarget:{exerciseId}";
+
+    private void SetPreference(string key, string value)
+    {
+        preferences[key] = value;
+        Save(store.SetSettingAsync(key, value));
     }
 
     // Saves run in the background; a failure is logged rather than holding up the screen.

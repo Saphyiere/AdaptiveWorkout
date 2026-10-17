@@ -114,7 +114,12 @@ I can leave simple mode at any moment, like leaving full screen. **Advanced mode
 3. **Break.** The rest timer, live heart rate, and an entry for each set since the last rest (one, or both halves of a superset round): weight, reps and **Hit goal**, pre-filled, each with its own **Save** (Enter works too). Time exercises need nothing: the stopwatch was the duration. Once every entry is saved, the break becomes a plain rest screen: **Today so far**, every exercise done in this workout in short form (`3 × 10 at 100`), with **Edit** to reopen the entries. One big button at the bottom names what's next: **Start set 3**, or **Start pull-ups**. It only starts the next set; anything not saved yet keeps what's in its fields.
 4. **Finish workout** is always reachable, in every state.
 
-The break screen reads **Rest 0:48**: the word big beside the timer, counting up. **(later)** An optional rest target turns it into a countdown that alerts me when it's up and moves on to the next set by itself.
+The break screen reads **Rest 0:48**: the word big beside the timer, counting up. **Tapping the time** turns it into a countdown (and back); the choice sticks for later rests.
+
+- **It learns:** the countdown after an exercise starts from the one I set for it last time; never set, from how long I usually rested after it last time (the middle rest, to the nearest 15 seconds); with nothing to go on, 1:30. **−15s** and **+15s** adjust it, and that's remembered.
+- **At zero** the phone buzzes and beeps, and the next set starts by itself. The last ten seconds turn pink.
+- A countdown that ran out while I was on another screen doesn't start anything; it shows how far over I am (**+0:23**).
+- The phone has to be awake on the break screen for the buzz. **(later)** The watch buzzes too, even with the phone in a pocket.
 
 ### Pre-filled and suggested values
 
@@ -269,7 +274,6 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 
 - Goals and suggestions: a target per exercise (sets × reps), "try 105 today".
 - Choosing which "better" signal leads.
-- Rest timer targets: an option that counts down, alerts, and starts the next set.
 - More exercise measures (distance, reps only).
 - A categorized exercise picker.
 - Macros.

@@ -1,0 +1,100 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject WorkoutFlow Flow
+@inject IJSRuntime JS
+@* The rest time. It counts up; tapped, it counts down from this exercise's rest instead, and at zero it buzzes and starts the next set. *@
+
+@{
+    var countdown = Flow.RestCountdown;
+    var target = Flow.RestTarget(ExerciseId);
+    var elapsed = DateTimeOffset.Now - Since;
+    var left = target - elapsed;
+}
+<button type="button" class="rest-time" aria-label="@(countdown ? "Rest countdown. Tap to count up instead." : "Rest time. Tap to count down to the next set.")" @onclick="() => Flow.SetRestCountdown(!countdown)">
+    <span class="rest-label">Rest</span>
+    <span class="number lg @(countdown && left <= TimeSpan.FromSeconds(10) ? "live" : "")">@(countdown ? left >= TimeSpan.Zero ? TimeText.Format(left) : $"+{TimeText.Format(-left)}" : TimeText.Format(elapsed))</span>
+</button>
+@if (countdown)
+{
+    <div class="spread">
+        <button type="button" class="btn" aria-label="15 seconds less" @onclick="() => Flow.AdjustRestTarget(ExerciseId, -15)">−15s</button>
+        <span class="caption center">@TimeText.Format(target)@(NextName is null ? " rest" : $", then {NextName}")</span>
+        <button type="button" class="btn" aria-label="15 seconds more" @onclick="() => Flow.AdjustRestTarget(ExerciseId, 15)">+15s</button>
+    </div>
+}
+else if (Flow.RestCountdownUntried)
+{
+    <p class="caption">Tap the time to count down to the next set instead.</p>
+}
+
+@code {
+    private readonly CancellationTokenSource stop = new();
+    private IJSObjectReference? alerts;
+    private bool seenRunning;
+    private bool done;
+
+    [Parameter, EditorRequired] public DateTimeOffset Since { get; set; }
+
+    /// <summary>The exercise just done; the countdown is its rest.</summary>
+    [Parameter, EditorRequired] public long ExerciseId { get; set; }
+
+    /// <summary>What starts at zero, for the caption; empty when nothing is left.</summary>
+    [Parameter] public string? NextName { get; set; }
+
+    /// <summary>Called once the countdown reaches zero on screen, after the buzz.</summary>
+    [Parameter] public EventCallback OnZero { get; set; }
+
+    protected override void OnInitialized()
+    {
+        seenRunning = Flow.RestCountdown && Flow.RestTarget(ExerciseId) > DateTimeOffset.Now - Since;
+        _ = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(stop.Token)) await InvokeAsync(TickAsync);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        });
+    }
+
+    private async Task TickAsync()
+    {
+        // Only a countdown seen running reaches zero: one that ran out while the app was elsewhere shows how far over it is instead.
+        var left = Flow.RestTarget(ExerciseId) - (DateTimeOffset.Now - Since);
+        seenRunning |= Flow.RestCountdown && left > TimeSpan.Zero;
+        if (!Flow.RestCountdown || left > TimeSpan.Zero || !seenRunning || done)
+        {
+            StateHasChanged();
+            return;
+        }
+
+        done = true;
+        try
+        {
+            alerts ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/AdaptiveWorkout.UI/Components/RestTimer.razor.js");
+            await alerts.InvokeVoidAsync("alert");
+        }
+        catch (JSException)
+        {
+            // No buzz; the next set still starts.
+        }
+
+        await OnZero.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        stop.Cancel();
+        stop.Dispose();
+        try
+        {
+            if (alerts is not null) await alerts.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}
