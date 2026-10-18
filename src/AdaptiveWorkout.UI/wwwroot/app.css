@@ -647,6 +647,69 @@ a.card:active {
     background: var(--accent);
 }
 
+/* Gym: the improvement trend. The SVG scales with the card; a row of invisible buttons over the plot picks a workout. */
+.trend-chart {
+    position: relative;
+}
+
+.trend-chart svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.trend-chart .grid {
+    stroke: var(--hairline);
+    stroke-width: 1;
+}
+
+.trend-chart .tick {
+    fill: var(--ink-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.trend-chart .wash {
+    fill: var(--accent);
+    opacity: 0.1;
+}
+
+.trend-chart .trend-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.trend-chart .crosshair {
+    stroke: var(--ink-muted);
+    stroke-width: 1;
+}
+
+/* Ringed in the card's color, so a dot stays clear where it sits on the line. */
+.trend-chart .dot {
+    fill: var(--accent);
+    stroke: var(--surface);
+    stroke-width: 2;
+}
+
+.trend-picks {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+}
+
+.trend-picks button {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+}
+
 /* Workout */
 
 .status {

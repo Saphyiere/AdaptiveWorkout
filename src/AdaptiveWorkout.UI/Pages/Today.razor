@@ -17,8 +17,8 @@
             <Icon Name="mark" Size="28" Color="var(--accent)" Stroke="1.8" />
         </header>
 
-        @* Opens the history of finished workouts. *@
-        <a class="card" href="history" aria-labelledby="gym-heading">
+        @* Opens Gym: the improvement trend, the routine, and every finished workout. *@
+        <a class="card" href="gym" aria-labelledby="gym-heading">
             <div class="spread">
                 <h2 id="gym-heading" class="label">Gym today</h2>
                 <span class="inline">
@@ -162,15 +162,19 @@
             <button type="button" class="btn-primary" @onclick="StartAsync">@startLabel</button>
             @if (routine is null)
             {
-                <a class="btn-ghost" href="routines">Set up a routine</a>
+                <a class="btn-ghost" href="routines?from=today">Set up a routine</a>
             }
             else if (!planned)
             {
-                <a class="btn-ghost" href="routines/@routine.Id">Plan your week</a>
+                <a class="btn-ghost" href="@($"routines/{routine.Id}?from=today")">Plan your week</a>
             }
             else if (openSession is null && todayTemplate is not null && !wentToday)
             {
                 <a class="btn-ghost" href="sessions">Other session</a>
+            }
+            else if (openSession is null && restDay)
+            {
+                <a class="btn-ghost" href="routines?from=today">Edit routine</a>
             }
         </div>
     </div>

@@ -18,7 +18,7 @@ Build the foundation first, then add on.
 
 ## Principles
 
-- **Store raw facts with timestamps; calculate everything else.** Rest time, heart rate during a set, progress, consistency and calorie deficits are all derived, never stored. Those calculations are the business logic the tests cover.
+- **Store raw facts with timestamps; calculate everything else.** Rest time, heart rate during a set, progress, consistency and calorie deficits are all derived, never stored. Those calculations are the business logic the tests cover. The one exception is each workout's **improvement**: it's worked out once, right after Finish, and kept with the workout, so the trend never has to redo it.
 - **Sessions are the center of workouts.** A session holds its sets and its heart rate. Calories and body weight happen on days, not in sessions, so they are simple daily logs.
 - **No exercise library.** Exercises are whatever names I type. Typing a name I've used before links to it.
 - **One button.** The app knows what's next and puts it on one big button. Everything else is one step away, never in the way.
@@ -41,16 +41,20 @@ Build the foundation first, then add on.
 
 The home screen answers the three questions at a glance. **(proposed)**
 
-- **Gym today:** done, not yet, or **rest day**, plus this week's gym days (e.g. Mon, Wed, Thu) with the routine's rest days marked, and the streak. Tapping it opens **History**.
+- **Gym today:** done, not yet, or **rest day**, plus this week's gym days (e.g. Mon, Wed, Thu) with the routine's rest days marked, and the streak. Tapping it opens **Gym**.
 - **Calories:** eaten today against 1,800, with a quick add. **Edit** lists today's entries, each deletable.
 - **Body weight:** the latest weigh-in and its trend, with a quick add. **Edit** lists the last 10 weigh-ins, each deletable.
-- The big button: **Start Back day** (today's session in the routine). On a rest day, or once today is done, it reads **Start a workout** and opens the session picker.
+- The big button: **Start Back day** (today's session in the routine). On a rest day, or once today is done, it reads **Start a workout** and opens the session picker. On a rest day, **Edit routine** sits under it.
 
 Every delete asks once (Keep or Delete) before anything is gone.
 
-### History
+### Gym
 
-Every finished workout, newest first and grouped by month: its name, date, length and set count, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
+Am I getting better, and everything I've done:
+
+- **Improvement:** how much better my exercises are than the first time I did them, on average (**+12.8%** over 13 workouts), with the line of how it got there. Tapping the line picks a workout: its name, date and how it did against the last time. See *Adaptive* for how it's worked out.
+- **Edit routine** opens the routines, to edit one or switch.
+- **History:** every finished workout, newest first and grouped by month: its name, date, length, set count and improvement, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
 
 ## Flows
 
@@ -197,6 +201,14 @@ Sets vary (3 × 10 one day, 5 × 5 another, 2 × 6 then 2 × 12 at a lower weigh
 
 **(later)** Suggestions from my method: "Last time 10, 10, 10 at 100. Try 105."
 
+### Improvement (the default lead signal)
+
+Until I choose a lead signal, one number stands for "better", so the Gym trend has something to show:
+
+- **Each exercise** counts as its sets' average estimated one-rep max, weight × (1 + reps ÷ 30), so heavier and more reps both count, however the sets were split (10, 10, 8 → 10, 10, 10 at 100 is +1.7%; 100 → 105 is +5%). Bodyweight and assisted sets lift my body too, at my last weigh-in before the workout, the same for both workouts (−50 → −40 assist at 200 lb is +6.7%); with no weigh-in, plain bodyweight compares by reps alone. Time exercises count their average set length.
+- **A workout's improvement** is how its exercises did against the last time I did each, averaged (the geometric mean, so +10% and the same ratio down even out). Exercises done for the first time are left out; with none to compare, a workout has no improvement. It's worked out once after Finish and stored; workouts finished before this existed get theirs the first time Gym opens.
+- **The trend** is each exercise's change since its first time, averaged over every exercise compared so far. More workouts in a week don't inflate it: bench +10% and curls +10% is +10%.
+
 ## Consistency
 
 Derived from session dates alone:
@@ -272,7 +284,7 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 2. **Sessions in simple mode:** routines, templates, the set loop, the last three times, supersets, Hit goal. *Built.*
 3. **Live heart rate** from the watch during sessions, with the rest timer on the watch and in the notification. *Built; needs its first run on the real watch.*
 4. **Advanced mode** and logging after the fact. *Advanced view built (add a set, different exercise, skip); reordering mid-workout and logging after the fact not yet.*
-5. **Adaptive comparisons** and charts.
+5. **Adaptive comparisons** and charts. *The improvement trend on Gym is built; choosing the lead signal and per-exercise charts not yet.*
 
 ## Later
 

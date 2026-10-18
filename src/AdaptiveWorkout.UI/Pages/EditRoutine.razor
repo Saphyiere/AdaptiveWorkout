@@ -9,7 +9,7 @@
 {
     <div class="screen tight">
         <header class="inline">
-            <a class="icon-btn" href="routines" aria-label="Back to routines"><Icon Name="back" /></a>
+            <a class="icon-btn" href="@($"routines{FromQuery}")" aria-label="Back to routines"><Icon Name="back" /></a>
             <h1 class="title small">@(Id is null ? "New routine" : "Edit routine")</h1>
         </header>
 
@@ -86,6 +86,11 @@
 
     [Parameter] public long? Id { get; set; }
 
+    /// <summary>Where the routines list's back arrow goes, passed back to it.</summary>
+    [SupplyParameterFromQuery] public string? From { get; set; }
+
+    private string FromQuery => From is "gym" or "today" ? $"?from={From}" : "";
+
     protected override async Task OnInitializedAsync()
     {
         templates = await Store.GetTemplatesAsync();
@@ -110,12 +115,12 @@
         await Store.SaveRoutineAsync(routine, week);
         if (use) await Store.SetActiveRoutineAsync(routine.Id);
         else if ((await Store.GetActiveRoutineAsync())?.Id == routine.Id) await Store.SetActiveRoutineAsync(null);
-        Nav.NavigateTo("routines");
+        Nav.NavigateTo($"routines{FromQuery}");
     }
 
     private async Task DeleteAsync()
     {
         await Store.DeleteRoutineAsync(routine);
-        Nav.NavigateTo("routines");
+        Nav.NavigateTo($"routines{FromQuery}");
     }
 }

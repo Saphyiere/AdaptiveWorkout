@@ -5,6 +5,8 @@ public static class WorkoutStats
 {
     private const double PoundsPerKilogram = 2.20462;
 
+    public static double Pounds(double weight, WeightUnit unit) => unit == WeightUnit.Kilograms ? weight * PoundsPerKilogram : weight;
+
     /// <summary>Total weight moved: weight × reps over every weighted set, in <paramref name="unit"/>. Bodyweight and assisted sets add nothing.</summary>
     public static double Volume(IEnumerable<WorkoutSet> sets, WeightUnit unit) => sets.Where(s => s.Weight > 0 && s.Reps > 0).Sum(s =>
     {

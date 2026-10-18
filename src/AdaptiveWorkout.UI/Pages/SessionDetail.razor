@@ -11,7 +11,7 @@
     var heartRate = WorkoutStats.HeartRate(samples, session.StartedAt, session.FinishedAt ?? session.StartedAt);
     <div class="screen tight">
         <header class="inline">
-            <a class="icon-btn" href="history" aria-label="Back to history"><Icon Name="back" /></a>
+            <a class="icon-btn" href="gym" aria-label="Back to Gym"><Icon Name="back" /></a>
             <div class="row-text">
                 <p class="label">@session.StartedAt.ToString("dddd, MMM d · h:mm tt", CultureInfo.CurrentCulture)</p>
                 <h1 class="title small">@name</h1>
@@ -117,7 +117,7 @@
         session = (await Store.GetSessionsAsync()).FirstOrDefault(s => s.Id == Id && s.FinishedAt is not null);
         if (session is null)
         {
-            Nav.NavigateTo("history", replace: true);
+            Nav.NavigateTo("gym", replace: true);
             return;
         }
 
@@ -132,6 +132,6 @@
     private async Task DeleteAsync()
     {
         await Flow.DeleteSessionAsync(session!);
-        Nav.NavigateTo("history");
+        Nav.NavigateTo("gym");
     }
 }

@@ -61,6 +61,15 @@ public sealed class WorkoutSession
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public bool LoggedAfterward { get; set; }
+
+    /// <summary>
+    /// How this workout compared with the last time of each of its exercises, worked out once after Finish (see
+    /// <see cref="Progress"/>): 0.03 is 3% better. Empty when none of its exercises had a last time.
+    /// </summary>
+    public double? Improvement { get; set; }
+
+    /// <summary>How many of its exercises had a last time to compare with; empty until worked out.</summary>
+    public int? ExercisesCompared { get; set; }
 }
 
 /// <summary>One bout of an exercise. Rest is the gap between sets and is never stored.</summary>

@@ -1,0 +1,169 @@
+@page "/gym"
+@inject WorkoutStore Store
+@inject WorkoutFlow Flow
+
+<PageTitle>Gym</PageTitle>
+
+@if (loaded)
+{
+    var trend = Progress.Trend(sessions, sets);
+    <div class="screen tight">
+        <header class="inline">
+            <a class="icon-btn" href="" aria-label="Back to Today"><Icon Name="back" /></a>
+            <div class="row-text">
+                <p class="label">@sessions.Count @(sessions.Count == 1 ? "workout" : "workouts")</p>
+                <h1 class="title small">Gym</h1>
+            </div>
+        </header>
+
+        @* Am I getting better? Each workout's improvement, worked out once after Finish, compounded into one line. *@
+        <section class="card" aria-labelledby="trend-heading">
+            <h2 id="trend-heading" class="label">Improvement</h2>
+            @if (trend.Count == 0)
+            {
+                <p class="caption">Your trend starts once you repeat an exercise from an earlier workout.</p>
+            }
+            else
+            {
+                var found = trend.FindIndex(p => p.Session == picked);
+                var index = found >= 0 ? found : trend.Count - 1;
+                var (pickedSession, _) = trend[index];
+
+                // A y-axis of round steps, with 0% always on it and at most five lines.
+                var low = Math.Min(0, trend.Min(p => p.Total));
+                var high = Math.Max(0, trend.Max(p => p.Total));
+                var step = Steps.FirstOrDefault(s => Math.Ceiling(high / s) - Math.Floor(low / s) <= 4, Math.Ceiling(high - low));
+                var bottom = Math.Floor(low / step) * step;
+                var top = Math.Max(Math.Ceiling(high / step) * step, bottom + step);
+                var ticks = Enumerable.Range(0, (int)Math.Round((top - bottom) / step) + 1).Select(i => bottom + i * step).ToList();
+                double X(int i) => (i + 0.5) * PlotWidth / trend.Count;
+                double Y(double total) => PlotBottom - (total - bottom) / (top - bottom) * (PlotBottom - PlotTop);
+                var line = trend.Select((p, i) => $"{N(X(i))},{N(Y(p.Total))}").ToList();
+                var wash = line.Append($"{N(X(trend.Count - 1))},{N(Y(0))}").Append($"{N(X(0))},{N(Y(0))}");
+
+                <span class="inline baseline">
+                    <span class="number md">@Percent(trend[^1].Total)</span>
+                    <span class="unit">over @trend.Count @(trend.Count == 1 ? "workout" : "workouts")</span>
+                </span>
+                <div class="trend-chart">
+                    <svg viewBox="0 0 @N(ChartWidth) @N(ChartHeight)" role="img" aria-label="@($"Improvement over {trend.Count} workouts: {Percent(trend[^1].Total)}")">
+                        @* In a group, since Razor reads a <text> that starts a code block's markup as its own text tag. *@
+                        @foreach (var tick in ticks)
+                        {
+                            <g>
+                                <line class="grid" x1="0" x2="@N(PlotWidth)" y1="@N(Y(tick))" y2="@N(Y(tick))" />
+                                <text class="tick" x="@N(PlotWidth + 8)" y="@N(Y(tick) + 4)">@Percent(tick)</text>
+                            </g>
+                        }
+                        <polygon class="wash" points="@string.Join(' ', wash)" />
+                        <polyline class="trend-line" points="@string.Join(' ', line)" />
+                        @if (index != trend.Count - 1)
+                        {
+                            <line class="crosshair" x1="@N(X(index))" x2="@N(X(index))" y1="@N(PlotTop)" y2="@N(PlotBottom)" />
+                            <circle class="dot" cx="@N(X(index))" cy="@N(Y(trend[index].Total))" r="4" />
+                        }
+                        <circle class="dot" cx="@N(X(trend.Count - 1))" cy="@N(Y(trend[^1].Total))" r="4" />
+                        <text class="tick" x="@N(trend.Count == 1 ? X(0) : 0)" y="@N(ChartHeight - 2)" text-anchor="@(trend.Count == 1 ? "middle" : "start")">@DateText(trend[0].Session)</text>
+                        @if (trend.Count > 1)
+                        {
+                            <g>
+                                <text class="tick" x="@N(PlotWidth)" y="@N(ChartHeight - 2)" text-anchor="end">@DateText(trend[^1].Session)</text>
+                            </g>
+                        }
+                    </svg>
+
+                    @* Each workout's slice of the plot picks it, so a tap anywhere lands on the nearest one. *@
+                    <div class="trend-picks" style="width: @N(PlotWidth / ChartWidth * 100)%; height: @N(PlotBottom / ChartHeight * 100)%">
+                        @foreach (var (session, _) in trend)
+                        {
+                            <button type="button" aria-pressed="@(session == pickedSession ? "true" : "false")" aria-label="@($"{NameOf(session)}, {DateText(session)}: {Percent(session.Improvement!.Value)}")"
+                                    @onclick="() => picked = session" @onfocus="() => picked = session"></button>
+                        }
+                    </div>
+                </div>
+                <div class="spread">
+                    <span class="caption">@NameOf(pickedSession), @pickedSession.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</span>
+                    <span class="inline baseline">
+                        <span class="body strong tabular">@Percent(pickedSession.Improvement!.Value)</span>
+                        <span class="unit">vs last time</span>
+                    </span>
+                </div>
+                <p class="caption">How much better your exercises are than the first time you did them, on average. Each workout counts against the last time: heavier, more reps, or longer for timed ones.</p>
+            }
+        </section>
+
+        <a class="btn" href="routines?from=gym">Edit routine</a>
+
+        @if (sessions.Count == 0)
+        {
+            <p class="caption">No finished workouts yet. Each one shows up here after Finish workout.</p>
+        }
+
+        @foreach (var month in sessions.GroupBy(s => s.StartedAt.ToString("MMMM yyyy", CultureInfo.CurrentCulture)))
+        {
+            <section class="stack" aria-label="@month.Key">
+                <h2 class="label">@month.Key</h2>
+                <div class="list">
+                    @foreach (var session in month)
+                    {
+                        var name = NameOf(session);
+                        var setCount = setCounts.GetValueOrDefault(session.Id);
+                        @* Keyed, so a deleted row's "Delete?" doesn't carry over to the row that takes its place. *@
+                        <div class="row" @key="session.Id">
+                            <a class="row-main" href="history/@session.Id">
+                                <span class="row-text">
+                                    <span class="body strong">@name</span>
+                                    <span class="caption tabular">@session.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture) · @TimeText.Format(session.FinishedAt!.Value - session.StartedAt) · @setCount @(setCount == 1 ? "set" : "sets")@(session.Improvement is { } change ? $" · {Percent(change)}" : "")</span>
+                                </span>
+                            </a>
+                            <ConfirmDelete Label="@($"Delete {name} on {session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteAsync(session)" />
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    // The trend chart's drawing space, which the SVG scales to the card: the plot, tick labels to its right, dates under it.
+    private const double ChartWidth = 320, ChartHeight = 132, PlotWidth = 280, PlotTop = 8, PlotBottom = 112;
+    private static readonly double[] Steps = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
+
+    private bool loaded;
+    private List<WorkoutSession> sessions = [];
+    private List<WorkoutSet> sets = [];
+    private Dictionary<long, int> setCounts = [];
+    private Dictionary<long, string> templateNames = [];
+    private WorkoutSession? picked;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Flow.ScoreSessionsAsync();
+        sessions = [.. (await Store.GetSessionsAsync()).Where(s => s.FinishedAt is not null).OrderByDescending(s => s.StartedAt)];
+        sets = await Store.GetSetsAsync();
+        setCounts = sets.GroupBy(s => s.SessionId).ToDictionary(g => g.Key, g => g.Count());
+        templateNames = (await Store.GetTemplatesAsync()).ToDictionary(t => t.Id, t => t.Name);
+        loaded = true;
+    }
+
+    private string NameOf(WorkoutSession session) => session.TemplateId is long id && templateNames.TryGetValue(id, out var name) ? name : "Workout";
+
+    private static string DateText(WorkoutSession session) => session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture);
+
+    // +3.1%, −1.2% (a real minus sign), or 0%.
+    private static string Percent(double change)
+    {
+        var percent = Math.Round(change * 100, 1);
+        return percent == 0 ? "0%" : $"{(percent > 0 ? "+" : "−")}{Math.Abs(percent).ToString("0.#", CultureInfo.CurrentCulture)}%";
+    }
+
+    // SVG numbers, which take a point whatever the phone's language.
+    private static string N(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private async Task DeleteAsync(WorkoutSession session)
+    {
+        sessions.Remove(session);
+        await Flow.DeleteSessionAsync(session);
+    }
+}

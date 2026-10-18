@@ -156,6 +156,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Save(store.FinishSessionAsync(state.Session));
         pastSessions.Add(state.Session);
         pastSets.AddRange(state.Sets);
+        Save(ScoreSessionsAsync());
         Current = null;
         watch.Close();
         Announce();
@@ -170,6 +171,25 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Current = null;
         watch.Close();
         Announce();
+    }
+
+    /// <summary>
+    /// Works out how each finished workout compared with the last time of its exercises (see <see cref="Progress"/>) and saves it
+    /// with the workout, once: at Finish, and for workouts finished before improvements existed.
+    /// </summary>
+    public async Task ScoreSessionsAsync()
+    {
+        await LoadAsync();
+        var unscored = pastSessions.Where(s => s is { FinishedAt: not null, ExercisesCompared: null }).OrderBy(s => s.StartedAt).ToList();
+        if (unscored.Count == 0) return;
+
+        var exercises = (await store.GetExercisesAsync()).ToDictionary(e => e.Id);
+        var bodyWeights = await store.GetBodyWeightsAsync();
+        foreach (var session in unscored)
+        {
+            (session.Improvement, session.ExercisesCompared) = Progress.Improvement(session, pastSessions, pastSets, exercises, bodyWeights);
+            Save(store.SaveImprovementAsync(session));
+        }
     }
 
     /// <summary>Deletes a finished session and its sets, so history and suggestions forget it.</summary>
