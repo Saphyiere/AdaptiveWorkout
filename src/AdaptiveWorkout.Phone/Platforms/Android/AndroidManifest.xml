@@ -3,8 +3,11 @@
     <application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true"></application>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- The rest countdown buzzes at zero. -->
+    <!-- The rest countdown buzzes at zero when no watch is connected. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- The workout notification, with its live rest or set timer; on Android 16, as a Live Update in the status bar. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <!-- Lets the app see the watch's companion app (Galaxy Wearable's plugin), which opens the watch app when a workout starts. -->
     <queries>
         <intent>

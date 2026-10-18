@@ -5,4 +5,5 @@
     <color name="ink">#F5F5F7</color>
     <color name="ink_muted">#9A9AA3</color>
     <color name="accent">#FF3D8F</color>
+    <color name="on_accent">#000000</color>
 </resources>

@@ -117,9 +117,11 @@ I can leave simple mode at any moment, like leaving full screen. **Advanced mode
 The break screen reads **Rest 0:48**: the word big beside the timer, counting up. **Tapping the time** turns it into a countdown (and back); the choice sticks for later rests.
 
 - **It learns:** the countdown after an exercise starts from the one I set for it last time; never set, from how long I usually rested after it last time (the middle rest, to the nearest 15 seconds); with nothing to go on, 1:30. **−15s** and **+15s** adjust it, and that's remembered.
-- **At zero** the phone buzzes and beeps, and the next set starts by itself. The last ten seconds turn pink.
-- A countdown that ran out while I was on another screen doesn't start anything; it shows how far over I am (**+0:23**).
-- The phone has to be awake on the break screen for the buzz. **(later)** The watch buzzes too, even with the phone in a pocket.
+- **At zero** the watch buzzes, and the next set starts by itself. The phone buzzes and beeps instead only when no watch is connected (no heart rate in the last 15 seconds), so they never both go. The last ten seconds turn pink.
+- A countdown that ran out while I was on another screen, or while the phone slept, doesn't start anything; it shows how far over I am (**+0:23**).
+- Starting by itself and the phone's buzz need the app open on the break screen (the phone's screen can be off). The watch buzzes wherever the phone is.
+
+**The notification:** the workout also sits in the notification bar and on the lock screen, so the phone can stay in a pocket: **Rest** with the countdown (or the time since the set, counting up) and what's next, or the running set and its time. The system keeps the timer ticking without the app. On Android 16 and newer it's a Live Update, which puts the timer in a chip in the status bar. Tapping it opens the app.
 
 ### Pre-filled and suggested values
 
@@ -220,7 +222,9 @@ The watch streams heart rate (about once a second) for the whole session, sets a
 How it runs:
 
 - **Start** on the phone opens the heart rate screen on the watch; I never touch the watch. If the watch can't be opened directly, it gets a "Workout started" notification instead. With the watch screen off, that notification opens the heart rate screen on its own.
-- **The watch screen:** the time up top, heart rate big in the middle, how long the workout has run below. When the watch screen times out, the app stays up, dimmed, instead of going back to the watch face. **(later)** A small graph or a zone scale under the number.
+- **The watch screen:** the time up top, then what the workout is doing (**Rest 1:12** counting down, or the set and its time), heart rate big in the middle, and how long the workout has run. While resting, a pink **Start pull-ups** button takes the workout time's place and starts that set on the phone. When the watch screen times out, the app stays up, dimmed, instead of going back to the watch face. **(later)** A small graph or a zone scale under the number.
+- The phone tells the watch what the workout is doing on every change: a set started or stopped, a rest countdown turned on or adjusted.
+- **Rest is up:** when the countdown hits zero, the watch buzzes and, if its app isn't showing, comes up on its own: **Rest is up +0:05** and **Start pull-ups**. If the phone started that set by itself at zero, the watch shows the set instead. It buzzes even when the phone is out of reach.
 - The watch keeps reading with its screen off, and holds readings while the phone is out of reach, then sends them all.
 - **The phone** shows the live number on the set and break screens, and saves every reading, even with the phone app in the background. Without a recent reading it says it's waiting and offers **Open on watch**.
 - **Finish** (or cancelling an empty session) closes the watch app. If that message doesn't arrive, the next reading the phone gets for a finished workout sends it again, and the watch stops on its own after 4 hours.
@@ -266,7 +270,7 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 
 1. **Today:** calories, weigh-ins and the gym-day check, with storage on the phone. *Built.*
 2. **Sessions in simple mode:** routines, templates, the set loop, the last three times, supersets, Hit goal. *Built.*
-3. **Live heart rate** from the watch during sessions. *Built; needs its first run on the real watch.*
+3. **Live heart rate** from the watch during sessions, with the rest timer on the watch and in the notification. *Built; needs its first run on the real watch.*
 4. **Advanced mode** and logging after the fact. *Advanced view built (add a set, different exercise, skip); reordering mid-workout and logging after the fact not yet.*
 5. **Adaptive comparisons** and charts.
 

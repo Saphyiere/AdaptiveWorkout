@@ -9,4 +9,8 @@
     <string name="workout_notification">Reading heart rate</string>
     <string name="start_channel">Workout started</string>
     <string name="start_notification">Tap for heart rate</string>
+    <string name="rest_over_channel">Rest timer</string>
+    <string name="rest_over">Rest is up</string>
+    <string name="start_next">Start %1$s</string>
+    <string name="starting">Starting…</string>
 </resources>

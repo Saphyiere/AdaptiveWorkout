@@ -2,7 +2,7 @@
 @inject WatchLink Watch
 @inject WorkoutFlow Flow
 @* Live heart rate from the watch. Without a recent reading, it offers to open the watch app again. *@
-@if (Watch.Latest is { } latest && DateTimeOffset.Now - latest.At < Recent)
+@if (Watch.Connected && Watch.Latest is { } latest)
 {
     <span class="inline baseline heart-rate">
         <Icon Name="mark" Size="18" Color="var(--accent)" />
@@ -22,8 +22,6 @@ else
 }
 
 @code {
-    // Readings come about once a second, so anything older means the watch stopped sending.
-    private static readonly TimeSpan Recent = TimeSpan.FromSeconds(15);
     private readonly CancellationTokenSource stop = new();
 
     protected override void OnInitialized()

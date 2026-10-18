@@ -1,8 +1,13 @@
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
 @inject WorkoutFlow Flow
+@inject WatchLink Watch
+@inject WorkoutNotice Notice
 @inject IJSRuntime JS
-@* The rest time. It counts up; tapped, it counts down from this exercise's rest instead, and at zero it buzzes and starts the next set. *@
+@*
+    The rest time. It counts up; tapped, it counts down from this exercise's rest instead, and at zero the next set starts.
+    The watch buzzes at zero; the phone buzzes only when no watch is sending heart rate.
+*@
 
 @{
     var countdown = Flow.RestCountdown;
@@ -41,7 +46,7 @@ else if (Flow.RestCountdownUntried)
     /// <summary>What starts at zero, for the caption; empty when nothing is left.</summary>
     [Parameter] public string? NextName { get; set; }
 
-    /// <summary>Called once the countdown reaches zero on screen, after the buzz.</summary>
+    /// <summary>Called once the countdown reaches zero on screen.</summary>
     [Parameter] public EventCallback OnZero { get; set; }
 
     protected override void OnInitialized()
@@ -62,7 +67,8 @@ else if (Flow.RestCountdownUntried)
 
     private async Task TickAsync()
     {
-        // Only a countdown seen running reaches zero: one that ran out while the app was elsewhere shows how far over it is instead.
+        // Only a countdown seen reaching zero starts the next set. One that ran out while the app was elsewhere, or while the
+        // phone was locked, shows how far over it is instead.
         var left = Flow.RestTarget(ExerciseId) - (DateTimeOffset.Now - Since);
         seenRunning |= Flow.RestCountdown && left > TimeSpan.Zero;
         if (!Flow.RestCountdown || left > TimeSpan.Zero || !seenRunning || done)
@@ -72,10 +78,17 @@ else if (Flow.RestCountdownUntried)
         }
 
         done = true;
+        if (left < -TimeSpan.FromSeconds(3))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        if (!Watch.Connected) Notice.Buzz();
         try
         {
             alerts ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/AdaptiveWorkout.UI/Components/RestTimer.razor.js");
-            await alerts.InvokeVoidAsync("alert");
+            await alerts.InvokeVoidAsync("alert", !Watch.Connected);
         }
         catch (JSException)
         {

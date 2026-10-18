@@ -1,4 +1,5 @@
 @page "/workout"
+@implements IDisposable
 @inject WorkoutFlow Flow
 @inject NavigationManager Nav
 
@@ -132,6 +133,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Flow.Changed += OnFlowChanged;
         state = Flow.Current ?? await Flow.LoadAsync();
         if (state is null) Nav.NavigateTo("", replace: true);
         else if (state.Sets.Count == 0) Nav.NavigateTo("workout/exercise", replace: true);
@@ -140,10 +142,12 @@
     private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";
 
     // The rest countdown reached zero: on to the next set.
-    private void StartNext()
-    {
-        if (state?.Next is { } next) Flow.StartSet(state.Exercises[next.ExerciseId]);
-    }
+    private void StartNext() => Flow.StartNext();
+
+    // A change made elsewhere, e.g. a set started from the watch.
+    private void OnFlowChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Flow.Changed -= OnFlowChanged;
 
     private void Finish()
     {

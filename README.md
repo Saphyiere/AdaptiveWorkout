@@ -66,7 +66,8 @@ The phone opens the watch app when a workout starts, and the watch sends heart r
 1. Deploy both apps from the same PC. The Data Layer only connects apps with the same id and signing key, and Debug and Release builds on one PC both use its debug key. If you ever set up a release keystore, sign both apps with it.
 2. Turn Bluetooth back on on the phone after deploying to the watch: the watch and phone talk over that link.
 3. Open **AdaptiveWorkout** on the watch once by hand and allow heart rate and notifications. It shows your heart rate right away. Swipe it away when done.
-4. Start a workout on the phone. The watch wakes up on the heart rate screen, and within a few seconds the phone shows the bpm under the timer. **Finish** closes the watch app.
+4. Start a workout on the phone (allow its notifications, for the rest timer on the lock screen). The watch wakes up on the heart rate screen, and within a few seconds the phone shows the bpm under the timer. **Finish** closes the watch app.
+5. On a break, tap the rest time for a countdown. At zero the watch buzzes; with the phone's screen elsewhere, the watch comes up with **Start <next>**, which starts that set on the phone.
 
 If the watch doesn't open, it should at least show a "Workout started" notification; tap it. Then check the phone's log with `adb logcat -s AdaptiveWorkout`: `Opening the watch app: done` or `failed (n)` says what the watch's companion app answered. **Open on watch** on the phone tries again.
 

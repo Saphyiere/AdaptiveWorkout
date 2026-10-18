@@ -10,7 +10,7 @@ namespace AdaptiveWorkout.UI.Workouts;
 /// Starting, stopping and finishing. Every change updates the in-memory workout first, so the screen moves on at once,
 /// then saves in the background; the store keeps those saves in order. The watch app opens with a new workout and closes when it ends.
 /// </summary>
-public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchLink watch)
+public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchLink watch, WorkoutNotice notice)
 {
     private const string RestCountdownKey = "RestCountdown";
 
@@ -21,6 +21,26 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
 
     /// <summary>The open workout, or null when there is none (or nothing has loaded yet).</summary>
     public WorkoutState? Current { get; private set; }
+
+    /// <summary>Raised after every change to the open workout, e.g. one made from the watch, so a screen showing it can update.</summary>
+    public event Action? Changed;
+
+    /// <summary>What the open workout is doing now, for the watch and the notification; null when none is open.</summary>
+    public WorkoutStatus? Status
+    {
+        get
+        {
+            if (Current is not { } state) return null;
+            if (state.Running is { } running) return new WorkoutStatus(false, state.Exercises[running.ExerciseId].Name, running.StartedAt!.Value, null, null);
+
+            var next = state.Next is { } step ? state.Exercises[step.ExerciseId].Name : null;
+            if (state.ToLog is not { } logged) return new WorkoutStatus(true, state.Name, state.Session.StartedAt, null, next);
+            if (state.Next is { AfterBreak: false }) return new WorkoutStatus(true, $"{state.Exercises[logged.ExerciseId].Name} done", logged.StoppedAt!.Value, null, next);
+
+            DateTimeOffset? endsAt = RestCountdown ? logged.StoppedAt!.Value + RestTarget(logged.ExerciseId) : null;
+            return new WorkoutStatus(true, "Rest", logged.StoppedAt!.Value, endsAt, next);
+        }
+    }
 
     /// <summary>Loads history and any open workout once; later calls return what's in memory.</summary>
     public async Task<WorkoutState?> LoadAsync()
@@ -41,6 +61,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Current = await CreateStateAsync(session, [], plan);
         watch.Open(session);
         if (Current.Next is { } first) StartSet(Current.Exercises[first.ExerciseId]);
+        else Announce();
     }
 
     /// <summary>Saves the set being logged, then starts a set of the exercise with suggested values.</summary>
@@ -73,6 +94,13 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         state.Sets.Add(set);
         state.Refresh();
         Save(store.InsertSetAsync(state.Session, set));
+        Announce();
+    }
+
+    /// <summary>Starts whatever comes next, e.g. from the watch when a rest is up. Does nothing while a set runs.</summary>
+    public void StartNext()
+    {
+        if (Current is { Running: null, Next: { } next } state) StartSet(state.Exercises[next.ExerciseId]);
     }
 
     /// <summary>Stops the running set; for a time exercise the stopwatch becomes its duration.</summary>
@@ -84,6 +112,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         if (Current.Exercises[running.ExerciseId].Measure == ExerciseMeasure.Time) running.DurationSeconds = (int)Math.Round((running.StoppedAt - running.StartedAt)?.TotalSeconds ?? 0);
         Current.Refresh();
         Save(store.UpdateSetAsync(running));
+        Announce();
     }
 
     /// <summary>Saves edits to a set (weight, reps, hit goal).</summary>
@@ -113,6 +142,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
 
         Current.Skipped.Add(exerciseId);
         Current.Refresh();
+        Announce();
     }
 
     /// <summary>Stops a running set, saves the one being logged, and closes the session.</summary>
@@ -128,6 +158,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         pastSets.AddRange(state.Sets);
         Current = null;
         watch.Close();
+        Announce();
     }
 
     /// <summary>Throws away the open session and its sets, e.g. one started by mistake.</summary>
@@ -138,6 +169,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Save(store.DeleteSessionAsync(state.Session));
         Current = null;
         watch.Close();
+        Announce();
     }
 
     /// <summary>Deletes a finished session and its sets, so history and suggestions forget it.</summary>
@@ -232,6 +264,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         var plan = await store.GetSessionPlanAsync(open.Id);
         if (plan.Count == 0 && open.TemplateId is long templateId) plan = PlanEdits.Copy(await store.GetTemplateExercisesAsync(templateId));
         Current = await CreateStateAsync(open, [.. sets.Where(s => s.SessionId == open.Id)], plan);
+        Announce();
     }
 
     // Replaces today's plan and saves it. A running set belonged to the exercise that changed, so it's thrown away and
@@ -248,10 +281,10 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         state.Plan = plan;
         state.Refresh();
         Save(store.SaveSessionPlanAsync(state.Session, plan));
-        if (running is null) return;
 
-        var next = startNow ?? (state.Next is { } step ? state.Exercises[step.ExerciseId] : null);
+        var next = running is null ? null : startNow ?? (state.Next is { } step ? state.Exercises[step.ExerciseId] : null);
         if (next is not null) StartSet(next);
+        else Announce();
     }
 
     private async Task<WorkoutState> CreateStateAsync(WorkoutSession session, List<WorkoutSet> sets, List<TemplateExercise> plan)
@@ -279,6 +312,16 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
     {
         preferences[key] = value;
         Save(store.SetSettingAsync(key, value));
+        Announce();
+    }
+
+    // Tells the watch, the notification and any screen showing the workout what it's doing now.
+    private void Announce()
+    {
+        var status = Status;
+        if (status is not null) watch.Show(status);
+        notice.Show(status);
+        Changed?.Invoke();
     }
 
     // Saves run in the background; a failure is logged rather than holding up the screen.

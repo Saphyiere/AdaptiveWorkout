@@ -11,6 +11,7 @@ namespace AdaptiveWorkout.Watch;
 /// <summary>
 /// Reads heart rate during a workout, screen on or off, and sends it to the phone.
 /// Readings wait here until the phone takes them, so a short disconnect loses nothing.
+/// It also keeps the phone's word on what the workout is doing, and buzzes when a rest countdown is up.
 /// </summary>
 [Service(ForegroundServiceType = ForegroundService.TypeHealth, Exported = false)]
 public sealed class HeartRateService : Service, ISensorEventListener
@@ -18,8 +19,12 @@ public sealed class HeartRateService : Service, ISensorEventListener
     /// <summary>The phone workout's start in Unix milliseconds; missing when the watch app was opened on its own.</summary>
     public const string ExtraWorkoutStartedAt = "workoutStartedAt";
 
+    /// <summary>The "rest is up" notification, which brings the screen up when it isn't showing.</summary>
+    public const int RestOverNotificationId = 3;
+
     private const int NotificationId = 1;
     private const string Channel = "workout";
+    private const string RestOverChannel = "rest";
 
     // Longer than any workout, so the watch stops even if the phone's Finish never arrives.
     private static readonly TimeSpan MaxWorkout = TimeSpan.FromHours(4);
@@ -29,6 +34,9 @@ public sealed class HeartRateService : Service, ISensorEventListener
 
     private readonly List<HeartRateSample> unsent = [];
     private readonly Handler handler = new(Looper.MainLooper!);
+    private readonly Handler restAlarm = new(Looper.MainLooper!);
+    private static HeartRateService? running;
+    private DateTimeOffset? buzzAt;
     private SensorManager? sensors;
     private PowerManager.WakeLock? wakeLock;
     private string? phoneId;
@@ -43,6 +51,12 @@ public sealed class HeartRateService : Service, ISensorEventListener
     public static int? Bpm { get; private set; }
     public static bool PhoneReachable { get; private set; } = true;
 
+    /// <summary>What the phone says the workout is doing; empty until it says.</summary>
+    public static WorkoutStatus? Status { get; private set; }
+
+    /// <summary>True once the rest countdown is up and the next set hasn't started.</summary>
+    public static bool RestOver => Status is { Resting: true, RestEndsAt: { } end } && DateTimeOffset.Now >= end;
+
     /// <summary>Raised on the main thread whenever the values above change, and when the service stops.</summary>
     public static event Action? Changed;
 
@@ -50,9 +64,13 @@ public sealed class HeartRateService : Service, ISensorEventListener
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
     {
+        running = this;
         var workoutStartedAt = intent?.GetLongExtra(ExtraWorkoutStartedAt, 0) ?? 0;
         if (workoutStartedAt > 0) (StartedAt, FromPhone) = (DateTimeOffset.FromUnixTimeMilliseconds(workoutStartedAt).ToLocalTime(), true);
         else StartedAt ??= DateTimeOffset.Now;
+
+        // The phone sends what the workout is doing on every change; this asks for it now, in case the last one came before this started.
+        if (FromPhone) _ = TellPhoneAsync(WatchMessages.Hello, []);
 
         var notifications = (NotificationManager)GetSystemService(NotificationService)!;
         notifications.CreateNotificationChannel(new NotificationChannel(Channel, GetString(Resource.String.workout_channel), NotificationImportance.Low));
@@ -103,9 +121,65 @@ public sealed class HeartRateService : Service, ISensorEventListener
         sensors?.UnregisterListener(this);
         if (wakeLock?.IsHeld == true) wakeLock.Release();
         handler.RemoveCallbacksAndMessages(null);
-        (StartedAt, FromPhone, Bpm, PhoneReachable) = (null, false, null, true);
+        restAlarm.RemoveCallbacksAndMessages(null);
+        ((NotificationManager)GetSystemService(NotificationService)!).Cancel(RestOverNotificationId);
+        running = null;
+        (StartedAt, FromPhone, Bpm, PhoneReachable, Status) = (null, false, null, true, null);
         Changed?.Invoke();
         base.OnDestroy();
+    }
+
+    /// <summary>Takes the phone's word for what the workout is doing, and sets the buzz for the end of a rest countdown. Any thread.</summary>
+    public static void Show(WorkoutStatus status) => running?.handler.Post(() =>
+    {
+        if (running is not { } service) return;
+
+        // With its screen on the rest, the phone starts the next set at zero itself, which can land just before this buzz. Buzz anyway.
+        var now = DateTimeOffset.Now;
+        var startedAtZero = !status.Resting && service.buzzAt - now < TimeSpan.FromSeconds(1);
+        Status = status;
+        service.restAlarm.RemoveCallbacksAndMessages(null);
+        service.buzzAt = status is { Resting: true, RestEndsAt: { } end, Next: not null } && end > now ? end : null;
+        if (service.buzzAt is { } at) service.restAlarm.PostDelayed(service.RestIsOver, (long)Math.Ceiling((at - now).TotalMilliseconds));
+        if (!RestOver) ((NotificationManager)service.GetSystemService(NotificationService)!).Cancel(RestOverNotificationId);
+        if (startedAtZero) service.RestIsOver();
+        else Changed?.Invoke();
+    });
+
+    /// <summary>Asks the phone to start whatever comes next; the phone answers with the new status. Any thread.</summary>
+    public static void StartNext() => running?.handler.Post(async () =>
+    {
+        if (running is not { } service) return;
+
+        PhoneReachable = await service.TellPhoneAsync(WatchMessages.Next, []);
+        Changed?.Invoke();
+    });
+
+    // The rest countdown is up: buzz, and if the heart rate screen isn't showing, bring it up with "Start <next>"
+    // (or the set itself, when the phone started it at zero).
+    private void RestIsOver()
+    {
+        buzzAt = null;
+        var vibrator = OperatingSystem.IsAndroidVersionAtLeast(31) ? ((VibratorManager)GetSystemService(VibratorManagerService)!).DefaultVibrator : (Vibrator)GetSystemService(VibratorService)!;
+        vibrator.Vibrate(VibrationEffect.CreateWaveform([0, 400, 200, 400, 200, 400], -1));
+        Changed?.Invoke();
+        if (MainActivity.IsVisible) return;
+
+        // It opens the screen straight away while the watch screen is off, and is one tap away otherwise. The buzz above is the only one.
+        var notifications = (NotificationManager)GetSystemService(NotificationService)!;
+        var channel = new NotificationChannel(RestOverChannel, GetString(Resource.String.rest_over_channel), NotificationImportance.High);
+        channel.EnableVibration(false);
+        channel.SetSound(null, null);
+        notifications.CreateNotificationChannel(channel);
+        var open = PendingIntent.GetActivity(this, 1, new Intent(this, typeof(MainActivity)).AddFlags(ActivityFlags.NewTask), PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
+        notifications.Notify(RestOverNotificationId, new Notification.Builder(this, RestOverChannel)
+            .SetSmallIcon(Resource.Drawable.appicon_foreground)
+            .SetContentTitle(GetString(Resource.String.rest_over))
+            .SetContentText(Status is { Resting: true, Next: { } next } ? GetString(Resource.String.start_next, new Java.Lang.String(next)) : Status?.Title)
+            .SetContentIntent(open)
+            .SetFullScreenIntent(open, true)
+            .SetAutoCancel(true)
+            .Build());
     }
 
     // Sends everything not yet sent. Runs on the main thread, one send at a time; readings that arrive meanwhile go with the next one.
@@ -113,28 +187,33 @@ public sealed class HeartRateService : Service, ISensorEventListener
     {
         sending = true;
         var batch = unsent.ToList();
+        PhoneReachable = await TellPhoneAsync(WatchMessages.HeartRate, WatchMessages.EncodeReadings(FromPhone ? StartedAt : null, batch));
+        if (PhoneReachable)
+        {
+            var sent = batch.ToHashSet();
+            unsent.RemoveAll(sent.Contains);
+        }
+
+        sending = false;
+        Changed?.Invoke();
+    }
+
+    // Sends one message to the phone; false when it couldn't.
+    private async Task<bool> TellPhoneAsync(string path, byte[] payload)
+    {
         try
         {
             phoneId ??= (await WearableClass.GetNodeClient(this).GetConnectedNodesAsync()).FirstOrDefault()?.Id;
-            if (phoneId is not null)
-            {
-                await WearableClass.GetMessageClient(this).SendMessageAsync(phoneId, WatchMessages.HeartRate, WatchMessages.EncodeReadings(FromPhone ? StartedAt : null, batch));
-                var sent = batch.ToHashSet();
-                unsent.RemoveAll(sent.Contains);
-            }
+            if (phoneId is null) return false;
 
-            PhoneReachable = phoneId is not null;
+            await WearableClass.GetMessageClient(this).SendMessageAsync(phoneId, path, payload);
+            return true;
         }
         catch (Exception ex)
         {
-            Log.Warn("AdaptiveWorkout", $"Sending heart rate failed: {ex.Message}");
-            (phoneId, PhoneReachable) = (null, false);
+            Log.Warn("AdaptiveWorkout", $"Reaching the phone failed: {ex.Message}");
+            phoneId = null;
+            return false;
         }
-        finally
-        {
-            sending = false;
-        }
-
-        Changed?.Invoke();
     }
 }

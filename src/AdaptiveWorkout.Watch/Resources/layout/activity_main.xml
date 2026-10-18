@@ -1,77 +1,139 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The heart rate screen: the time up top, heart rate in the middle, how long the workout has run below it. -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+    The heart rate screen: the time up top, then what the workout is doing (a set and its time, or the rest and how long is
+    left), heart rate in the middle, and how long the workout has run. While resting, a button that starts the next set on the
+    phone takes the workout time's place.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/black"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/edge_margin"
+    android:paddingBottom="@dimen/edge_margin"
     tools:deviceIds="wear">
 
     <TextClock
         android:id="@+id/clock"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="@dimen/edge_margin"
         android:format12Hour="h:mm"
         android:format24Hour="HH:mm"
         android:textColor="@color/ink_muted"
-        android:textSize="16sp" />
+        android:textSize="14sp" />
+
+    <Space
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:id="@+id/phase"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:baselineAligned="true"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/phase_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxWidth="96dp"
+            android:maxLines="1"
+            android:textColor="@color/ink_muted"
+            android:textSize="14sp" />
+
+        <Chronometer
+            android:id="@+id/phase_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/archivo_expanded"
+            android:fontFeatureSettings="tnum"
+            android:fontVariationSettings="'wght' 600"
+            android:includeFontPadding="false"
+            android:textColor="@color/ink"
+            android:textSize="18sp" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center_horizontal"
-        android:orientation="vertical">
+        android:layout_marginTop="2dp"
+        android:baselineAligned="true"
+        android:orientation="horizontal">
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/bpm"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:baselineAligned="true"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/bpm"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/archivo_expanded"
-                android:fontFeatureSettings="tnum"
-                android:fontVariationSettings="'wght' 700"
-                android:includeFontPadding="false"
-                android:text="@string/no_reading"
-                android:textColor="@color/accent"
-                android:textSize="64sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="@string/bpm"
-                android:textColor="@color/ink_muted"
-                android:textSize="14sp" />
-        </LinearLayout>
-
-        <Chronometer
-            android:id="@+id/elapsed"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
             android:fontFamily="@font/archivo_expanded"
             android:fontFeatureSettings="tnum"
-            android:fontVariationSettings="'wght' 600"
-            android:textColor="@color/ink"
-            android:textSize="22sp" />
+            android:fontVariationSettings="'wght' 700"
+            android:includeFontPadding="false"
+            android:text="@string/no_reading"
+            android:textColor="@color/accent"
+            android:textSize="56sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="@string/bpm"
+            android:textColor="@color/ink_muted"
+            android:textSize="14sp" />
     </LinearLayout>
+
+    <Chronometer
+        android:id="@+id/elapsed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:fontFamily="@font/archivo_expanded"
+        android:fontFeatureSettings="tnum"
+        android:fontVariationSettings="'wght' 600"
+        android:includeFontPadding="false"
+        android:textColor="@color/ink"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/start"
+        android:layout_width="wrap_content"
+        android:layout_height="34dp"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/start_button"
+        android:ellipsize="end"
+        android:maxWidth="124dp"
+        android:maxLines="1"
+        android:minWidth="96dp"
+        android:minHeight="0dp"
+        android:paddingStart="14dp"
+        android:paddingTop="0dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="0dp"
+        android:stateListAnimator="@null"
+        android:textAllCaps="false"
+        android:textColor="@color/on_accent"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <Space
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
     <TextView
         android:id="@+id/status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="@dimen/edge_margin"
         android:gravity="center"
         android:maxWidth="160dp"
         android:textColor="@color/ink_muted"
-        android:textSize="12sp" />
-</FrameLayout>
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

@@ -47,6 +47,9 @@ public sealed class PhoneWatchLink(WorkoutStore store) : WatchLink(store)
 
     public override void Close() => _ = ToEachWatchAsync((context, watch) => WearableClass.GetMessageClient(context).SendMessageAsync(watch.Id, WatchMessages.Stop, []));
 
+    public override void Show(WorkoutStatus status) =>
+        _ = ToEachWatchAsync((context, watch) => WearableClass.GetMessageClient(context).SendMessageAsync(watch.Id, WatchMessages.Status, WatchMessages.EncodeStatus(status)));
+
     private static async Task ToEachWatchAsync(Func<Context, INode, Task> send)
     {
         try

@@ -16,6 +16,9 @@ public class WatchLink(WorkoutStore store)
     /// <summary>Raised when a reading arrives, on whatever thread it arrived on.</summary>
     public event Action? Changed;
 
+    /// <summary>True while the watch is sending heart rate (about once a second), so the watch can buzz instead of the phone.</summary>
+    public bool Connected => Latest is { } latest && DateTimeOffset.Now - latest.At < TimeSpan.FromSeconds(15);
+
     /// <summary>Opens the watch app's heart rate screen for this workout.</summary>
     public virtual void Open(WorkoutSession session)
     {
@@ -23,6 +26,11 @@ public class WatchLink(WorkoutStore store)
 
     /// <summary>Stops the watch's heart rate and closes its screen.</summary>
     public virtual void Close()
+    {
+    }
+
+    /// <summary>Tells the watch what the workout is doing, so it can show the rest or set and buzz when a rest countdown ends.</summary>
+    public virtual void Show(WorkoutStatus status)
     {
     }
 
