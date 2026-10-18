@@ -1,7 +1,7 @@
 @inherits LayoutComponentBase
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
-@inject WorkoutFlow Flow
+@inject AppLaunch Launch
 @inject ThemeSetting ThemeSetting
 @inject IJSRuntime JS
 
@@ -22,10 +22,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Warm up storage and the open workout in the background, so the first tap is already fast.
-        _ = Flow.LoadAsync();
+        // The opening's timing (AppLaunch): Blazor is running, then the saved settings are read.
+        Launch.Step("Blazor");
         ThemeSetting.Changed += OnThemeChanged;
         await ThemeSetting.LoadAsync();
+        Launch.Step("settings");
         themeLoaded = true;
     }
 

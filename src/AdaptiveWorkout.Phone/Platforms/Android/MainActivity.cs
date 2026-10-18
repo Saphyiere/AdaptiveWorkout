@@ -1,3 +1,4 @@
+using AdaptiveWorkout.UI;
 using Android.App;
 using Android.Content.PM;
 using Android.OS;
@@ -11,6 +12,9 @@ public class MainActivity : MauiAppCompatActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+
+        // For the opening's timing (AppLaunch): MAUI has made the window and its page. Their views, the web view among them, come next.
+        IPlatformApplication.Current!.Services.GetRequiredService<AppLaunch>().Step("window");
 
         // The page draws behind the status and navigation bars, so their icons follow its theme: dark on Logbook's paper, light on Telemetry.
         PhoneThemeSetting.DressBars(Window!, PhoneThemeSetting.Last);

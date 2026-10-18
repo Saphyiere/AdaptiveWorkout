@@ -1,3 +1,4 @@
+using AdaptiveWorkout.UI;
 using AdaptiveWorkout.UI.Themes;
 
 namespace AdaptiveWorkout.Phone;
@@ -8,6 +9,9 @@ public partial class MainPage : ContentPage
 	{
 		InitializeComponent();
 		ShowTheme(PhoneThemeSetting.Last);
+
+		// For the opening's timing (AppLaunch): the web view exists, and starts loading the page.
+		blazorWebView.BlazorWebViewInitialized += (_, _) => IPlatformApplication.Current!.Services.GetRequiredService<AppLaunch>().Step("web view");
 	}
 
 	/// <summary>The theme's background (app.css's ground) behind the page and in its web view, seen while the page loads.</summary>

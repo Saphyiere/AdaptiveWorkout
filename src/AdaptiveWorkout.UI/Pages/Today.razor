@@ -2,6 +2,7 @@
 @inject WorkoutStore Store
 @inject WorkoutFlow Flow
 @inject AppSettings Settings
+@inject AppLaunch Launch
 @inject NavigationManager Nav
 
 <PageTitle>Today</PageTitle>
@@ -353,6 +354,7 @@
 
 @code {
     private bool loaded;
+    private bool shown;
     private DateOnly today;
     private DateOnly monday;
     private bool[] week = new bool[7];
@@ -408,7 +410,8 @@
         var gymDays = sessions.Select(s => DateOnly.FromDateTime(s.StartedAt.DateTime)).ToList();
         week = Consistency.Week(gymDays, today);
         wentToday = gymDays.Contains(today);
-        openSession = (await Flow.LoadAsync())?.Session;
+        // The open workout, by WorkoutFlow's own rule. Asking the flow would wait for every set ever logged, which it loads after Today is up.
+        openSession = sessions.LastOrDefault(s => s.FinishedAt is null);
 
         // The routine in use plans each day; without one (or with an empty week) any day is a gym day, counted by weeks.
         routine = await Store.GetActiveRoutineAsync();
@@ -432,7 +435,8 @@
         eaten = todayFood.Sum(f => f.Calories);
         left = Settings.CalorieGoal - eaten;
 
-        weights = await Store.GetBodyWeightsAsync();
+        // The weigh-ins Today shows: the last 30 days, and the latest few for the list.
+        weights = await Store.GetBodyWeightsSinceAsync(now.AddDays(-30), 10);
         latestWeight = weights.MaxBy(w => w.At);
         var change = BodyWeight.Change(weights, now, 30);
         weightChange = change is null or 0 ? null : $"{(change < 0 ? "−" : "+")}{Math.Abs(change.Value).ToString("0.#", CultureInfo.CurrentCulture)} {UnitText}";
@@ -462,7 +466,19 @@
         }
         else weightTrace = null;
 
+        Launch.Step("Today's data");
         loaded = true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!loaded || shown) return;
+
+        // Today is up, which ends the opening. The workout history loads only now, so however long it grows it never holds Today up,
+        // and it's usually ready by the time Start or Resume needs it.
+        shown = true;
+        Launch.Drawn();
+        _ = Flow.LoadAsync();
     }
 
     private async Task AddFoodAsync()

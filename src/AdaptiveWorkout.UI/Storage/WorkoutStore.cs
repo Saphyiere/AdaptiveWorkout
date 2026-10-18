@@ -187,8 +187,9 @@ public sealed class WorkoutStore(string databasePath)
 
     public Task AddFoodAsync(int calories, DateTimeOffset at) => RunAsync(c => c.ExecuteAsync("INSERT INTO FoodEntry (At, Calories) VALUES (@at, @calories)", new { at, calories }));
 
+    /// <summary>Food eaten since a time. Times are text with an offset, so SQL narrows with a day of slack and the exact range is checked in memory.</summary>
     public Task<List<FoodEntry>> GetFoodSinceAsync(DateTimeOffset since) => RunAsync(async c =>
-        (await c.QueryAsync<FoodEntry>("SELECT Id, At, Calories FROM FoodEntry ORDER BY Id")).Where(e => e.At >= since).ToList());
+        (await c.QueryAsync<FoodEntry>("SELECT Id, At, Calories FROM FoodEntry WHERE At >= @start ORDER BY Id", new { start = since.AddDays(-1) })).Where(e => e.At >= since).ToList());
 
     public Task DeleteFoodAsync(FoodEntry entry) => RunAsync(c => c.ExecuteAsync("DELETE FROM FoodEntry WHERE Id = @Id", entry));
 
@@ -197,6 +198,10 @@ public sealed class WorkoutStore(string databasePath)
 
     public Task<List<BodyWeightEntry>> GetBodyWeightsAsync() => RunAsync(async c =>
         (await c.QueryAsync<BodyWeightEntry>("SELECT Id, At, Weight, WeightUnit FROM BodyWeightEntry ORDER BY Id")).AsList());
+
+    /// <summary>Weigh-ins since a time, with a day of slack as for food, and the newest few whenever they were.</summary>
+    public Task<List<BodyWeightEntry>> GetBodyWeightsSinceAsync(DateTimeOffset since, int newest) => RunAsync(async c =>
+        (await c.QueryAsync<BodyWeightEntry>("SELECT Id, At, Weight, WeightUnit FROM BodyWeightEntry WHERE At >= @start OR Id IN (SELECT Id FROM BodyWeightEntry ORDER BY Id DESC LIMIT @newest) ORDER BY Id", new { start = since.AddDays(-1), newest })).AsList());
 
     public Task DeleteBodyWeightAsync(BodyWeightEntry entry) => RunAsync(c => c.ExecuteAsync("DELETE FROM BodyWeightEntry WHERE Id = @Id", entry));
 

@@ -17,6 +17,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<WatchLink, PhoneWatchLink>();
 		builder.Services.AddSingleton<WorkoutNotice, PhoneWorkoutNotice>();
 		builder.Services.AddSingleton<ThemeSetting, PhoneThemeSetting>();
+		builder.Services.AddSingleton<AppLaunch, PhoneAppLaunch>();
 		builder.Services.AddAdaptiveWorkout(Path.Combine(FileSystem.AppDataDirectory, "adaptiveworkout.db"));
 
 #if DEBUG

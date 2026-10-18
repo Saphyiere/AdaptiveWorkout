@@ -11,9 +11,10 @@ namespace AdaptiveWorkout.UI;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the app's storage, theme, workout flow, watch link and notice. The host decides where the database file lives,
-    /// and registers its own <see cref="WatchLink"/>, <see cref="WorkoutNotice"/> and <see cref="ThemeSetting"/> first if it can reach
-    /// a watch, show notifications, or has parts of its own to dress for the theme.
+    /// Registers the app's storage, theme, workout flow, watch link, notice and launch timing. The host decides where the database
+    /// file lives, and registers its own <see cref="WatchLink"/>, <see cref="WorkoutNotice"/>, <see cref="ThemeSetting"/> and
+    /// <see cref="AppLaunch"/> first if it can reach a watch, show notifications, has parts of its own to dress for the theme, or
+    /// times its own start.
     /// </summary>
     public static IServiceCollection AddAdaptiveWorkout(this IServiceCollection services, string databasePath)
     {
@@ -22,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<WatchLink>();
         services.TryAddSingleton<WorkoutNotice>();
         services.TryAddSingleton<ThemeSetting>();
+        services.TryAddSingleton<AppLaunch>();
         services.AddSingleton<WorkoutFlow>();
         return services;
     }

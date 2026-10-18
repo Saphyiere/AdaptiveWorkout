@@ -41,6 +41,14 @@ What the app does and how its data is shaped: [docs/concept.md](docs/concept.md)
 
 The app opens on Today. F5 runs a Debug build, which opens slowly: it compiles each method on the phone the first time it runs, and with the debugger attached it also waits for Visual Studio. (`UseInterpreter` is off in both apps, so Debug builds at least run compiled code rather than Mono's interpreter, which gives up C# Hot Reload on the devices.) **For the copy you use day to day, install Release**: pick **Release** in Visual Studio's configuration dropdown and press **Ctrl+F5**, or run `dotnet build src/AdaptiveWorkout.Phone -t:Run -c Release`. Release compiles the whole app ahead of time (`AndroidEnableProfiledAot` is off), so it opens quickly. It takes a few minutes to build, installs over a Debug build, and keeps the app's data.
 
+Each start writes how long it took to the phone's log, as one line that `adb logcat -s AdaptiveWorkout` shows, like this (numbers made up):
+
+```
+Opened in 1200 ms: .NET +300, app +50, window +100, web view +200, Blazor +350, settings +50, Today's data +50, drawn +100
+```
+
+Each step's number is the time since the step before it, counting from when Android started the app: `.NET` until the app's own code runs, `app` building the MAUI app, `window` its window and page, `web view` creating the web view, `Blazor` loading the page and starting Blazor in it, `settings` opening the database and reading the theme, `Today's data` Today's reads, and `drawn` Today rendered with them. Android times the start too, from the tap: `adb logcat -s ActivityTaskManager` shows `Fully drawn …: +1s200ms`.
+
 If the app stops as it opens with *No view found for id 0x… for fragment NavigationRootManager_ElementBasedFragment*, the build deployed resource ids that don't match the app's resources. `Directory.Build.targets` stops Visual Studio's background builds from causing that; if it happens anyway, delete the `artifacts` folder and build again. Don't uninstall the app to fix it: that deletes its data.
 
 ## Hello world on the watch (no USB needed)
