@@ -1,5 +1,6 @@
 @* The workout's masthead: its name, time and a tally of the sets done, the view switch, and Finish, which is always reachable.
    Its rule is in the pen's color while the workout is live. *@
+@inject AppNavigation Navigation
 @{ var setsDone = State.Sets.Count(s => s.StoppedAt is not null); }
 <header class="masthead live">
     <div class="spread">
@@ -27,11 +28,11 @@
         <div class="inline">
             @if (Advanced)
             {
-                <a class="icon-btn" href="workout" aria-label="Simple view"><Icon Name="page" Size="22" /></a>
+                <a class="icon-btn" href="workout" aria-label="Simple view" @onclick="@(() => Navigation.Replace("workout"))" @onclick:preventDefault><Icon Name="page" Size="22" /></a>
             }
             else
             {
-                <a class="icon-btn" href="workout/advanced" aria-label="Advanced view"><Icon Name="list" Size="22" /></a>
+                <a class="icon-btn" href="workout/advanced" aria-label="Advanced view" @onclick="@(() => Navigation.Replace("workout/advanced"))" @onclick:preventDefault><Icon Name="list" Size="22" /></a>
             }
             <button type="button" class="btn" @onclick="() => confirming = true">Finish</button>
         </div>
@@ -57,4 +58,7 @@
     [Parameter, EditorRequired] public WorkoutState State { get; set; } = default!;
     [Parameter] public bool Advanced { get; set; }
     [Parameter] public EventCallback OnFinish { get; set; }
+
+    // The workout's other screens name it on their way back. Its two views take each other's place rather than stacking up.
+    protected override void OnParametersSet() => Navigation.Name(State.Name);
 }

@@ -3,7 +3,7 @@
 @inject WorkoutFlow Flow
 @inject AppSettings Settings
 @inject AppLaunch Launch
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>Today</PageTitle>
 
@@ -333,11 +333,11 @@
         <div class="push-down">
             @if (routine is null)
             {
-                <a class="btn-ghost" href="routines?from=today">Set up a routine</a>
+                <a class="btn-ghost" href="routines">Set up a routine</a>
             }
             else if (!planned)
             {
-                <a class="btn-ghost" href="@($"routines/{routine.Id}?from=today")">Plan your week</a>
+                <a class="btn-ghost" href="@($"routines/{routine.Id}")">Plan your week</a>
             }
             else if (openSession is null && todayTemplate is not null && !wentToday)
             {
@@ -345,7 +345,7 @@
             }
             else if (openSession is null && restDay)
             {
-                <a class="btn-ghost" href="routines?from=today">Edit routine</a>
+                <a class="btn-ghost" href="routines">Edit routine</a>
             }
             <button type="button" class="btn-primary go" @onclick="StartAsync">@startLabel</button>
         </div>
@@ -515,11 +515,11 @@
     {
         if (openSession is null && (todayTemplate is null || wentToday))
         {
-            Nav.NavigateTo("sessions");
+            Navigation.Open("sessions");
             return;
         }
 
         if (openSession is null) await Flow.StartSessionAsync(todayTemplate!.Id);
-        Nav.NavigateTo("workout");
+        Navigation.Open("workout");
     }
 }

@@ -2,7 +2,7 @@
 @inject WorkoutStore Store
 @inject WorkoutFlow Flow
 @inject AppSettings Settings
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>@name</PageTitle>
 
@@ -114,7 +114,7 @@
         session = (await Store.GetSessionsAsync()).FirstOrDefault(s => s.Id == Id && s.FinishedAt is not null);
         if (session is null)
         {
-            Nav.NavigateTo("gym", replace: true);
+            await Navigation.BackAsync("gym");
             return;
         }
 
@@ -129,6 +129,6 @@
     private async Task DeleteAsync()
     {
         await Flow.DeleteSessionAsync(session!);
-        Nav.NavigateTo("gym");
+        await Navigation.BackAsync("gym");
     }
 }

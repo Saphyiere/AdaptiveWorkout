@@ -1,6 +1,6 @@
 @page "/workout/exercise"
 @inject WorkoutFlow Flow
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>Pick an exercise</PageTitle>
 
@@ -12,13 +12,13 @@
         <PageHeader Back="@(state.Sets.Count == 0 ? "" : "workout")" BackText="@(state.Sets.Count == 0 ? "Today" : state.Name)" Label="@(state.Sets.Count == 0 ? state.Name : null)"
                     Title="@(state.Sets.Count == 0 ? "First exercise" : "Different exercise")" Small="true" Live="true" />
 
-        <ExercisePicker State="state" OnPick="Start" Exclude="@stillToDo.Select(e => e.Id).ToHashSet()" NewAction="Start set">
+        <ExercisePicker State="state" OnPick="StartAsync" Exclude="@stillToDo.Select(e => e.Id).ToHashSet()" NewAction="Start set">
             <BeforeTyping>
                 @if (stillToDo.Count > 0)
                 {
                     <section class="stack" aria-labelledby="still-heading">
                         <h2 id="still-heading" class="label">Still to do in @state.Name</h2>
-                        <ExerciseList Exercises="stillToDo" State="state" OnPick="Start" />
+                        <ExerciseList Exercises="stillToDo" State="state" OnPick="StartAsync" />
                     </section>
                 }
             </BeforeTyping>
@@ -27,7 +27,7 @@
         @if (state.Sets.Count == 0)
         {
             <div class="push-down">
-                <button type="button" class="btn-ghost" @onclick="Cancel">Cancel workout</button>
+                <button type="button" class="btn-ghost" @onclick="CancelAsync">Cancel workout</button>
             </div>
         }
     </div>
@@ -39,19 +39,20 @@
     protected override async Task OnInitializedAsync()
     {
         state = Flow.Current ?? await Flow.LoadAsync();
-        if (state is null) Nav.NavigateTo("", replace: true);
-        else if (state.Running is not null) Nav.NavigateTo("workout", replace: true);
+        if (state is null) await Navigation.HomeAsync();
+        else if (state.Running is not null) await Navigation.ReturnToAsync("workout");
     }
 
-    private void Start(Exercise exercise)
+    // Back to the workout this was opened from, or, before the first set, on to it in this screen's place.
+    private Task StartAsync(Exercise exercise)
     {
         Flow.StartSet(exercise);
-        Nav.NavigateTo("workout");
+        return Navigation.ReturnToAsync("workout");
     }
 
-    private void Cancel()
+    private Task CancelAsync()
     {
         Flow.Cancel();
-        Nav.NavigateTo("");
+        return Navigation.HomeAsync();
     }
 }

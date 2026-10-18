@@ -509,7 +509,13 @@ h2.label::after {
     border-bottom-color: var(--mark);
 }
 
-/* The way back, above a screen's title. */
+/* The way back, above a screen's title; from two or more screens in, a way straight to Today at the other end. */
+.masthead-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
 .back {
     align-self: flex-start;
     height: 44px;
@@ -521,6 +527,22 @@ h2.label::after {
     font-size: 15px;
     line-height: 20px;
     font-weight: 600;
+}
+
+.home {
+    height: 44px;
+    padding-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-control);
+    font-size: 15px;
+    line-height: 20px;
+    font-weight: 600;
+    color: var(--ink-muted);
+}
+
+.home .icon {
+    display: none;
 }
 
 /* A section: space around it rather than a rule, and its heading (h2.label) underlined by the pen. */
@@ -1626,7 +1648,26 @@ a.link {
     text-align: right;
 }
 
+/* With the way to Today beside the way back, the row is too short for the label at its end: it goes above the title instead. */
+[data-theme="telemetry"] .masthead:has(.home) .masthead-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+[data-theme="telemetry"] .masthead:has(.home) .masthead-text .label {
+    max-width: none;
+    text-align: left;
+}
+
+[data-theme="telemetry"] .masthead-nav {
+    flex: none;
+    gap: 8px;
+}
+
 [data-theme="telemetry"] .back,
+[data-theme="telemetry"] .home,
 [data-theme="telemetry"] .masthead .icon-btn.plain {
     width: 48px;
     height: 48px;
@@ -1638,7 +1679,16 @@ a.link {
     border-radius: var(--radius);
 }
 
-[data-theme="telemetry"] .back span {
+[data-theme="telemetry"] .home {
+    color: inherit;
+}
+
+[data-theme="telemetry"] .home .icon {
+    display: block;
+}
+
+[data-theme="telemetry"] .back span,
+[data-theme="telemetry"] .home span {
     position: absolute;
     width: 1px;
     height: 1px;

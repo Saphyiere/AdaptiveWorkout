@@ -1,8 +1,16 @@
-@* A screen's masthead: the way back, a small label, the title, and the rule under them, with any tools (like Settings) at the right. *@
+@* A screen's masthead: the way back to the screen it was opened from (and, from further in, straight to Today), a small label,
+   the title, and the rule under them, with any tools (like Settings) at the right. *@
+@inject AppNavigation Navigation
 <header class="masthead @(Live ? "live" : "")">
     @if (Back is not null)
     {
-        <a class="back" href="@Back"><Icon Name="arrow-left" Size="22" /><span>@BackText</span></a>
+        <nav class="masthead-nav">
+            <a class="back" href="@Back" @onclick="() => Navigation.BackAsync(Back)" @onclick:preventDefault><Icon Name="arrow-left" Size="22" /><span>@(Navigation.PreviousName ?? BackText)</span></a>
+            @if (!Live && Navigation.TodayIsFurtherBack)
+            {
+                <a class="home" href="" @onclick="Navigation.HomeAsync" @onclick:preventDefault><Icon Name="home" Size="22" /><span>Today</span></a>
+            }
+        </nav>
     }
     <div class="masthead-main">
         <div class="masthead-text">
@@ -17,9 +25,10 @@
 </header>
 
 @code {
-    /// <summary>Where the way back goes; none on Today.</summary>
+    /// <summary>Where the way back goes if the app opened on this screen; none on Today. Otherwise it goes to the screen before.</summary>
     [Parameter] public string? Back { get; set; }
 
+    /// <summary>The way back's words when the screen before hasn't named itself.</summary>
     [Parameter] public string BackText { get; set; } = "Back";
     [Parameter] public string? Label { get; set; }
     [Parameter, EditorRequired] public string Title { get; set; } = "";
@@ -32,4 +41,7 @@
 
     /// <summary>Buttons or links at the right of the title.</summary>
     [Parameter] public RenderFragment? Tools { get; set; }
+
+    // The next screen's way back names this one by its title.
+    protected override void OnParametersSet() => Navigation.Name(Title);
 }

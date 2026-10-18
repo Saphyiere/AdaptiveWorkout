@@ -1,6 +1,6 @@
 @page "/workout/change"
 @inject WorkoutFlow Flow
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>Change</PageTitle>
 
@@ -22,16 +22,16 @@
                     <h2 id="first-heading" class="label">Do another one first</h2>
                     <p class="note">@target.Name waits until it's done.</p>
                 </div>
-                <ExerciseList Exercises="others" State="state" OnPick="DoFirst" />
+                <ExerciseList Exercises="others" State="state" OnPick="DoFirstAsync" />
             </section>
         }
 
-        <ExercisePicker State="state" OnPick="Swap" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="swap-name" Label="@($"Swap {target.Name} for")" NewAction="Swap it in" />
+        <ExercisePicker State="state" OnPick="SwapAsync" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="swap-name" Label="@($"Swap {target.Name} for")" NewAction="Swap it in" />
 
         @if (state.Plan.Any(e => e.ExerciseId == targetId))
         {
             <div class="push-down">
-                <button type="button" class="btn-ghost" @onclick="Drop">Drop @target.Name today</button>
+                <button type="button" class="btn-ghost" @onclick="DropAsync">Drop @target.Name today</button>
             </div>
         }
     </div>
@@ -43,24 +43,24 @@
     protected override async Task OnInitializedAsync()
     {
         state = Flow.Current ?? await Flow.LoadAsync();
-        if (state?.ChangeTarget is null) Nav.NavigateTo(state is null ? "" : "workout", replace: true);
+        if (state?.ChangeTarget is null) await Navigation.ReturnToAsync(state is null ? "" : "workout");
     }
 
-    private void DoFirst(Exercise exercise)
+    private Task DoFirstAsync(Exercise exercise)
     {
         Flow.DoFirst(exercise);
-        Nav.NavigateTo("workout");
+        return Navigation.ReturnToAsync("workout");
     }
 
-    private void Swap(Exercise exercise)
+    private Task SwapAsync(Exercise exercise)
     {
         Flow.SwapFor(exercise);
-        Nav.NavigateTo("workout");
+        return Navigation.ReturnToAsync("workout");
     }
 
-    private void Drop()
+    private Task DropAsync()
     {
         Flow.Drop();
-        Nav.NavigateTo("workout");
+        return Navigation.ReturnToAsync("workout");
     }
 }

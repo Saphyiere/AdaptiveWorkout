@@ -1,7 +1,7 @@
 @page "/sessions/new"
 @page "/sessions/{Id:long}"
 @inject WorkoutStore Store
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>@(Id is null ? "New session" : "Edit session")</PageTitle>
 
@@ -182,7 +182,7 @@
 
         template.Name = name.Trim();
         await Store.SaveTemplateAsync(template, saved);
-        Nav.NavigateTo("sessions");
+        await Navigation.BackAsync("sessions");
     }
 
     private sealed class Entry

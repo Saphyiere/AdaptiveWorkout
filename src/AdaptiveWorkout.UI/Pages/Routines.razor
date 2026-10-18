@@ -5,9 +5,8 @@
 
 @if (loaded)
 {
-    var (back, backText) = From switch { "gym" => ("gym", "Gym"), "today" => ("", "Today"), _ => ("sessions", "Sessions") };
     <div class="screen">
-        <PageHeader Back="@back" BackText="@backText" Title="Routines" />
+        <PageHeader Back="" BackText="Today" Title="Routines" />
         <p class="note">A routine plans the week: a session or a rest day for each day. Today and the streak follow the one in use; tap another to switch.</p>
 
         <section class="ledger" aria-label="Routines">
@@ -28,7 +27,7 @@
                             <span class="caption">@(restDays.Count == 7 ? "No days planned yet" : $"{7 - restDays.Count} gym days{(restDays.Count > 0 ? $" · rest {string.Join(", ", restDays)}" : "")}")</span>
                         </span>
                     </button>
-                    <a class="icon-btn plain" href="@($"routines/{routine.Id}{FromQuery}")" aria-label="Edit @routine.Name"><Icon Name="edit" /></a>
+                    <a class="icon-btn plain" href="@($"routines/{routine.Id}")" aria-label="Edit @routine.Name"><Icon Name="edit" /></a>
                 </div>
             }
             <button type="button" class="row" aria-pressed="@(activeId is null ? "true" : "false")" @onclick="() => UseAsync(null)">
@@ -43,7 +42,7 @@
                     <span class="caption">Any day is a gym day, and the streak counts weeks.</span>
                 </span>
             </button>
-            <a class="row" href="@($"routines/new{FromQuery}")">
+            <a class="row" href="routines/new">
                 <span class="row-text">
                     <span class="name">New routine</span>
                     <span class="note">Pick a session or a rest day for each day</span>
@@ -58,12 +57,6 @@
     private bool loaded;
     private long? activeId;
     private List<(Routine Routine, long?[] Week)> routines = [];
-
-    /// <summary>Where the back arrow goes: Gym or Today, which link here too, or else the session picker.</summary>
-    [SupplyParameterFromQuery] public string? From { get; set; }
-
-    // Carried to the routine editor and back, so the back arrow here still knows.
-    private string FromQuery => From is "gym" or "today" ? $"?from={From}" : "";
 
     protected override async Task OnInitializedAsync()
     {

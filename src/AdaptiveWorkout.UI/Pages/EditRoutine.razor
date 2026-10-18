@@ -1,14 +1,14 @@
 @page "/routines/new"
 @page "/routines/{Id:long}"
 @inject WorkoutStore Store
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>@(Id is null ? "New routine" : "Edit routine")</PageTitle>
 
 @if (loaded)
 {
     <div class="screen">
-        <PageHeader Back="@($"routines{FromQuery}")" BackText="Routines" Title="@(Id is null ? "New routine" : "Edit routine")" />
+        <PageHeader Back="routines" BackText="Routines" Title="@(Id is null ? "New routine" : "Edit routine")" />
 
         <div class="field-group">
             <label class="field-label" for="routine-name">Routine name</label>
@@ -19,7 +19,7 @@
             <h2 id="week-heading" class="label">The week</h2>
             @if (templates.Count == 0)
             {
-                <p class="note">No sessions yet. <a class="link" href="sessions/new">Make one first</a>, then pick it for its days here.</p>
+                <p class="note">No sessions yet. Make one below, then pick it for its days here.</p>
             }
             <div class="ledger">
                 @for (var i = 0; i < 7; i++)
@@ -37,7 +37,16 @@
                     </div>
                 }
             </div>
-            <p class="note">The same session can be on several days, and in other routines too.</p>
+            <div class="ledger">
+                <button type="button" class="row" @onclick="NewSession">
+                    <span class="row-text">
+                        <span class="name">New session</span>
+                        <span class="note">Then back here to pick its days</span>
+                    </span>
+                    <Icon Name="plus" />
+                </button>
+            </div>
+            <p class="note">@(added is null ? "The same session can be on several days, and in other routines too." : $"{added} is ready: pick it for its days above.")</p>
         </section>
 
         <label class="goal">
@@ -81,12 +90,10 @@
     private bool deleting;
     private IReadOnlyList<SessionTemplate> templates = [];
 
+    // The session just made from here, now ready to pick.
+    private string? added;
+
     [Parameter] public long? Id { get; set; }
-
-    /// <summary>Where the routines list's back arrow goes, passed back to it.</summary>
-    [SupplyParameterFromQuery] public string? From { get; set; }
-
-    private string FromQuery => From is "gym" or "today" ? $"?from={From}" : "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -101,7 +108,20 @@
         name = routine.Name;
         // A new routine is usually meant to be followed; an existing one is in use if it already was.
         use = routine.Id == 0 || active?.Id == routine.Id || active is null;
+
+        // Back from making a session: the routine as it was left, changes not saved yet too.
+        if (Navigation.Kept<Draft>() is { } draft)
+        {
+            (name, week, use) = (draft.Name, draft.Week, draft.Use);
+            added = templates.FirstOrDefault(t => !draft.Sessions.Contains(t.Id))?.Name;
+        }
         loaded = true;
+    }
+
+    private void NewSession()
+    {
+        Navigation.Keep(new Draft(name, week, use, [.. templates.Select(t => t.Id)]));
+        Navigation.Open("sessions/new");
     }
 
     private async Task SaveAsync()
@@ -112,12 +132,15 @@
         await Store.SaveRoutineAsync(routine, week);
         if (use) await Store.SetActiveRoutineAsync(routine.Id);
         else if ((await Store.GetActiveRoutineAsync())?.Id == routine.Id) await Store.SetActiveRoutineAsync(null);
-        Nav.NavigateTo($"routines{FromQuery}");
+        await Navigation.BackAsync("routines");
     }
 
     private async Task DeleteAsync()
     {
         await Store.DeleteRoutineAsync(routine);
-        Nav.NavigateTo($"routines{FromQuery}");
+        await Navigation.BackAsync("routines");
     }
+
+    // The routine being edited, kept while a new session is made, and the sessions there were before it.
+    private sealed record Draft(string Name, long?[] Week, bool Use, HashSet<long> Sessions);
 }

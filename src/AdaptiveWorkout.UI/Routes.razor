@@ -1,3 +1,6 @@
+@* Injected here so the way back is made before the router, and hears of every move before the next screen draws. *@
+@inject AppNavigation Navigation
+
 <Router AppAssembly="typeof(Routes).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />

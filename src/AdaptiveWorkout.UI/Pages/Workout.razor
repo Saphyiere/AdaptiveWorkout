@@ -1,14 +1,14 @@
 @page "/workout"
 @implements IDisposable
 @inject WorkoutFlow Flow
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>@(state?.Name ?? "Workout")</PageTitle>
 
 @if (state is not null)
 {
     <div class="screen">
-        <WorkoutHeader State="state" OnFinish="Finish" />
+        <WorkoutHeader State="state" OnFinish="FinishAsync" />
 
         @if (state.Running is { } running)
         {
@@ -156,7 +156,7 @@
                 }
 
                 <div class="push-down">
-                    <NextStepButton State="state" OnStarted="() => { }" OnFinish="Finish" />
+                    <NextStepButton State="state" OnStarted="() => { }" OnFinish="FinishAsync" />
                 </div>
             </div>
         }
@@ -172,8 +172,8 @@
     {
         Flow.Changed += OnFlowChanged;
         state = Flow.Current ?? await Flow.LoadAsync();
-        if (state is null) Nav.NavigateTo("", replace: true);
-        else if (state.Sets.Count == 0) Nav.NavigateTo("workout/exercise", replace: true);
+        if (state is null) await Navigation.HomeAsync();
+        else if (state.Sets.Count == 0) Navigation.Replace("workout/exercise");
     }
 
     private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";
@@ -186,9 +186,9 @@
 
     public void Dispose() => Flow.Changed -= OnFlowChanged;
 
-    private void Finish()
+    private Task FinishAsync()
     {
         Flow.Finish();
-        Nav.NavigateTo("");
+        return Navigation.HomeAsync();
     }
 }

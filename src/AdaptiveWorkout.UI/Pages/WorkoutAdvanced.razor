@@ -1,7 +1,7 @@
 @page "/workout/advanced"
 @implements IDisposable
 @inject WorkoutFlow Flow
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>@(state?.Name ?? "Workout")</PageTitle>
 
@@ -13,7 +13,7 @@
     var planIds = state.Plan.Select(e => e.ExerciseId).ToHashSet();
     var extraIds = stopped.Select(s => s.ExerciseId).Where(id => !planIds.Contains(id)).Distinct().ToList();
     <div class="screen">
-        <WorkoutHeader State="state" Advanced="true" OnFinish="Finish" />
+        <WorkoutHeader State="state" Advanced="true" OnFinish="FinishAsync" />
 
         @* Each exercise's box: ticked in pen once it has sets, the pen's dot while it's the one now, empty until then. *@
         @if (state.Plan.Count > 0)
@@ -89,9 +89,9 @@
 
         <div class="grid-2">
             <button type="button" class="btn tall" disabled="@(running is not null || stopped.Count == 0)" @onclick="AddSet">Add a set</button>
-            <button type="button" class="btn tall" disabled="@(running is not null)" @onclick="@(() => Nav.NavigateTo("workout/exercise"))">Different exercise</button>
+            <button type="button" class="btn tall" disabled="@(running is not null)" @onclick="@(() => Navigation.Open("workout/exercise"))">Different exercise</button>
             <button type="button" class="btn tall" disabled="@(running is not null || next is null || state.Plan.Count == 0)" @onclick="() => Flow.Skip(next!.ExerciseId)">Skip @(next is null ? "exercise" : state.Exercises[next.ExerciseId].Name)</button>
-            <a class="btn tall" href="workout">Back to simple</a>
+            <a class="btn tall" href="workout" @onclick="@(() => Navigation.Replace("workout"))" @onclick:preventDefault>Back to simple</a>
         </div>
 
         <div class="push-down">
@@ -101,7 +101,7 @@
             }
             else
             {
-                <NextStepButton State="state" OnStarted="@(() => Nav.NavigateTo("workout"))" OnFinish="Finish" />
+                <NextStepButton State="state" OnStarted="@(() => Navigation.Replace("workout"))" OnFinish="FinishAsync" />
             }
         </div>
     </div>
@@ -114,7 +114,7 @@
     {
         Flow.Changed += OnFlowChanged;
         state = Flow.Current ?? await Flow.LoadAsync();
-        if (state is null) Nav.NavigateTo("", replace: true);
+        if (state is null) await Navigation.HomeAsync();
     }
 
     // A change made elsewhere, e.g. a set started from the watch.
@@ -125,18 +125,18 @@
     private void AddSet()
     {
         Flow.StartSet(state!.Exercises[state.Sets[^1].ExerciseId]);
-        Nav.NavigateTo("workout");
+        Navigation.Replace("workout");
     }
 
     private void Stop()
     {
         Flow.StopSet();
-        Nav.NavigateTo("workout");
+        Navigation.Replace("workout");
     }
 
-    private void Finish()
+    private Task FinishAsync()
     {
         Flow.Finish();
-        Nav.NavigateTo("");
+        return Navigation.HomeAsync();
     }
 }

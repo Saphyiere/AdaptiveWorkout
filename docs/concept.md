@@ -65,6 +65,10 @@ The icon at the top right of Today. For now it holds the look:
 
 Choosing one switches the whole app at once, and it's remembered.
 
+### Getting around
+
+Every screen below Today has its way back at the top, naming the screen it goes back to, and the phone's back gesture does the same: one screen per step, back the way I came. Finishing what a screen was opened for (saving a session or routine, deleting a workout, choosing in Change) also goes back there, never on to a fresh copy of a screen I'd already left, so back never walks through finished forms. Starting a workout from the session picker, and switching the workout between its views, take the screen's place instead of stacking up. Two or more screens in, **Today** at the top right (a house in Telemetry) goes straight home, and finishing or cancelling a workout always lands on Today.
+
 ## Flows
 
 ### Start workout
@@ -88,6 +92,7 @@ While a workout is open, the session picker shows it at the top with **Resume**,
 A routine plans the week: each day has a session or is a rest day. Monday to Saturday with a different session each day and Sunday off is one routine; a five-day week is another. Sessions don't belong to a routine, so the same Chest day can sit in several, on any days.
 
 - One routine is **in use**, or none. Switching is one tap in the routines list; editing a routine changes its name and days, and can put it in use.
+- Editing a routine has **New session** under the week. Saving the new session comes back to the routine as I left it, changes not saved yet included, with the new session ready to pick for its days.
 - Today's session comes from the routine in use. Doing a different session is always allowed.
 - **Rest days are part of the plan:** Today says so, and they never break the streak.
 - **No routine** is fine too: any day can be a gym day, and the streak counts weeks.

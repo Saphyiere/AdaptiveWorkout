@@ -1,7 +1,7 @@
 @page "/workout/add"
 @inject WorkoutFlow Flow
 @inject WorkoutStore Store
-@inject NavigationManager Nav
+@inject AppNavigation Navigation
 
 <PageTitle>Add to today</PageTitle>
 
@@ -30,7 +30,7 @@
             </section>
         }
 
-        <ExercisePicker State="state" OnPick="AddExercise" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="add-name" Label="One exercise" NewAction="Add it" />
+        <ExercisePicker State="state" OnPick="AddExerciseAsync" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="add-name" Label="One exercise" NewAction="Add it" />
     </div>
 }
 
@@ -43,7 +43,7 @@
         state = Flow.Current ?? await Flow.LoadAsync();
         if (state is null)
         {
-            Nav.NavigateTo("", replace: true);
+            await Navigation.HomeAsync();
             return;
         }
 
@@ -53,12 +53,12 @@
     private async Task AddSessionAsync(SessionTemplate template)
     {
         await Flow.AddSessionAsync(template.Id);
-        Nav.NavigateTo("workout");
+        await Navigation.ReturnToAsync("workout");
     }
 
-    private void AddExercise(Exercise exercise)
+    private Task AddExerciseAsync(Exercise exercise)
     {
         Flow.AddExercise(exercise);
-        Nav.NavigateTo("workout");
+        return Navigation.ReturnToAsync("workout");
     }
 }
