@@ -39,7 +39,7 @@ What the app does and how its data is shaped: [docs/concept.md](docs/concept.md)
 3. Visual Studio: set **AdaptiveWorkout.Phone** as the startup project, pick the phone in the device dropdown, and press F5.
    CLI: `dotnet build src/AdaptiveWorkout.Phone -t:Run`
 
-The app opens on Today. Debug builds run compiled code (`UseInterpreter` is off in both apps, which gives up C# Hot Reload on the devices), so they're quick enough to use. **Release** (Visual Studio's configuration dropdown, or `-c Release`) is still a little faster for everyday use.
+The app opens on Today. F5 runs a Debug build, which opens slowly: it compiles each method on the phone the first time it runs, and with the debugger attached it also waits for Visual Studio. (`UseInterpreter` is off in both apps, so Debug builds at least run compiled code rather than Mono's interpreter, which gives up C# Hot Reload on the devices.) **For the copy you use day to day, install Release**: pick **Release** in Visual Studio's configuration dropdown and press **Ctrl+F5**, or run `dotnet build src/AdaptiveWorkout.Phone -t:Run -c Release`. Release compiles the whole app ahead of time (`AndroidEnableProfiledAot` is off), so it opens quickly. It takes a few minutes to build, installs over a Debug build, and keeps the app's data.
 
 If the app stops as it opens with *No view found for id 0x… for fragment NavigationRootManager_ElementBasedFragment*, the build deployed resource ids that don't match the app's resources. `Directory.Build.targets` stops Visual Studio's background builds from causing that; if it happens anyway, delete the `artifacts` folder and build again. Don't uninstall the app to fix it: that deletes its data.
 

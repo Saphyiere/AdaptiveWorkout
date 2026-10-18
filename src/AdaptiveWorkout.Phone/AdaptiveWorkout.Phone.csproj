@@ -20,6 +20,10 @@
         <ApplicationVersion>1</ApplicationVersion>
         <!-- Debug builds otherwise run on Mono's interpreter (for Hot Reload), which makes every tap visibly slow. -->
         <UseInterpreter>false</UseInterpreter>
+        <!-- Release compiles the whole app ahead of time, so it opens fast. By default it only compiles what MAUI's startup profiles
+             list, which leaves almost all of this app's screens, storage and logic to be compiled on the phone every time it opens.
+             The app gets about 15 MB bigger. -->
+        <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     </PropertyGroup>
 
     <ItemGroup>
