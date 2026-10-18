@@ -175,7 +175,7 @@ From the set screen, the running set starts over as the new exercise. **Add more
 
 Every tap has to feel instant. The open workout lives in memory: Stop, Start and the break screen change on the spot, and saving happens in the background, one write at a time and in order. Buttons react the moment they're pressed, and each step slides in, already mostly visible so the slide never reads as waiting. Debug builds run compiled code too (the Android interpreter is off), so testing feels like the real thing.
 
-Opening has to be quick, and stay quick as the log grows. Today reads only what it shows: the list of workouts for the week and the streak, today's food, and the last 30 days of weigh-ins (plus the latest few for the list). The workout history behind suggestions and the last three times, every set ever logged, loads once Today is up, so it never holds Today up and is usually ready before Start or Resume needs it.
+Opening has to be quick, and stay quick as the log grows. Today reads only what it shows: the list of workouts for the week and the streak, today's food, and the last 30 days of weigh-ins (plus the latest few for the list). The workout history behind suggestions and the last three times, every set ever logged, loads once Today is up, so it never holds Today up and is usually ready before Start or Resume needs it. The history screens read only what they show too: a past workout reads its own sets and the heart rate during it, and Gym reads how many sets each workout had of each exercise rather than every set.
 
 ### Supersets
 

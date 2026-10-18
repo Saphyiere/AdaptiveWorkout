@@ -6,7 +6,7 @@
 
 @if (loaded)
 {
-    var trend = Progress.Trend(sessions, sets);
+    var trend = Progress.Trend(sessions, exercisesDone);
     var shown = trend.Count == 0 ? null : trend.Find(p => p.Session == picked).Session ?? trend[^1].Session;
     var telemetry = Theme == Theme.Telemetry;
     <div class="screen">
@@ -182,7 +182,7 @@
 
     private bool loaded;
     private List<WorkoutSession> sessions = [];
-    private List<WorkoutSet> sets = [];
+    private List<(long SessionId, long ExerciseId)> exercisesDone = [];
     private Dictionary<long, int> setCounts = [];
     private Dictionary<long, string> templateNames = [];
     private WorkoutSession? picked;
@@ -194,8 +194,10 @@
     {
         await Flow.ScoreSessionsAsync();
         sessions = [.. (await Store.GetSessionsAsync()).Where(s => s.FinishedAt is not null).OrderByDescending(s => s.StartedAt)];
-        sets = await Store.GetSetsAsync();
-        setCounts = sets.GroupBy(s => s.SessionId).ToDictionary(g => g.Key, g => g.Count());
+        // Each workout's exercises and how many sets of each: all the trend and the list need, rather than every set ever logged.
+        var counts = await Store.GetExerciseSetCountsAsync();
+        exercisesDone = [.. counts.Select(c => (c.SessionId, c.ExerciseId))];
+        setCounts = counts.GroupBy(c => c.SessionId).ToDictionary(g => g.Key, g => g.Sum(c => c.Sets));
         templateNames = (await Store.GetTemplatesAsync()).ToDictionary(t => t.Id, t => t.Name);
         loaded = true;
     }

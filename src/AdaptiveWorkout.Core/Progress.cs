@@ -54,11 +54,13 @@ public static class Progress
     /// <summary>
     /// Finished workouts with an improvement, oldest first, each with how much better my exercises were by then than the first
     /// time I did them, on average: 0.06 is 6% better. Each exercise's ups and downs add up to its change since its first time,
-    /// and the total is their average, so it doesn't grow just because there were more workouts.
+    /// and the total is their average, so it doesn't grow just because there were more workouts. All it needs of the sets is
+    /// which exercises each workout had (<paramref name="exercisesDone"/>; repeats don't matter).
     /// </summary>
-    public static List<(WorkoutSession Session, double Total)> Trend(IEnumerable<WorkoutSession> sessions, IEnumerable<WorkoutSet> sets)
+    public static List<(WorkoutSession Session, double Total)> Trend(IEnumerable<WorkoutSession> sessions,
+        IEnumerable<(long SessionId, long ExerciseId)> exercisesDone)
     {
-        var exercisesBySession = sets.ToLookup(s => s.SessionId, s => s.ExerciseId);
+        var exercisesBySession = exercisesDone.ToLookup(e => e.SessionId, e => e.ExerciseId);
         var seen = new HashSet<long>();
         var compared = new HashSet<long>();
         var logs = 0.0;

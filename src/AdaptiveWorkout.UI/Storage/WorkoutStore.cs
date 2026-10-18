@@ -26,6 +26,9 @@ public sealed class WorkoutStore(string databasePath)
         CREATE TABLE IF NOT EXISTS BodyWeightEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Weight REAL NOT NULL, WeightUnit INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS HeartRateSample (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Bpm INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS SessionExercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, SessionId INTEGER NOT NULL REFERENCES WorkoutSession (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, PlannedSets INTEGER, SupersetGroup INTEGER);
+        -- One workout's sets, and the heart rate during it, found without reading every row ever logged.
+        CREATE INDEX IF NOT EXISTS WorkoutSetBySession ON WorkoutSet (SessionId, "Order");
+        CREATE INDEX IF NOT EXISTS HeartRateSampleByTime ON HeartRateSample (At);
         """;
 
     // Sessions used to belong to one routine; now a routine's days point at them. SQLite can't drop a column a foreign key
@@ -144,6 +147,10 @@ public sealed class WorkoutStore(string databasePath)
     public Task<List<WorkoutSession>> GetSessionsAsync() => RunAsync(async c =>
         (await c.QueryAsync<WorkoutSession>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared FROM WorkoutSession ORDER BY Id")).AsList());
 
+    /// <summary>One workout, or null when there's none with that id.</summary>
+    public Task<WorkoutSession?> GetSessionAsync(long id) => RunAsync(c =>
+        c.QueryFirstOrDefaultAsync<WorkoutSession?>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared FROM WorkoutSession WHERE Id = @id", new { id }));
+
     /// <summary>Saves a new session and fills in its Id.</summary>
     public Task StartSessionAsync(WorkoutSession session) => RunAsync(async c =>
         session.Id = await c.ExecuteScalarAsync<long>("INSERT INTO WorkoutSession (TemplateId, StartedAt) VALUES (@TemplateId, @StartedAt); SELECT last_insert_rowid();", session));
@@ -158,6 +165,14 @@ public sealed class WorkoutStore(string databasePath)
 
     public Task<List<WorkoutSet>> GetSetsAsync() => RunAsync(async c =>
         (await c.QueryAsync<WorkoutSet>("""SELECT Id, SessionId, ExerciseId, "Order", StartedAt, StoppedAt, Weight, WeightUnit, Reps, DurationSeconds, HitGoal FROM WorkoutSet ORDER BY SessionId, "Order" """)).AsList());
+
+    /// <summary>One workout's sets, in order.</summary>
+    public Task<List<WorkoutSet>> GetSessionSetsAsync(long sessionId) => RunAsync(async c =>
+        (await c.QueryAsync<WorkoutSet>("""SELECT Id, SessionId, ExerciseId, "Order", StartedAt, StoppedAt, Weight, WeightUnit, Reps, DurationSeconds, HitGoal FROM WorkoutSet WHERE SessionId = @sessionId ORDER BY "Order" """, new { sessionId })).AsList());
+
+    /// <summary>How many sets each workout had of each exercise: enough for Gym's list and trend, without reading every set.</summary>
+    public Task<List<(long SessionId, long ExerciseId, int Sets)>> GetExerciseSetCountsAsync() => RunAsync(async c =>
+        (await c.QueryAsync<(long SessionId, long ExerciseId, int Sets)>("SELECT SessionId, ExerciseId, COUNT(*) FROM WorkoutSet GROUP BY SessionId, ExerciseId")).AsList());
 
     /// <summary>Saves a new set and fills in its Id. The session may still be waiting to be saved; its Id is read when this runs.</summary>
     public Task InsertSetAsync(WorkoutSession session, WorkoutSet set) => RunAsync(async c =>

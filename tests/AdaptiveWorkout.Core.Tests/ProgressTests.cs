@@ -113,7 +113,7 @@ public class ProgressTests
         var open = new WorkoutSession { Id = 99, StartedAt = Monday.AddDays(40), Improvement = 0.5, ExercisesCompared = 1 };
         foreach (var session in sessions) (session.Improvement, session.ExercisesCompared) = Improvement(session);
 
-        var trend = Progress.Trend([.. sessions, open], sets);
+        var trend = Progress.Trend([.. sessions, open], sets.Select(s => (s.SessionId, s.ExerciseId)));
 
         // Bench +10%, then curls +10% too: on average 10% better, not 21% for two good workouts. Curls back down: √1.1 − 1.
         Assert.Equal([benchUp, curlsUp, curlsDown], trend.Select(p => p.Session));

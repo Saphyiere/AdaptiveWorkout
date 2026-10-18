@@ -111,7 +111,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        session = (await Store.GetSessionsAsync()).FirstOrDefault(s => s.Id == Id && s.FinishedAt is not null);
+        session = await Store.GetSessionAsync(Id) is { FinishedAt: not null } finished ? finished : null;
         if (session is null)
         {
             await Navigation.BackAsync("gym");
@@ -119,7 +119,7 @@
         }
 
         name = session.TemplateId is long templateId ? (await Store.GetTemplateAsync(templateId))?.Name ?? name : name;
-        sets = [.. (await Store.GetSetsAsync()).Where(s => s.SessionId == Id)];
+        sets = await Store.GetSessionSetsAsync(Id);
         exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
         samples = await Store.GetHeartRateAsync(session.StartedAt, session.FinishedAt!.Value);
     }
