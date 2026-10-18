@@ -77,7 +77,7 @@ If an Android build ever fails over output paths, temporarily remove the two art
 
 The phone app has two looks, switched in **Settings** (the icon at the top right of Today). The switch applies at once and is remembered.
 
-- **Logbook:** a printed training log on warm paper. Serif words and big serif numbers in fixed-width figures, ruled lines instead of cards, and one vermilion pen that marks what you did: a tick on each gym day, a circle around today, tally strokes for the streak and the sets done, a tick over Hit goal, and a bracket down a superset. The pen marks; it never grades a number.
+- **Logbook:** a printed training log on warm paper, kept like a journal. Serif words and big serif numbers in fixed-width figures, no cards or boxes: each section is set apart by space and a heading the pen underlines once, rows sit on hairlines, and a faint tint inside a field says it's a place to write. The one vermilion pen also marks what you did: a tick on each gym day, a circle around today, tally strokes for the streak and the sets done, a tick over Hit goal, and a bracket down a superset. The pen marks; it never grades a number.
 - **Telemetry:** the body as live instrument channels on a dark panel. Monospace readouts that never jitter (Martian Mono, slashed zero), words in Atkinson Hyperlegible Next, tiles, and every number on its own ruler in its channel's color: lime for training, amber for food, blue for body weight, coral for heart rate. The set's time fills a minute of seconds, the rest drains its countdown, calories sit on a ruler with the goal and maintenance marked, and the heart rate shows its last minute as a line.
 
 Design links:

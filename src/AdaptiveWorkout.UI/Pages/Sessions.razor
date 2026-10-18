@@ -40,8 +40,8 @@
             </section>
         }
 
-        @* The routine in use plans the week; Today and the streak follow it. Its week's last rule closes the block. *@
-        <a class="block open" href="routines" aria-labelledby="routine-heading">
+        @* The routine in use plans the week; Today and the streak follow it. *@
+        <a class="block" href="routines" aria-labelledby="routine-heading">
             <div class="spread">
                 <h2 id="routine-heading" class="label">Routine</h2>
                 <span class="inline">
@@ -88,6 +88,8 @@
                                 {
                                     <span class="pen-note">today</span>
                                 }
+                                @* Tapping the row starts this session; the pencil beside it edits it. *@
+                                <Icon Name="forward" Size="16" Color="var(--ink-muted)" />
                             </button>
                             <a class="icon-btn plain" href="sessions/@template.Id" aria-label="Edit @template.Name"><Icon Name="edit" /></a>
                         </div>

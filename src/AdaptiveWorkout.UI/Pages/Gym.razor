@@ -13,7 +13,7 @@
         <PageHeader Back="" BackText="Today" Label="@($"{sessions.Count} {(sessions.Count == 1 ? "workout" : "workouts")}")" Title="Gym" />
 
         @* Am I getting better? Each workout's improvement, worked out once after Finish, adds up to one line. *@
-        <section class="block open" aria-labelledby="trend-heading">
+        <section class="block" aria-labelledby="trend-heading">
             @if (telemetry && trend.Count > 0)
             {
                 <div class="spread">

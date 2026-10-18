@@ -50,7 +50,7 @@
         {
             var exercise = exercises[exerciseSets.Key];
             var list = exerciseSets.ToList();
-            <section class="block open" aria-label="@exercise.Name">
+            <section class="block" aria-label="@exercise.Name">
                 <div class="spread">
                     <h2 class="name big">@exercise.Name</h2>
                     @if (list.Any(s => s.HitGoal))
@@ -82,7 +82,7 @@
         <div class="push-down">
             @if (confirming)
             {
-                <div class="block open appear">
+                <div class="block appear">
                     <p class="name big">Delete this workout?</p>
                     <p class="note">@name on @session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture) @(sets.Count == 0 ? "is" : $"and its {sets.Count} {(sets.Count == 1 ? "set" : "sets")} are") deleted for good.</p>
                     <div class="grid-2">
