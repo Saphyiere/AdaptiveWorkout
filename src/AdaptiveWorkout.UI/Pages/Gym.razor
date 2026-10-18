@@ -7,27 +7,21 @@
 @if (loaded)
 {
     var trend = Progress.Trend(sessions, sets);
-    <div class="screen tight">
-        <header class="inline">
-            <a class="icon-btn" href="" aria-label="Back to Today"><Icon Name="back" /></a>
-            <div class="row-text">
-                <p class="label">@sessions.Count @(sessions.Count == 1 ? "workout" : "workouts")</p>
-                <h1 class="title small">Gym</h1>
-            </div>
-        </header>
+    var shown = trend.Count == 0 ? null : trend.Find(p => p.Session == picked).Session ?? trend[^1].Session;
+    <div class="screen">
+        <PageHeader Back="" BackText="Today" Label="@($"{sessions.Count} {(sessions.Count == 1 ? "workout" : "workouts")}")" Title="Gym" />
 
-        @* Am I getting better? Each workout's improvement, worked out once after Finish, compounded into one line. *@
-        <section class="card" aria-labelledby="trend-heading">
+        @* Am I getting better? Each workout's improvement, worked out once after Finish, adds up to one line. *@
+        <section class="stack" aria-labelledby="trend-heading">
             <h2 id="trend-heading" class="label">Improvement</h2>
             @if (trend.Count == 0)
             {
-                <p class="caption">Your trend starts once you repeat an exercise from an earlier workout.</p>
+                <p class="note">Your trend starts once you repeat an exercise from an earlier workout.</p>
             }
             else
             {
-                var found = trend.FindIndex(p => p.Session == picked);
-                var index = found >= 0 ? found : trend.Count - 1;
-                var (pickedSession, _) = trend[index];
+                var index = trend.FindIndex(p => p.Session == shown);
+                var pickedTotal = trend[index].Total;
 
                 // A y-axis of round steps, with 0% always on it and at most five lines.
                 var low = Math.Min(0, trend.Min(p => p.Total));
@@ -36,87 +30,103 @@
                 var bottom = Math.Floor(low / step) * step;
                 var top = Math.Max(Math.Ceiling(high / step) * step, bottom + step);
                 var ticks = Enumerable.Range(0, (int)Math.Round((top - bottom) / step) + 1).Select(i => bottom + i * step).ToList();
-                double X(int i) => (i + 0.5) * PlotWidth / trend.Count;
+                double X(int i) => PlotLeft + (i + 0.5) * (ChartWidth - PlotLeft) / trend.Count;
                 double Y(double total) => PlotBottom - (total - bottom) / (top - bottom) * (PlotBottom - PlotTop);
-                var line = trend.Select((p, i) => $"{N(X(i))},{N(Y(p.Total))}").ToList();
-                var wash = line.Append($"{N(X(trend.Count - 1))},{N(Y(0))}").Append($"{N(X(0))},{N(Y(0))}");
+                var line = string.Join(' ', trend.Select((p, i) => $"{N(X(i))},{N(Y(p.Total))}"));
 
-                <span class="inline baseline">
-                    <span class="number md">@Percent(trend[^1].Total)</span>
-                    <span class="unit">over @trend.Count @(trend.Count == 1 ? "workout" : "workouts")</span>
-                </span>
+                // A note at the low point, when it's a dip along the way rather than an end.
+                var lowest = trend.FindIndex(p => p.Total == trend.Min(q => q.Total));
+                var noteDip = lowest > 0 && lowest < trend.Count - 1 && lowest != index;
+
+                <p class="number hero">@PercentText.Format(trend[^1].Total)</p>
+                <p class="note">How much better your exercises are than the first time, on average, over @trend.Count @(trend.Count == 1 ? "workout" : "workouts").</p>
                 <div class="trend-chart">
-                    <svg viewBox="0 0 @N(ChartWidth) @N(ChartHeight)" role="img" aria-label="@($"Improvement over {trend.Count} workouts: {Percent(trend[^1].Total)}")">
+                    <svg viewBox="0 0 @N(ChartWidth) @N(ChartHeight)" role="img" aria-label="@($"Improvement over {trend.Count} workouts: {PercentText.Format(trend[^1].Total)}")">
                         @* In a group, since Razor reads a <text> that starts a code block's markup as its own text tag. *@
                         @foreach (var tick in ticks)
                         {
                             <g>
-                                <line class="grid" x1="0" x2="@N(PlotWidth)" y1="@N(Y(tick))" y2="@N(Y(tick))" />
-                                <text class="tick" x="@N(PlotWidth + 8)" y="@N(Y(tick) + 4)">@Percent(tick)</text>
+                                <line class="grid" x1="@N(PlotLeft)" x2="@N(ChartWidth)" y1="@N(Y(tick) + 0.5)" y2="@N(Y(tick) + 0.5)" />
+                                <text class="tick" x="@N(PlotLeft - 8)" y="@N(Y(tick) + 4.5)" text-anchor="end">@(tick == 0 ? "0" : TickText(tick))</text>
                             </g>
                         }
-                        <polygon class="wash" points="@string.Join(' ', wash)" />
-                        <polyline class="trend-line" points="@string.Join(' ', line)" />
-                        @if (index != trend.Count - 1)
+                        @if (noteDip)
                         {
-                            <line class="crosshair" x1="@N(X(index))" x2="@N(X(index))" y1="@N(PlotTop)" y2="@N(PlotBottom)" />
-                            <circle class="dot" cx="@N(X(index))" cy="@N(Y(trend[index].Total))" r="4" />
+                            <g>
+                                <line class="leader" x1="@N(X(lowest) + 0.5)" x2="@N(X(lowest) + 0.5)" y1="@N(Y(trend[lowest].Total) + 6)" y2="@N(Y(trend[lowest].Total) + 18)" />
+                                <text class="aside" x="@N(X(lowest))" y="@N(Y(trend[lowest].Total) + 30)" text-anchor="middle">@DateText(trend[lowest].Session)</text>
+                            </g>
                         }
-                        <circle class="dot" cx="@N(X(trend.Count - 1))" cy="@N(Y(trend[^1].Total))" r="4" />
-                        <text class="tick" x="@N(trend.Count == 1 ? X(0) : 0)" y="@N(ChartHeight - 2)" text-anchor="@(trend.Count == 1 ? "middle" : "start")">@DateText(trend[0].Session)</text>
+                        <line class="picked-line" x1="@N(X(index) + 0.5)" x2="@N(X(index) + 0.5)" y1="@N(Y(pickedTotal) + 10)" y2="@N(PlotBottom)" />
+                        <polyline class="trend-line" points="@line" />
+                        <circle class="dot" cx="@N(X(index))" cy="@N(Y(pickedTotal))" r="4" />
+                        <path class="pen" stroke-width="2.5" transform="@($"translate({N(X(index) - 15.6)} {N(Y(pickedTotal) - 12.7)}) scale(0.8)")" d="M33 8C27 2.5 9 2.5 4.5 11C0.5 19 9 28.5 21 27.5C32 26.5 38 18.5 34.5 10.5L31 6.5" />
+                        <text class="tick" x="@N(X(0))" y="@N(ChartHeight - 4)" text-anchor="@(trend.Count == 1 ? "middle" : "start")">@DateText(trend[0].Session)</text>
                         @if (trend.Count > 1)
                         {
                             <g>
-                                <text class="tick" x="@N(PlotWidth)" y="@N(ChartHeight - 2)" text-anchor="end">@DateText(trend[^1].Session)</text>
+                                <text class="tick" x="@N(ChartWidth)" y="@N(ChartHeight - 4)" text-anchor="end">@DateText(trend[^1].Session)</text>
                             </g>
                         }
                     </svg>
 
                     @* Each workout's slice of the plot picks it, so a tap anywhere lands on the nearest one. *@
-                    <div class="trend-picks" style="width: @N(PlotWidth / ChartWidth * 100)%; height: @N(PlotBottom / ChartHeight * 100)%">
+                    <div class="trend-picks" style="left: @N(PlotLeft / ChartWidth * 100)%; width: @N((ChartWidth - PlotLeft) / ChartWidth * 100)%; height: @N(PlotBottom / ChartHeight * 100)%">
                         @foreach (var (session, _) in trend)
                         {
-                            <button type="button" aria-pressed="@(session == pickedSession ? "true" : "false")" aria-label="@($"{NameOf(session)}, {DateText(session)}: {Percent(session.Improvement!.Value)}")"
+                            <button type="button" aria-pressed="@(session == shown ? "true" : "false")" aria-label="@($"{NameOf(session)}, {DateText(session)}: {PercentText.Format(session.Improvement!.Value)}")"
                                     @onclick="() => picked = session" @onfocus="() => picked = session"></button>
                         }
                     </div>
                 </div>
-                <div class="spread">
-                    <span class="caption">@NameOf(pickedSession), @pickedSession.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</span>
-                    <span class="inline baseline">
-                        <span class="body strong tabular">@Percent(pickedSession.Improvement!.Value)</span>
-                        <span class="unit">vs last time</span>
-                    </span>
+                <div class="spread baseline">
+                    <p class="body strong">@NameOf(shown!), @shown!.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</p>
+                    <p class="inline baseline">
+                        <Delta Change="shown.Improvement!.Value" />
+                        <span class="note">vs last time</span>
+                    </p>
                 </div>
-                <p class="caption">How much better your exercises are than the first time you did them, on average. Each workout counts against the last time: heavier, more reps, or longer for timed ones.</p>
             }
+            <a class="btn" href="routines?from=gym">Edit routine</a>
         </section>
-
-        <a class="btn" href="routines?from=gym">Edit routine</a>
 
         @if (sessions.Count == 0)
         {
-            <p class="caption">No finished workouts yet. Each one shows up here after Finish workout.</p>
+            <p class="note">No finished workouts yet. Each one shows up here after Finish workout.</p>
         }
 
         @foreach (var month in sessions.GroupBy(s => s.StartedAt.ToString("MMMM yyyy", CultureInfo.CurrentCulture)))
         {
-            <section class="stack" aria-label="@month.Key">
-                <h2 class="label">@month.Key</h2>
-                <div class="list">
+            var editing = editingMonth == month.Key;
+            <section class="stack tight" aria-label="@month.Key">
+                <div class="spread">
+                    <h2 class="month">@month.Key</h2>
+                    <button type="button" class="btn-ghost" aria-label="@(editing ? "Done editing" : $"Edit {month.Key}")" @onclick="() => editingMonth = editing ? null : month.Key">@(editing ? "Done" : "Edit")</button>
+                </div>
+                <div class="ledger">
                     @foreach (var session in month)
                     {
                         var name = NameOf(session);
                         var setCount = setCounts.GetValueOrDefault(session.Id);
                         @* Keyed, so a deleted row's "Delete?" doesn't carry over to the row that takes its place. *@
-                        <div class="row" @key="session.Id">
-                            <a class="row-main" href="history/@session.Id">
-                                <span class="row-text">
-                                    <span class="body strong">@name</span>
-                                    <span class="caption tabular">@session.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture) · @TimeText.Format(session.FinishedAt!.Value - session.StartedAt) · @setCount @(setCount == 1 ? "set" : "sets")@(session.Improvement is { } change ? $" · {Percent(change)}" : "")</span>
-                                </span>
+                        <div class="history-row @(session == shown ? "picked" : "")" @key="session.Id">
+                            <span class="caption">@session.StartedAt.ToString("ddd d", CultureInfo.CurrentCulture)</span>
+                            <a class="row-text" href="history/@session.Id">
+                                <span class="name">@name</span>
+                                <span class="caption">@TimeText.Format(session.FinishedAt!.Value - session.StartedAt) · @setCount @(setCount == 1 ? "set" : "sets")</span>
                             </a>
-                            <ConfirmDelete Label="@($"Delete {name} on {session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteAsync(session)" />
+                            @if (editing)
+                            {
+                                <ConfirmDelete Label="@($"Delete {name} on {session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteAsync(session)" />
+                            }
+                            else if (session.Improvement is { } change)
+                            {
+                                <Delta Change="change" />
+                            }
+                            else
+                            {
+                                <span></span>
+                            }
                         </div>
                     }
                 </div>
@@ -126,8 +136,8 @@
 }
 
 @code {
-    // The trend chart's drawing space, which the SVG scales to the card: the plot, tick labels to its right, dates under it.
-    private const double ChartWidth = 320, ChartHeight = 132, PlotWidth = 280, PlotTop = 8, PlotBottom = 112;
+    // The trend chart's drawing space, which the SVG scales to the page: tick labels at the left, the plot, dates under it.
+    private const double ChartWidth = 350, ChartHeight = 168, PlotLeft = 32, PlotTop = 8, PlotBottom = 140;
     private static readonly double[] Steps = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
 
     private bool loaded;
@@ -136,6 +146,7 @@
     private Dictionary<long, int> setCounts = [];
     private Dictionary<long, string> templateNames = [];
     private WorkoutSession? picked;
+    private string? editingMonth;
 
     protected override async Task OnInitializedAsync()
     {
@@ -151,12 +162,8 @@
 
     private static string DateText(WorkoutSession session) => session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture);
 
-    // +3.1%, −1.2% (a real minus sign), or 0%.
-    private static string Percent(double change)
-    {
-        var percent = Math.Round(change * 100, 1);
-        return percent == 0 ? "0%" : $"{(percent > 0 ? "+" : "−")}{Math.Abs(percent).ToString("0.#", CultureInfo.CurrentCulture)}%";
-    }
+    // The y-axis: 5%, 10%, −5%.
+    private static string TickText(double tick) => $"{(tick < 0 ? "−" : "")}{Math.Abs(Math.Round(tick * 100, 1)).ToString("0.#", CultureInfo.CurrentCulture)}%";
 
     // SVG numbers, which take a point whatever the phone's language.
     private static string N(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);

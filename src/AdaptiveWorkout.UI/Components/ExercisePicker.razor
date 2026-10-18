@@ -14,8 +14,10 @@
     @BeforeTyping
     @if (recent.Count > 0)
     {
-        <h2 class="label">Done before</h2>
-        <ExerciseList Exercises="recent" State="State" OnPick="OnPick" />
+        <section class="stack" aria-labelledby="@Id-recent">
+            <h2 id="@Id-recent" class="label">Done before</h2>
+            <ExerciseList Exercises="recent" State="State" OnPick="OnPick" />
+        </section>
     }
 }
 else
@@ -23,19 +25,22 @@ else
     var matches = State.Exercises.Values.Where(e => ExerciseNames.Key(e.Name).Contains(key)).OrderBy(e => e.Name).Take(8).ToList();
     @if (matches.Count > 0)
     {
-        <h2 class="label">Matches</h2>
-        <ExerciseList Exercises="matches" State="State" OnPick="OnPick" />
+        <section class="stack" aria-labelledby="@Id-matches">
+            <h2 id="@Id-matches" class="label">Matches</h2>
+            <ExerciseList Exercises="matches" State="State" OnPick="OnPick" />
+        </section>
     }
     @if (State.Exercises.Values.All(e => ExerciseNames.Key(e.Name) != key))
     {
-        <h2 class="label">New exercise</h2>
-        <section class="card">
-            <p class="body strong">“@ExerciseNames.Clean(query)”</p>
+        <section class="stack" aria-labelledby="@Id-new">
+            <h2 id="@Id-new" class="label">New exercise</h2>
+            <p class="name big">“@ExerciseNames.Clean(query)”</p>
+            <p class="note">Track it by</p>
             <div class="segmented" role="group" aria-label="Track by">
                 <button type="button" aria-pressed="@(measure == ExerciseMeasure.Weight ? "true" : "false")" @onclick="() => measure = ExerciseMeasure.Weight">Weight and reps</button>
                 <button type="button" aria-pressed="@(measure == ExerciseMeasure.Time ? "true" : "false")" @onclick="() => measure = ExerciseMeasure.Time">Time</button>
             </div>
-            <button type="button" class="btn tall accent" @onclick="PickNewAsync">@NewAction</button>
+            <button type="button" class="btn tall fill" @onclick="PickNewAsync">@NewAction</button>
         </section>
     }
 }

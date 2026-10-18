@@ -39,3 +39,13 @@ public static class TimeText
         return time.TotalHours >= 1 ? time.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture) : time.ToString(@"m\:ss", CultureInfo.InvariantCulture);
     }
 }
+
+public static class PercentText
+{
+    /// <summary>A change as a percentage: "+3.1%", "−1.2%" (a real minus sign), or "0%".</summary>
+    public static string Format(double change)
+    {
+        var percent = Math.Round(change * 100, 1);
+        return percent == 0 ? "0%" : $"{(percent > 0 ? "+" : "−")}{Math.Abs(percent).ToString("0.#", CultureInfo.CurrentCulture)}%";
+    }
+}

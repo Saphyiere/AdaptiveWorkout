@@ -4,9 +4,10 @@
              xmlns:local="clr-namespace:AdaptiveWorkout.Phone"
              xmlns:ui="clr-namespace:AdaptiveWorkout.UI;assembly=AdaptiveWorkout.UI"
              x:Class="AdaptiveWorkout.Phone.MainPage"
-             BackgroundColor="#000000">
+             BackgroundColor="#F3EFE6">
 
-    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" BackgroundColor="#000000">
+    <!-- The theme's paper (app.css's ground) behind the page while it loads, so it opens without a flash. -->
+    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" BackgroundColor="#F3EFE6">
         <BlazorWebView.RootComponents>
             <RootComponent Selector="#app" ComponentType="{x:Type ui:Routes}" />
         </BlazorWebView.RootComponents>

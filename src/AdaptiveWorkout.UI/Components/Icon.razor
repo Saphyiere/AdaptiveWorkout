@@ -1,6 +1,6 @@
-@* Thin line icons with sharp joins, to match the mark. *@
+@* Plain line icons: thin strokes with round caps and joins. Only the pen marks (Mark.razor) look hand-made. *@
 <svg aria-hidden="true" viewBox="0 0 24 24" width="@Size" height="@Size">
-    <path d="@PathData" fill="none" stroke="@Color" stroke-width="@Stroke" stroke-linecap="round" stroke-linejoin="miter" stroke-miterlimit="12"></path>
+    <path d="@PathData" fill="none" stroke="@Color" stroke-width="@Stroke" stroke-linecap="round" stroke-linejoin="round"></path>
 </svg>
 
 @code {
@@ -13,6 +13,7 @@
     {
         "back" => "M15 5L8 12L15 19",
         "forward" => "M9 5L16 12L9 19",
+        "arrow-left" => "M19 12H5M10.5 6.5L5 12L10.5 17.5",
         "plus" => "M12 5V19M5 12H19",
         "minus" => "M5 12H19",
         "close" => "M6 6L18 18M18 6L6 18",
@@ -20,8 +21,11 @@
         "up" => "M6 15L12 9L18 15",
         "down" => "M6 9L12 15L18 9",
         "edit" => "M4 20H8L19 9L15 5L4 16Z",
-        "mark" => "M3 15H9L12 4L15 20L17 11H21",
         "trash" => "M4 7H20M9 7V4H15V7M6 7L7 20H17L18 7M10 11V16M14 11V16",
+        "heart" => "M12 19.6C9.4 17.6 4.2 14 4.2 9.4C4.2 6.9 6.1 5 8.5 5C10 5 11.3 5.8 12 7.1C12.7 5.8 14 5 15.5 5C17.9 5 19.8 6.9 19.8 9.4C19.8 14 14.6 17.6 12 19.6Z",
+        "list" => "M9.5 7H19M9.5 12H19M9.5 17H19M5.25 7H5.3M5.25 12H5.3M5.25 17H5.3",
+        "page" => "M6 4H18V20H6ZM9 8.5H15M9 12H15",
+        "pen" => "M4 20L5 15L15.5 4.5L19.5 8.5L9 19ZM13 7L17 11",
         _ => "",
     };
 }

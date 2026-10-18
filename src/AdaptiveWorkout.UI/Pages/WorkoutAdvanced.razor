@@ -12,18 +12,19 @@
     var stopped = state.Sets.Where(s => s.StoppedAt is not null).ToList();
     var planIds = state.Plan.Select(e => e.ExerciseId).ToHashSet();
     var extraIds = stopped.Select(s => s.ExerciseId).Where(id => !planIds.Contains(id)).Distinct().ToList();
-    <div class="screen tight">
+    <div class="screen">
         <WorkoutHeader State="state" Advanced="true" OnFinish="Finish" />
 
+        @* Each exercise's box: ticked in pen once it has sets, the pen's dot while it's the one now, empty until then. *@
         @if (state.Plan.Count > 0)
         {
-            <section class="list" aria-label="Plan">
+            <section class="ledger" aria-label="Plan">
                 @foreach (var block in WorkoutPlan.Blocks(state.Plan))
                 {
-                    <div>
+                    <div class="@(block.Count > 1 ? "superset" : "")">
                         @if (block.Count > 1)
                         {
-                            <p class="label live group-label">Superset@(block[0].PlannedSets is int rounds ? $" · {rounds} rounds" : "")</p>
+                            <p class="label">Superset@(block[0].PlannedSets is int rounds ? $" · {rounds} rounds" : "")</p>
                         }
                         @foreach (var entry in block)
                         {
@@ -31,16 +32,20 @@
                             var done = stopped.Where(s => s.ExerciseId == entry.ExerciseId).ToList();
                             var isCurrent = (running?.ExerciseId ?? next?.ExerciseId) == entry.ExerciseId;
                             var last = done.Count == 0 ? state.History(entry.ExerciseId).FirstOrDefault() : null;
-                            <div class="row">
-                                <span class="status @(isCurrent ? "current" : "")">
-                                    @if (done.Count > 0 && !isCurrent)
+                            <div class="row @(isCurrent ? "picked" : "")">
+                                <span class="status">
+                                    @if (isCurrent)
                                     {
-                                        <Icon Name="check" Size="16" Stroke="2" />
+                                        <span class="live-dot"></span>
+                                    }
+                                    else if (done.Count > 0)
+                                    {
+                                        <Mark Kind="MarkKind.Tick" Size="28" />
                                     }
                                 </span>
                                 <span class="row-text">
-                                    <span class="body strong">@exercise.Name</span>
-                                    <span class="caption tabular">
+                                    <span class="name">@exercise.Name</span>
+                                    <span class="caption">
                                         @if (state.Skipped.Contains(entry.ExerciseId))
                                         {
                                             @("Skipped")
@@ -64,19 +69,21 @@
 
         @if (extraIds.Count > 0)
         {
-            <h2 class="label">@(state.Plan.Count > 0 ? "Also done" : "Done so far")</h2>
-            <section class="list">
-                @foreach (var id in extraIds)
-                {
-                    var exercise = state.Exercises[id];
-                    <div class="row">
-                        <span class="status"><Icon Name="check" Size="16" Stroke="2" /></span>
-                        <span class="row-text">
-                            <span class="body strong">@exercise.Name</span>
-                            <span class="caption tabular">@SetSummary.Format([.. stopped.Where(s => s.ExerciseId == id)], exercise.Measure)</span>
-                        </span>
-                    </div>
-                }
+            <section class="stack" aria-labelledby="extra-heading">
+                <h2 id="extra-heading" class="label">@(state.Plan.Count > 0 ? "Also done" : "Done so far")</h2>
+                <div class="ledger">
+                    @foreach (var id in extraIds)
+                    {
+                        var exercise = state.Exercises[id];
+                        <div class="row">
+                            <span class="status"><Mark Kind="MarkKind.Tick" Size="28" /></span>
+                            <span class="row-text">
+                                <span class="name">@exercise.Name</span>
+                                <span class="caption">@SetSummary.Format([.. stopped.Where(s => s.ExerciseId == id)], exercise.Measure)</span>
+                            </span>
+                        </div>
+                    }
+                </div>
             </section>
         }
 
@@ -90,7 +97,7 @@
         <div class="push-down">
             @if (running is not null)
             {
-                <button type="button" class="btn-primary big" @onclick="Stop">Stop @state.Exercises[running.ExerciseId].Name</button>
+                <button type="button" class="btn-primary stop" @onclick="Stop">Stop @state.Exercises[running.ExerciseId].Name</button>
             }
             else
             {

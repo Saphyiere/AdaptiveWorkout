@@ -7,14 +7,8 @@
 
 @if (loaded)
 {
-    <div class="screen tight">
-        <header class="inline">
-            <a class="icon-btn" href="sessions" aria-label="Back to sessions"><Icon Name="back" /></a>
-            <div class="row-text">
-                <p class="label">Session</p>
-                <h1 class="title small">@(Id is null ? "New session" : "Edit session")</h1>
-            </div>
-        </header>
+    <div class="screen">
+        <PageHeader Back="sessions" BackText="Sessions" Title="@(Id is null ? "New session" : "Edit session")" />
 
         <div class="field-group">
             <label class="field-label" for="session-name">Session name</label>
@@ -25,24 +19,25 @@
             <h2 id="exercises-heading" class="label">Exercises, in order</h2>
             @if (entries.Count == 0)
             {
-                <p class="caption">Add the exercises you do in this session. Start workout goes through them in this order.</p>
+                <p class="note">Add the exercises you do in this session. Start workout goes through them in this order.</p>
             }
             else
             {
-                <div class="list">
+                <div class="ledger">
                     @for (var i = 0; i < entries.Count; i++)
                     {
                         var index = i;
                         var entry = entries[i];
                         var joinedToPrevious = i > 0 && entries[i - 1].LinkedToNext;
                         var linked = entry.LinkedToNext && i < entries.Count - 1;
-                        <div class="entry">
+                        @* A superset is bracketed in the pen's color down its exercises' left edge. *@
+                        <div class="entry @(linked || joinedToPrevious ? "superset" : "")">
                             @if (linked && !joinedToPrevious)
                             {
-                                <p class="label live">Superset</p>
+                                <p class="label">Superset</p>
                             }
                             <div class="spread">
-                                <span class="body strong">@entry.Exercise.Name</span>
+                                <span class="name">@entry.Exercise.Name</span>
                                 <div class="inline">
                                     <button type="button" class="icon-btn plain" aria-label="Move @entry.Exercise.Name up" disabled="@(index == 0)" @onclick="() => Move(index, -1)"><Icon Name="up" /></button>
                                     <button type="button" class="icon-btn plain" aria-label="Move @entry.Exercise.Name down" disabled="@(index == entries.Count - 1)" @onclick="() => Move(index, 1)"><Icon Name="down" /></button>
@@ -51,7 +46,7 @@
                             </div>
                             @if (joinedToPrevious)
                             {
-                                <p class="caption">Alternates with the exercise above, same number of rounds.</p>
+                                <p class="note">Alternates with the exercise above, same number of rounds.</p>
                             }
                             else
                             {
@@ -62,16 +57,17 @@
                                     </div>
                                     <div class="stepper">
                                         <button type="button" class="icon-btn" aria-label="Fewer" disabled="@(entry.PlannedSets is null)" @onclick="() => entry.PlannedSets = entry.PlannedSets > 1 ? entry.PlannedSets - 1 : null"><Icon Name="minus" Size="18" /></button>
-                                        <span class="@(entry.PlannedSets is null ? "caption center" : "number")" aria-live="polite">@(entry.PlannedSets?.ToString(CultureInfo.CurrentCulture) ?? "Auto")</span>
+                                        <span class="@(entry.PlannedSets is null ? "note center" : "number")" aria-live="polite">@(entry.PlannedSets?.ToString(CultureInfo.CurrentCulture) ?? "Auto")</span>
                                         <button type="button" class="icon-btn" aria-label="More" @onclick="() => entry.PlannedSets = (entry.PlannedSets ?? 0) + 1"><Icon Name="plus" Size="18" /></button>
                                     </div>
                                 </div>
                             }
                             @if (index < entries.Count - 1)
                             {
-                                <button type="button" class="btn @(entry.LinkedToNext ? "accent" : "")" aria-pressed="@(entry.LinkedToNext ? "true" : "false")" @onclick="() => entry.LinkedToNext = !entry.LinkedToNext">
-                                    @(entry.LinkedToNext ? "In a superset with the next exercise" : "Superset with the next exercise")
-                                </button>
+                                <label class="goal">
+                                    <input type="checkbox" @bind="entry.LinkedToNext" />
+                                    Superset with the next exercise
+                                </label>
                             }
                         </div>
                     }
@@ -81,9 +77,9 @@
 
         <div class="field-group">
             <label class="field-label" for="add-exercise">Add an exercise</label>
-            <div class="inline">
+            <div class="inline end">
                 <input id="add-exercise" class="field" placeholder="Type a name" autocomplete="off" @bind="newName" @bind:event="oninput" />
-                <button type="button" class="btn tall" disabled="@string.IsNullOrWhiteSpace(newName)" @onclick="AddAsync">Add</button>
+                <button type="button" class="btn" disabled="@string.IsNullOrWhiteSpace(newName)" @onclick="AddAsync"><Icon Name="plus" Size="16" />Add</button>
             </div>
         </div>
         @if (!string.IsNullOrWhiteSpace(newName))
@@ -92,13 +88,13 @@
             var matches = exercises.Where(e => ExerciseNames.Key(e.Name).Contains(key) && entries.All(x => x.Exercise.Id != e.Id)).Take(5).ToList();
             @if (matches.Count > 0)
             {
-                <section class="list" aria-label="Exercises you've done before">
+                <section class="ledger" aria-label="Exercises you've done before">
                     @foreach (var match in matches)
                     {
                         <button type="button" class="row" @onclick="() => AddExisting(match)">
                             <span class="row-text">
-                                <span class="body strong">@match.Name</span>
-                                <span class="caption">Done before · @(match.Measure == ExerciseMeasure.Time ? "time" : "weight")</span>
+                                <span class="name">@match.Name</span>
+                                <span class="note">done before · @(match.Measure == ExerciseMeasure.Time ? "time" : "weight")</span>
                             </span>
                             <Icon Name="plus" />
                         </button>
@@ -108,7 +104,7 @@
             @if (exercises.All(e => ExerciseNames.Key(e.Name) != key))
             {
                 <div class="stack">
-                    <p class="caption">New exercise. Track it by:</p>
+                    <p class="note">New exercise. Track it by</p>
                     <div class="segmented" role="group" aria-label="Track by">
                         <button type="button" aria-pressed="@(newMeasure == ExerciseMeasure.Weight ? "true" : "false")" @onclick="() => newMeasure = ExerciseMeasure.Weight">Weight and reps</button>
                         <button type="button" aria-pressed="@(newMeasure == ExerciseMeasure.Time ? "true" : "false")" @onclick="() => newMeasure = ExerciseMeasure.Time">Time</button>
@@ -118,7 +114,7 @@
         }
 
         <div class="push-down">
-            <button type="button" class="btn-primary" disabled="@string.IsNullOrWhiteSpace(name)" @onclick="SaveAsync">Save session</button>
+            <button type="button" class="btn-primary save" disabled="@string.IsNullOrWhiteSpace(name)" @onclick="SaveAsync">Save session</button>
         </div>
     </div>
 }

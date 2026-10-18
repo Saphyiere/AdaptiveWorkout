@@ -4,17 +4,19 @@
 @* Live heart rate from the watch. Without a recent reading, it offers to open the watch app again. *@
 @if (Watch.Connected && Watch.Latest is { } latest)
 {
-    <span class="inline baseline heart-rate">
-        <Icon Name="mark" Size="18" Color="var(--accent)" />
-        <span class="number sm">@latest.Bpm</span>
-        <span class="unit">bpm</span>
-    </span>
+    <p class="inline heart-rate">
+        <Icon Name="heart" Size="22" />
+        <span class="inline baseline">
+            <span class="number sm">@latest.Bpm</span>
+            <span class="unit">bpm</span>
+        </span>
+    </p>
 }
 else
 {
     <div class="spread heart-rate">
-        <span class="caption inline">
-            <Icon Name="mark" Size="16" />
+        <span class="inline note">
+            <Icon Name="heart" Size="22" Color="var(--ink-muted)" />
             Waiting for the watch
         </span>
         <button type="button" class="btn" @onclick="OpenOnWatch">Open on watch</button>

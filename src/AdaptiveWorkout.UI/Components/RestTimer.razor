@@ -14,22 +14,34 @@
     var target = Flow.RestTarget(ExerciseId);
     var elapsed = DateTimeOffset.Now - Since;
     var left = target - elapsed;
+    var lastSeconds = countdown && left <= TimeSpan.FromSeconds(10);
 }
+<div class="spread">
+    <h2 class="label">Rest</h2>
+    <span class="note">@(countdown ? "counting down" : "counting up")</span>
+</div>
 <button type="button" class="rest-time" aria-label="@(countdown ? "Rest countdown. Tap to count up instead." : "Rest time. Tap to count down to the next set.")" @onclick="() => Flow.SetRestCountdown(!countdown)">
     <span class="rest-label">Rest</span>
-    <span class="number lg @(countdown && left <= TimeSpan.FromSeconds(10) ? "live" : "")">@(countdown ? left >= TimeSpan.Zero ? TimeText.Format(left) : $"+{TimeText.Format(-left)}" : TimeText.Format(elapsed))</span>
+    <span class="number lg @(lastSeconds ? "live" : "")">@(countdown ? left >= TimeSpan.Zero ? TimeText.Format(left) : $"+{TimeText.Format(-left)}" : TimeText.Format(elapsed))</span>
 </button>
 @if (countdown)
 {
-    <div class="spread">
-        <button type="button" class="btn" aria-label="15 seconds less" @onclick="() => Flow.AdjustRestTarget(ExerciseId, -15)">−15s</button>
-        <span class="caption center">@TimeText.Format(target)@(NextName is null ? " rest" : $", then {NextName}")</span>
-        <button type="button" class="btn" aria-label="15 seconds more" @onclick="() => Flow.AdjustRestTarget(ExerciseId, 15)">+15s</button>
+    var share = Math.Clamp(left / target, 0, 1);
+    <div class="stack tight">
+        <div class="time-left @(lastSeconds ? "live" : "")" role="progressbar" aria-label="@($"Rest left, {TimeText.Format(left)} of {TimeText.Format(target)}")" aria-valuemin="0" aria-valuemax="@((int)target.TotalSeconds)" aria-valuenow="@((int)Math.Max(0, left.TotalSeconds))">
+            <span style="width: @((share * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span>
+        </div>
+        <span class="caption center-end">@TimeText.Format(target)</span>
+    </div>
+    <div class="inline">
+        <button type="button" class="btn tall adjust" aria-label="15 seconds less" @onclick="() => Flow.AdjustRestTarget(ExerciseId, -15)">−15s</button>
+        <p class="note grow center"><span class="ink">@TimeText.Format(target)</span>@(NextName is null ? " rest" : $", then {NextName}")</p>
+        <button type="button" class="btn tall adjust" aria-label="15 seconds more" @onclick="() => Flow.AdjustRestTarget(ExerciseId, 15)">+15s</button>
     </div>
 }
 else if (Flow.RestCountdownUntried)
 {
-    <p class="caption">Tap the time to count down to the next set instead.</p>
+    <p class="note">Tap the time to count down to the next set instead.</p>
 }
 
 @code {

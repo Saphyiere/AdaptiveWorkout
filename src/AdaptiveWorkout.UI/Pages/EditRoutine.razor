@@ -7,11 +7,8 @@
 
 @if (loaded)
 {
-    <div class="screen tight">
-        <header class="inline">
-            <a class="icon-btn" href="@($"routines{FromQuery}")" aria-label="Back to routines"><Icon Name="back" /></a>
-            <h1 class="title small">@(Id is null ? "New routine" : "Edit routine")</h1>
-        </header>
+    <div class="screen">
+        <PageHeader Back="@($"routines{FromQuery}")" BackText="Routines" Title="@(Id is null ? "New routine" : "Edit routine")" />
 
         <div class="field-group">
             <label class="field-label" for="routine-name">Routine name</label>
@@ -22,15 +19,15 @@
             <h2 id="week-heading" class="label">The week</h2>
             @if (templates.Count == 0)
             {
-                <p class="caption">No sessions yet. <a class="link" href="sessions/new">Make one first</a>, then pick it for its days here.</p>
+                <p class="note">No sessions yet. <a class="link" href="sessions/new">Make one first</a>, then pick it for its days here.</p>
             }
-            <div class="list">
+            <div class="ledger">
                 @for (var i = 0; i < 7; i++)
                 {
                     var day = i;
                     <div class="row">
-                        <label class="row-text" for="day-@day"><span class="body strong">@Schedule.Name(day)</span></label>
-                        <select id="day-@day" class="field" @bind="week[day]">
+                        <label class="row-text" for="day-@day"><span class="name">@Schedule.Name(day)</span></label>
+                        <select id="day-@day" class="field day-pick" @bind="week[day]">
                             <option value="">Rest day</option>
                             @foreach (var template in templates)
                             {
@@ -40,29 +37,28 @@
                     </div>
                 }
             </div>
-            <p class="caption">The same session can be on several days, and in other routines too.</p>
+            <p class="note">The same session can be on several days, and in other routines too.</p>
         </section>
 
         <label class="goal">
             <input type="checkbox" @bind="use" />
             <span class="row-text">
-                <span class="body strong">Use this routine</span>
-                <span class="caption">Today, its Start button and the streak follow it.</span>
+                <span class="name">Use this routine</span>
+                <span class="note">Today, its Start button and the streak follow it.</span>
             </span>
         </label>
 
         <div class="push-down">
-            <button type="button" class="btn-primary" disabled="@string.IsNullOrWhiteSpace(name)" @onclick="SaveAsync">Save routine</button>
             @if (routine.Id != 0)
             {
                 @if (deleting)
                 {
-                    <div class="card">
-                        <p class="body strong">Delete @routine.Name?</p>
-                        <p class="caption">Its sessions and your workouts stay.</p>
+                    <div class="block open appear">
+                        <p class="name big">Delete @routine.Name?</p>
+                        <p class="note">Its sessions and your workouts stay.</p>
                         <div class="grid-2">
                             <button type="button" class="btn tall" @onclick="() => deleting = false">Keep it</button>
-                            <button type="button" class="btn tall accent" @onclick="DeleteAsync">Delete</button>
+                            <button type="button" class="btn tall fill" @onclick="DeleteAsync">Delete</button>
                         </div>
                     </div>
                 }
@@ -71,6 +67,7 @@
                     <button type="button" class="btn-ghost" @onclick="() => deleting = true">Delete routine</button>
                 }
             }
+            <button type="button" class="btn-primary save" disabled="@string.IsNullOrWhiteSpace(name)" @onclick="SaveAsync">Save routine</button>
         </div>
     </div>
 }

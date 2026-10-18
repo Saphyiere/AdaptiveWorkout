@@ -1,0 +1,7 @@
+@* A change against last time: a small triangle up or down beside the number, never a color. *@
+@{ var rounded = Math.Round(Change * 100, 1); }
+<span class="delta @(rounded > 0 ? "" : rounded < 0 ? "down" : "flat")">@PercentText.Format(Change)</span>
+
+@code {
+    [Parameter, EditorRequired] public double Change { get; set; }
+}

@@ -7,25 +7,19 @@
 @if (state is not null)
 {
     var stillToDo = state.StillToDo().Select(id => state.Exercises[id]).ToList();
-    <div class="screen tight">
-        <header class="inline">
-            @if (state.Sets.Count == 0)
-            {
-                <a class="icon-btn" href="" aria-label="Back to Today"><Icon Name="back" /></a>
-            }
-            else
-            {
-                <a class="icon-btn" href="workout" aria-label="Close"><Icon Name="close" /></a>
-            }
-            <h1 class="title small">@(state.Sets.Count == 0 ? "First exercise" : "Different exercise")</h1>
-        </header>
+    <div class="screen">
+        @* Before the first set there's no workout screen to go back to, only Today. *@
+        <PageHeader Back="@(state.Sets.Count == 0 ? "" : "workout")" BackText="@(state.Sets.Count == 0 ? "Today" : state.Name)" Label="@(state.Sets.Count == 0 ? state.Name : null)"
+                    Title="@(state.Sets.Count == 0 ? "First exercise" : "Different exercise")" Small="true" Live="true" />
 
         <ExercisePicker State="state" OnPick="Start" Exclude="@stillToDo.Select(e => e.Id).ToHashSet()" NewAction="Start set">
             <BeforeTyping>
                 @if (stillToDo.Count > 0)
                 {
-                    <h2 class="label">Still to do in @state.Name</h2>
-                    <ExerciseList Exercises="stillToDo" State="state" OnPick="Start" />
+                    <section class="stack" aria-labelledby="still-heading">
+                        <h2 id="still-heading" class="label">Still to do in @state.Name</h2>
+                        <ExerciseList Exercises="stillToDo" State="state" OnPick="Start" />
+                    </section>
                 }
             </BeforeTyping>
         </ExercisePicker>

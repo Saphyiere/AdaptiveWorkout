@@ -28,4 +28,14 @@ public class SetSummaryTests
 
         Assert.Equal("5:00, 4:30, 1:02:05", SetSummary.Format(sets, ExerciseMeasure.Time));
     }
+
+    [Fact]
+    public void PercentText_SignsChangesAndRoundsTinyOnesToZero()
+    {
+        Assert.Equal("+3.1%", PercentText.Format(0.0312));
+        Assert.Equal("−1.2%", PercentText.Format(-0.0118));
+        Assert.Equal("+12%", PercentText.Format(0.12));
+        Assert.Equal("0%", PercentText.Format(0.0004));
+        Assert.Equal("0%", PercentText.Format(-0.0004));
+    }
 }

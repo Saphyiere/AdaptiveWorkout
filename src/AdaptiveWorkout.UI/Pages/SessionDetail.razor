@@ -9,16 +9,10 @@
 @if (session is not null)
 {
     var heartRate = WorkoutStats.HeartRate(samples, session.StartedAt, session.FinishedAt ?? session.StartedAt);
-    <div class="screen tight">
-        <header class="inline">
-            <a class="icon-btn" href="gym" aria-label="Back to Gym"><Icon Name="back" /></a>
-            <div class="row-text">
-                <p class="label">@session.StartedAt.ToString("dddd, MMM d · h:mm tt", CultureInfo.CurrentCulture)</p>
-                <h1 class="title small">@name</h1>
-            </div>
-        </header>
+    <div class="screen">
+        <PageHeader Back="gym" BackText="Gym" Label="@session.StartedAt.ToString("dddd, MMM d · h:mm tt", CultureInfo.CurrentCulture)" Title="@name" />
 
-        <section class="card" aria-label="Summary">
+        <section class="block" aria-label="Summary">
             <div class="grid-2">
                 <div class="row-text">
                     <span class="label">Time</span>
@@ -46,7 +40,7 @@
                     }
                     else
                     {
-                        <span class="caption">No readings</span>
+                        <span class="note">No readings</span>
                     }
                 </div>
             </div>
@@ -56,15 +50,18 @@
         {
             var exercise = exercises[exerciseSets.Key];
             var list = exerciseSets.ToList();
-            <section class="card" aria-label="@exercise.Name">
+            <section class="stack" aria-label="@exercise.Name">
                 <div class="spread">
-                    <h2 class="body strong">@exercise.Name</h2>
+                    <h2 class="name big">@exercise.Name</h2>
                     @if (list.Any(s => s.HitGoal))
                     {
-                        <span class="pill accent">Hit goal</span>
+                        <span class="inline">
+                            <Mark Kind="MarkKind.Tick" Size="22" />
+                            <span class="caption">Hit goal</span>
+                        </span>
                     }
                 </div>
-                <div class="set-grid tabular">
+                <div class="set-grid">
                     <span class="label">Set</span>
                     <span class="label">@(exercise.Measure == ExerciseMeasure.Time ? "Time" : $"{Unit(list[0].WeightUnit)} × reps")</span>
                     <span class="label">@(exercise.Measure == ExerciseMeasure.Time ? "" : "Time")</span>
@@ -85,12 +82,12 @@
         <div class="push-down">
             @if (confirming)
             {
-                <div class="card">
-                    <p class="body strong">Delete this workout?</p>
-                    <p class="caption">@name on @session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture) @(sets.Count == 0 ? "is" : $"and its {sets.Count} {(sets.Count == 1 ? "set" : "sets")} are") deleted for good.</p>
+                <div class="block open appear">
+                    <p class="name big">Delete this workout?</p>
+                    <p class="note">@name on @session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture) @(sets.Count == 0 ? "is" : $"and its {sets.Count} {(sets.Count == 1 ? "set" : "sets")} are") deleted for good.</p>
                     <div class="grid-2">
                         <button type="button" class="btn tall" @onclick="() => confirming = false">Keep it</button>
-                        <button type="button" class="btn tall accent" @onclick="DeleteAsync">Delete</button>
+                        <button type="button" class="btn tall fill" @onclick="DeleteAsync">Delete</button>
                     </div>
                 </div>
             }

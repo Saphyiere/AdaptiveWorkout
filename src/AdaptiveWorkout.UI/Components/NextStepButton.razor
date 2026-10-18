@@ -9,16 +9,19 @@
     @if (State.Plan.Count > 0)
     {
         <div class="spread">
-            <p class="caption">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
-            <a class="btn" href="workout/change">Change</a>
+            <div class="row-text">
+                <p class="label">Next</p>
+                <p class="body">@exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+            </div>
+            <a class="btn-ghost" href="workout/change">Change</a>
         </div>
     }
     else
     {
-        <p class="caption center">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+        <p class="note center">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
     }
-    <button type="button" class="btn-primary big" @onclick="() => Start(exercise)">@(sameExercise ? $"Start set {next.SetNumber}" : $"Start {exercise.Name}")</button>
 
+    @* Other ways on sit above the big button, which stays in the same place on every screen. *@
     @if (State.Plan.Count == 0)
     {
         <div class="grid-2">
@@ -38,12 +41,13 @@
             <button type="button" class="btn tall" @onclick="OnFinish">Finish workout</button>
         </div>
     }
+    <button type="button" class="btn-primary go" @onclick="() => Start(exercise)">@(sameExercise ? $"Start set {next.SetNumber}" : $"Start {exercise.Name}")</button>
 }
 else
 {
-    <p class="caption center">Every planned exercise is done.</p>
-    <button type="button" class="btn-primary big" @onclick="OnFinish">Finish workout</button>
+    <p class="note center">Every planned exercise is done.</p>
     <a class="btn tall" href="workout/add">Add more</a>
+    <button type="button" class="btn-primary save" @onclick="OnFinish">Finish workout</button>
 }
 
 @code {

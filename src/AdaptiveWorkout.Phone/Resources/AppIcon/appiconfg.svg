@@ -1,6 +1,6 @@
 <svg width="456" height="456" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg">
     <!-- The mark on Android's 108-unit adaptive canvas, inside the 66-unit safe zone. Source of truth: the AdaptiveWorkout design system. -->
     <g transform="translate(27.333 27.333) scale(2.2222)">
-        <path d="M3 15H9L12 4L15 20L17 11H21" fill="none" stroke="#FF3D8F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="miter" stroke-miterlimit="12" />
+        <path d="M3 15H9L12 4L15 20L17 11H21" fill="none" stroke="#AE2F18" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="miter" stroke-miterlimit="12" />
     </g>
 </svg>

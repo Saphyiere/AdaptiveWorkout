@@ -7,26 +7,20 @@
 
 @if (state is not null)
 {
-    <div class="screen tight">
-        <header class="inline">
-            <a class="icon-btn" href="workout" aria-label="Close"><Icon Name="close" /></a>
-            <div class="row-text">
-                <p class="label">@state.Name</p>
-                <h1 class="title small">Add to today</h1>
-            </div>
-        </header>
-        <p class="caption">It goes after everything else in today's workout. The session itself stays as it is.</p>
+    <div class="screen">
+        <PageHeader Back="workout" BackText="@state.Name" Title="Add to today" Small="true" Live="true" />
+        <p class="note">It goes after everything else in today's workout. The session itself stays as it is.</p>
 
         @if (sessions.Count > 0)
         {
             <section class="stack" aria-labelledby="sessions-heading">
                 <h2 id="sessions-heading" class="label">A whole session</h2>
-                <div class="list">
+                <div class="ledger">
                     @foreach (var (template, exerciseCount) in sessions)
                     {
                         <button type="button" class="row" @onclick="() => AddSessionAsync(template)">
                             <span class="row-text">
-                                <span class="body strong">@template.Name</span>
+                                <span class="name">@template.Name</span>
                                 <span class="caption">@exerciseCount @(exerciseCount == 1 ? "exercise" : "exercises")</span>
                             </span>
                             <Icon Name="plus" />
@@ -36,10 +30,7 @@
             </section>
         }
 
-        <section class="stack" aria-labelledby="exercise-heading">
-            <h2 id="exercise-heading" class="label">One exercise</h2>
-            <ExercisePicker State="state" OnPick="AddExercise" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="add-name" Label="Exercise" NewAction="Add it" />
-        </section>
+        <ExercisePicker State="state" OnPick="AddExercise" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="add-name" Label="One exercise" NewAction="Add it" />
     </div>
 }
 

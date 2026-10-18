@@ -1,12 +1,12 @@
 @* Exercises to pick from, each with how it went last time. *@
-<section class="list">
+<section class="ledger">
     @foreach (var exercise in Exercises)
     {
         var last = State.History(exercise.Id).FirstOrDefault();
         <button type="button" class="row" @onclick="() => OnPick.InvokeAsync(exercise)">
             <span class="row-text">
-                <span class="body strong">@exercise.Name</span>
-                <span class="caption tabular">@(last is null ? "Not done before" : $"Last: {SetSummary.Format(last.Sets, exercise.Measure)}")</span>
+                <span class="name">@exercise.Name</span>
+                <span class="note">@(last is null ? "not done before" : $"last: {SetSummary.Format(last.Sets, exercise.Measure)}")</span>
             </span>
             <Icon Name="forward" />
         </button>

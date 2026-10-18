@@ -75,10 +75,22 @@ If an Android build ever fails over output paths, temporarily remove the two art
 
 ## Design
 
-- Design system (colors, type, spacing, the mark and app icon): https://claude.ai/artifact/H9wJAoBQE834PEQ9qG4wmq
-- First-launch mockups (splash, first screen, app icon): https://claude.ai/artifact/EwspcKFgzTGB9FsPDC4RdC
+The phone app's look is **Logbook**: a printed training log on warm paper. Serif words and big serif numbers in fixed-width figures, ruled lines instead of cards, and one vermilion pen that marks what you did: a tick on each gym day, a circle around today, tally strokes for the streak and the sets done, a tick over Hit goal, and a bracket down a superset. The pen marks; it never grades a number.
 
-Black with one hot pink accent. The app icon and splash live in `src/AdaptiveWorkout.Phone/Resources` (SVG) and `src/AdaptiveWorkout.Watch/Resources/drawable` (vector drawables); the screens' CSS tokens are in `src/AdaptiveWorkout.UI/wwwroot/app.css`. The watch screen uses the same colors (`Resources/values/colors.xml`) and display font, Archivo Expanded (SIL Open Font License, `src/AdaptiveWorkout.UI/wwwroot/fonts/OFL.txt`).
+- Style directions (Logbook was picked; Telemetry, a dark instrument panel, is the next theme to try): https://claude.ai/artifact/2Z6jpTXARxNPY9AWAS2hxQ
+- The first design system (the mark and app icon): https://claude.ai/artifact/H9wJAoBQE834PEQ9qG4wmq
+
+**Themes.** `data-theme` on `<html>` picks the theme (`src/AdaptiveWorkout.Phone/wwwroot/index.html`). `src/AdaptiveWorkout.UI/wwwroot/app.css` gives each theme a block of tokens (paper, ink, pen, fonts, line weights, corner radius) under its `[data-theme]` selector, and every component uses only tokens. To add one, such as Telemetry:
+
+1. Copy Logbook's token block under `[data-theme="telemetry"]` and change the values.
+2. Where its shapes differ, add rules under `[data-theme="telemetry"]` without touching Logbook's. The pen marks (`Components/Mark.razor`) draw in `--mark`, whatever the theme.
+3. Add its fonts to `wwwroot/fonts` with `@font-face` rules.
+4. The native shell follows the page: the page background in `MainPage.xaml`, the status and navigation bar icons in `MainActivity` (a dark theme makes them light), the splash color and `colors.xml`.
+5. Switch by setting `data-theme`; a setting can choose it at startup.
+
+Fonts: Newsreader and Schibsted Grotesk, in `src/AdaptiveWorkout.UI/wwwroot/fonts` under the SIL Open Font License (`OFL-*.txt`). The app icon and splash (the mark in vermilion on paper) are SVGs in `src/AdaptiveWorkout.Phone/Resources`.
+
+The watch keeps its black screen with the pink accent: a dark screen suits the watch, and vermilion on black is too dim to read. Its colors are in `src/AdaptiveWorkout.Watch/Resources/values/colors.xml`, its icon in `Resources/drawable`, and its font is Archivo Expanded (SIL Open Font License, `src/AdaptiveWorkout.Watch/OFL-ArchivoExpanded.txt`).
 
 ## Tests
 

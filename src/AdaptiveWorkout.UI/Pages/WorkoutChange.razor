@@ -11,31 +11,22 @@
     var midRound = state.Running is null && state.Next is { AfterBreak: false };
     var partners = WorkoutPlan.Blocks(state.Plan).Find(b => b.Any(e => e.ExerciseId == targetId))?.Select(e => e.ExerciseId).ToHashSet() ?? [];
     var others = state.StillToDo().Where(id => id != targetId && !(midRound && partners.Contains(id))).Select(id => state.Exercises[id]).ToList();
-    <div class="screen tight">
-        <header class="inline">
-            <a class="icon-btn" href="workout" aria-label="Close"><Icon Name="close" /></a>
-            <div class="row-text">
-                <p class="label">Today only</p>
-                <h1 class="title small">Change @target.Name</h1>
-            </div>
-        </header>
-        <p class="caption">@(state.Running is null ? "The session itself stays as it is." : "The running set starts over as whatever you pick. The session itself stays as it is.")</p>
+    <div class="screen">
+        <PageHeader Back="workout" BackText="@state.Name" Label="Today only" Title="@($"Change {target.Name}")" Small="true" Live="true" />
+        <p class="note">@(state.Running is null ? "The session itself stays as it is." : "The running set starts over as whatever you pick. The session itself stays as it is.")</p>
 
         @if (others.Count > 0)
         {
             <section class="stack" aria-labelledby="first-heading">
                 <div class="row-text">
                     <h2 id="first-heading" class="label">Do another one first</h2>
-                    <p class="caption">@target.Name waits until it's done.</p>
+                    <p class="note">@target.Name waits until it's done.</p>
                 </div>
                 <ExerciseList Exercises="others" State="state" OnPick="DoFirst" />
             </section>
         }
 
-        <section class="stack" aria-labelledby="swap-heading">
-            <h2 id="swap-heading" class="label">Swap @target.Name for</h2>
-            <ExercisePicker State="state" OnPick="Swap" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="swap-name" Label="Another exercise" NewAction="Swap it in" />
-        </section>
+        <ExercisePicker State="state" OnPick="Swap" Exclude="@state.Plan.Select(e => e.ExerciseId).ToHashSet()" Id="swap-name" Label="@($"Swap {target.Name} for")" NewAction="Swap it in" />
 
         @if (state.Plan.Any(e => e.ExerciseId == targetId))
         {

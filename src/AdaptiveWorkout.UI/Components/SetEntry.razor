@@ -7,29 +7,34 @@
     var id = $"set-{Set.Order}";
     var unit = Set.WeightUnit == WeightUnit.Kilograms ? "kg" : "lb";
 }
-<form class="card appear" aria-labelledby="@id-heading" @onsubmit="SaveAsync">
+<form class="block appear" aria-labelledby="@id-heading" @onsubmit="SaveAsync">
     <h2 id="@id-heading" class="label">@exercise.Name · @WorkoutState.StepLabel(State.Describe(Set))</h2>
-    <div class="grid-2">
-        <div class="field-group">
-            <label class="field-label" for="@id-weight">Weight (@unit)</label>
-            <input id="@id-weight" class="field number-field" type="number" inputmode="decimal" step="any" placeholder="Bodyweight" @bind="Set.Weight" @bind:after="() => Flow.SaveSet(Set)" />
+    <div class="entry-row">
+        <div class="field-group entry-weight">
+            <label class="field-label" for="@id-weight">Weight</label>
+            <div class="writing">
+                <input id="@id-weight" class="field number-field" type="number" inputmode="decimal" step="any" placeholder="Bodyweight" @bind="Set.Weight" @bind:after="() => Flow.SaveSet(Set)" />
+                <span class="unit">@unit</span>
+            </div>
         </div>
-        <div class="field-group">
+        <div class="field-group entry-reps">
             <label class="field-label" for="@id-reps">Reps</label>
-            <input id="@id-reps" class="field number-field" type="number" inputmode="numeric" min="0" @bind="Set.Reps" @bind:after="() => Flow.SaveSet(Set)" />
+            <div class="writing">
+                <input id="@id-reps" class="field number-field" type="number" inputmode="numeric" min="0" @bind="Set.Reps" @bind:after="() => Flow.SaveSet(Set)" />
+            </div>
+        </div>
+        <label class="goal">
+            <input type="checkbox" @bind="Set.HitGoal" @bind:after="() => Flow.SaveSet(Set)" />
+            <span>Hit goal</span>
+        </label>
+    </div>
+    <div class="spread">
+        <p class="note">@(Set.Weight is double weight ? $"Hit goal: next time starts at {SetSummary.WeightText(weight + Settings.HitGoalStep)} {unit}" : "Bodyweight stays bodyweight")</p>
+        <div class="inline">
+            <button type="button" class="btn tall" aria-label="Switch between added and assisted weight" disabled="@(Set.Weight is null)" @onclick="() => { Set.Weight = -Set.Weight; Flow.SaveSet(Set); }">+/−</button>
+            <button type="submit" class="btn tall adjust">Save</button>
         </div>
     </div>
-    <div class="inline">
-        <label class="goal compact">
-            <input type="checkbox" @bind="Set.HitGoal" @bind:after="() => Flow.SaveSet(Set)" />
-            <span class="row-text">
-                <span class="body strong">Hit goal</span>
-                <span class="caption">@(Set.Weight is double weight ? $"Next time starts at {SetSummary.WeightText(weight + Settings.HitGoalStep)} {unit}" : "Next time stays bodyweight")</span>
-            </span>
-        </label>
-        <button type="button" class="btn tall" aria-label="Switch between added and assisted weight" disabled="@(Set.Weight is null)" @onclick="() => { Set.Weight = -Set.Weight; Flow.SaveSet(Set); }">+/−</button>
-    </div>
-    <button type="submit" class="btn tall accent"><Icon Name="check" Size="18" Stroke="2" />Save</button>
 </form>
 
 @code {

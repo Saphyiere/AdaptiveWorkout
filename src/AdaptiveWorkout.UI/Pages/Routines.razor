@@ -5,29 +5,26 @@
 
 @if (loaded)
 {
-    var (back, backLabel) = From switch { "gym" => ("gym", "Back to Gym"), "today" => ("", "Back to Today"), _ => ("sessions", "Back to sessions") };
-    <div class="screen tight">
-        <header class="inline">
-            <a class="icon-btn" href="@back" aria-label="@backLabel"><Icon Name="back" /></a>
-            <h1 class="title small">Routines</h1>
-        </header>
-        <p class="caption">A routine plans the week: a session or a rest day for each day. Today and the streak follow the one in use; tap another to switch.</p>
+    var (back, backText) = From switch { "gym" => ("gym", "Gym"), "today" => ("", "Today"), _ => ("sessions", "Sessions") };
+    <div class="screen">
+        <PageHeader Back="@back" BackText="@backText" Title="Routines" />
+        <p class="note">A routine plans the week: a session or a rest day for each day. Today and the streak follow the one in use; tap another to switch.</p>
 
-        <section class="list" aria-label="Routines">
+        <section class="ledger" aria-label="Routines">
             @foreach (var (routine, week) in routines)
             {
                 var inUse = routine.Id == activeId;
                 var restDays = Enumerable.Range(0, 7).Where(i => week[i] is null).Select(Schedule.ShortName).ToList();
                 <div class="row" @key="routine.Id">
                     <button type="button" class="row-main" aria-pressed="@(inUse ? "true" : "false")" @onclick="() => UseAsync(routine.Id)">
-                        <span class="status @(inUse ? "current" : "")">
+                        <span class="status">
                             @if (inUse)
                             {
-                                <Icon Name="check" Size="16" Stroke="2" Color="var(--accent)" />
+                                <Mark Kind="MarkKind.Tick" Size="28" />
                             }
                         </span>
                         <span class="row-text">
-                            <span class="body strong">@routine.Name</span>
+                            <span class="name">@routine.Name</span>
                             <span class="caption">@(restDays.Count == 7 ? "No days planned yet" : $"{7 - restDays.Count} gym days{(restDays.Count > 0 ? $" · rest {string.Join(", ", restDays)}" : "")}")</span>
                         </span>
                     </button>
@@ -35,26 +32,23 @@
                 </div>
             }
             <button type="button" class="row" aria-pressed="@(activeId is null ? "true" : "false")" @onclick="() => UseAsync(null)">
-                <span class="status @(activeId is null ? "current" : "")">
+                <span class="status">
                     @if (activeId is null)
                     {
-                        <Icon Name="check" Size="16" Stroke="2" Color="var(--accent)" />
+                        <Mark Kind="MarkKind.Tick" Size="28" />
                     }
                 </span>
                 <span class="row-text">
-                    <span class="body strong">No routine</span>
+                    <span class="name">No routine</span>
                     <span class="caption">Any day is a gym day, and the streak counts weeks.</span>
                 </span>
             </button>
-        </section>
-
-        <section class="list">
             <a class="row" href="@($"routines/new{FromQuery}")">
-                <span class="icon-btn"><Icon Name="plus" /></span>
                 <span class="row-text">
-                    <span class="body strong">New routine</span>
-                    <span class="caption">Pick a session or a rest day for each day</span>
+                    <span class="name">New routine</span>
+                    <span class="note">Pick a session or a rest day for each day</span>
                 </span>
+                <Icon Name="plus" />
             </a>
         </section>
     </div>

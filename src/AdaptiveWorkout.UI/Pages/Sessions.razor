@@ -9,33 +9,29 @@
 {
     var todayIndex = Schedule.DayIndex(DateOnly.FromDateTime(DateTime.Now));
     var todayId = routineWeek?[todayIndex];
-    <div class="screen tight">
-        <header class="inline">
-            <a class="icon-btn" href="" aria-label="Back to Today"><Icon Name="back" /></a>
-            <h1 class="title small">Choose session</h1>
-        </header>
+    <div class="screen">
+        <PageHeader Back="" BackText="Today" Title="Choose session" />
 
         @if (open is not null)
         {
             var openName = templates.FirstOrDefault(t => t.Id == open.Session.TemplateId)?.Name ?? "Workout";
             var setCount = open.Sets.Count;
-            <section class="card">
-                <div class="row-text">
-                    <p class="body"><strong>@openName</strong> is in progress.</p>
-                    <p class="caption">Started @open.Session.StartedAt.ToString("h:mm tt", CultureInfo.CurrentCulture) · @setCount @(setCount == 1 ? "set" : "sets")</p>
-                </div>
+            <section class="block" aria-labelledby="open-heading">
+                <p class="inline"><span class="live-dot"></span><span id="open-heading" class="label">In progress</span></p>
+                <p class="name big">@openName</p>
+                <p class="caption">Started @open.Session.StartedAt.ToString("h:mm tt", CultureInfo.CurrentCulture) · @setCount @(setCount == 1 ? "set" : "sets")</p>
                 @if (cancelling)
                 {
                     <p class="body strong">Cancel @openName?</p>
-                    <p class="caption">@(setCount == 0 ? "Nothing was logged yet. The workout is deleted." : $"The workout and its {setCount} {(setCount == 1 ? "set" : "sets")} are deleted for good.")</p>
+                    <p class="note">@(setCount == 0 ? "Nothing was logged yet. The workout is deleted." : $"The workout and its {setCount} {(setCount == 1 ? "set" : "sets")} are deleted for good.")</p>
                     <div class="grid-2">
                         <button type="button" class="btn tall" @onclick="() => cancelling = false">Keep it</button>
-                        <button type="button" class="btn tall accent" @onclick="CancelAsync">Delete it</button>
+                        <button type="button" class="btn tall fill" @onclick="CancelAsync">Delete it</button>
                     </div>
                 }
                 else
                 {
-                    <a class="btn tall accent" href="workout">Resume</a>
+                    <a class="btn tall fill" href="workout">Resume</a>
                     <div class="grid-2">
                         <button type="button" class="btn tall" @onclick="FinishAsync">Finish</button>
                         <button type="button" class="btn tall" @onclick="() => cancelling = true">Cancel session</button>
@@ -44,75 +40,78 @@
             </section>
         }
 
-        @* The routine in use plans the week; Today and the streak follow it. *@
-        <a class="card" href="routines" aria-labelledby="routine-heading">
+        @* The routine in use plans the week; Today and the streak follow it. Its week's last rule closes the block. *@
+        <a class="block open" href="routines" aria-labelledby="routine-heading">
             <div class="spread">
                 <h2 id="routine-heading" class="label">Routine</h2>
-                <span class="inline caption">Change <Icon Name="forward" Size="18" Color="var(--ink-muted)" /></span>
+                <span class="inline">
+                    <span class="status-word">@(routine?.Name ?? "None")</span>
+                    <Icon Name="forward" Size="16" />
+                </span>
             </div>
             @if (routine is null || routineWeek is null)
             {
-                <p class="body strong">None</p>
-                <p class="caption">A routine plans the week: a session or a rest day for each day.</p>
+                <p class="note">A routine plans the week: a session or a rest day for each day.</p>
             }
             else
             {
-                <p class="body strong">@routine.Name</p>
                 <div class="week-plan">
                     @for (var i = 0; i < 7; i++)
                     {
                         var session = templates.FirstOrDefault(t => t.Id == routineWeek[i]);
                         <span class="caption @(i == todayIndex ? "today" : "")">@Schedule.ShortName(i)</span>
-                        <span class="@(session is null ? "caption" : "body") @(i == todayIndex ? "today" : "")">@(session?.Name ?? "Rest day")</span>
+                        <span class="@(session is null ? "note" : "body") @(i == todayIndex ? "today" : "")">@(session?.Name ?? "Rest day")</span>
                     }
                 </div>
             }
         </a>
 
-        <h2 class="label">Sessions</h2>
-        @if (templates.Count == 0)
-        {
-            <p class="caption">No sessions yet. Add the first one below.</p>
-        }
-        else
-        {
-            <section class="list" aria-label="Sessions">
-                @foreach (var template in templates)
-                {
-                    var lastDone = sessions.Where(s => s.TemplateId == template.Id && s.FinishedAt is not null).MaxBy(s => s.StartedAt);
-                    <div class="row">
-                        <button type="button" class="row-main" disabled="@(open is not null)" @onclick="() => StartAsync(template.Id)">
-                            <span class="row-text">
-                                <span class="body strong">@template.Name</span>
-                                <span class="caption">@(lastDone is null ? "Not done yet" : $"Last done {lastDone.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)}")</span>
-                            </span>
-                            @if (template.Id == todayId)
-                            {
-                                <span class="pill accent">Today</span>
-                            }
-                        </button>
-                        <a class="icon-btn plain" href="sessions/@template.Id" aria-label="Edit @template.Name"><Icon Name="edit" /></a>
-                    </div>
-                }
-            </section>
-        }
+        <section class="stack" aria-labelledby="sessions-heading">
+            <h2 id="sessions-heading" class="label">Sessions</h2>
+            @if (templates.Count == 0)
+            {
+                <p class="note">No sessions yet. Add the first one below.</p>
+            }
+            else
+            {
+                <div class="ledger">
+                    @foreach (var template in templates)
+                    {
+                        var lastDone = sessions.Where(s => s.TemplateId == template.Id && s.FinishedAt is not null).MaxBy(s => s.StartedAt);
+                        <div class="row">
+                            <button type="button" class="row-main" disabled="@(open is not null)" @onclick="() => StartAsync(template.Id)">
+                                <span class="row-text">
+                                    <span class="name">@template.Name</span>
+                                    <span class="caption">@(lastDone is null ? "Not done yet" : $"Last done {lastDone.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)}")</span>
+                                </span>
+                                @if (template.Id == todayId)
+                                {
+                                    <span class="pen-note">today</span>
+                                }
+                            </button>
+                            <a class="icon-btn plain" href="sessions/@template.Id" aria-label="Edit @template.Name"><Icon Name="edit" /></a>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
 
-        <section class="list">
+        <div class="ledger">
             <button type="button" class="row" disabled="@(open is not null)" @onclick="() => StartAsync(null)">
-                <span class="icon-btn"><Icon Name="mark" /></span>
                 <span class="row-text">
-                    <span class="body strong">Just track</span>
-                    <span class="caption">No plan. Add exercises as you go.</span>
+                    <span class="name">Just track</span>
+                    <span class="note">No plan. Add exercises as you go.</span>
                 </span>
+                <Icon Name="forward" />
             </button>
             <a class="row" href="sessions/new">
-                <span class="icon-btn"><Icon Name="plus" /></span>
                 <span class="row-text">
-                    <span class="body strong">New session</span>
-                    <span class="caption">A list of exercises to use in any routine</span>
+                    <span class="name">New session</span>
+                    <span class="note">A list of exercises to use in any routine</span>
                 </span>
+                <Icon Name="plus" />
             </a>
-        </section>
+        </div>
     </div>
 }
 

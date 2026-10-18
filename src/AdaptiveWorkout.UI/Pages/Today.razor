@@ -8,22 +8,23 @@
 
 @if (loaded)
 {
-    <div class="screen tight">
-        <header class="spread">
-            <div class="row-text">
-                <p class="label">@today.ToString("dddd, MMM d", CultureInfo.CurrentCulture)</p>
-                <h1 class="title">Today</h1>
-            </div>
-            <Icon Name="mark" Size="28" Color="var(--accent)" Stroke="1.8" />
-        </header>
+    <div class="screen">
+        <PageHeader Label="@today.ToString("dddd, MMMM d", CultureInfo.CurrentCulture)" Title="Today" />
 
         @* Opens Gym: the improvement trend, the routine, and every finished workout. *@
-        <a class="card" href="gym" aria-labelledby="gym-heading">
+        <a class="block" href="gym" aria-labelledby="gym-heading">
             <div class="spread">
                 <h2 id="gym-heading" class="label">Gym today</h2>
                 <span class="inline">
-                    <span class="pill @(wentToday ? "accent" : "")">@(openSession is not null ? "In progress" : wentToday ? "Done" : restDay ? "Rest day" : "Not yet")</span>
-                    <Icon Name="forward" Size="18" Color="var(--ink-muted)" />
+                    @if (openSession is null && wentToday)
+                    {
+                        <span class="stamp">Done</span>
+                    }
+                    else
+                    {
+                        <span class="status-word">@(openSession is not null ? "In progress" : restDay ? "Rest day" : "Not yet")</span>
+                    }
+                    <Icon Name="forward" Size="16" />
                 </span>
             </div>
             <div class="week">
@@ -32,50 +33,81 @@
                     var date = monday.AddDays(i);
                     var isToday = date == today;
                     var isRest = planned && routineWeek![i] is null;
+                    var missed = planned && !week[i] && !isRest && date < today;
                     <div class="day @(isToday ? "today" : "")">
-                        <span class="dot @(week[i] ? "done" : isRest ? "rest" : isToday ? "ring" : "")">
+                        <span class="day-letter">
+                            @date.ToString("ddd", CultureInfo.CurrentCulture)[..1]
+                            @if (isToday)
+                            {
+                                <Mark Kind="MarkKind.Circle" Size="32" />
+                            }
+                        </span>
+                        <span class="day-cell @(isRest && !week[i] ? "rest" : "")">
                             @if (week[i])
                             {
-                                <Icon Name="check" Size="16" Color="var(--on-accent)" Stroke="2.5" />
+                                <Mark Kind="MarkKind.Tick" />
                             }
                             else if (isRest)
                             {
-                                <Icon Name="minus" Size="14" Color="var(--ink-muted)" />
+                                @("rest")
+                            }
+                            else if (missed)
+                            {
+                                @("–")
                             }
                         </span>
-                        <span>@date.ToString("ddd", CultureInfo.CurrentCulture)[..1]<span class="sr-only">@date.ToString("dddd", CultureInfo.CurrentCulture)@(week[i] ? ", gym day" : "")</span></span>
+                        <span class="sr-only">@date.ToString("dddd", CultureInfo.CurrentCulture)@(week[i] ? ", gym day" : isRest ? ", rest day" : missed ? ", missed" : "")</span>
                     </div>
                 }
             </div>
-            <p class="caption">@weekText</p>
+            <div class="spread">
+                <p class="body"><span class="strong">@weekCount</span> @weekWords</p>
+                @if (streak > 0)
+                {
+                    <span class="inline">
+                        @if (streak <= 10)
+                        {
+                            <Mark Kind="MarkKind.Tally" Count="streak" Size="22" />
+                        }
+                        <span class="label">@streak-@(planned ? "day" : "week") streak</span>
+                    </span>
+                }
+            </div>
         </a>
 
-        <section class="card" aria-labelledby="calories-heading">
+        <section class="block" aria-labelledby="calories-heading">
             <div class="spread">
                 <h2 id="calories-heading" class="label">Calories eaten</h2>
-                <span class="inline">
-                    @if (todayFood.Count > 0)
-                    {
-                        <button type="button" class="btn @(editingFood ? "accent" : "")" @onclick="() => editingFood = !editingFood">@(editingFood ? "Done" : "Edit")</button>
-                    }
-                    @if (!addingFood)
-                    {
-                        <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="18" />Add</button>
-                    }
+                <span class="note">of @Settings.CalorieGoal.ToString("N0", CultureInfo.CurrentCulture) goal</span>
+            </div>
+            <div class="spread end">
+                <span class="row-text">
+                    <span class="name big tabular">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span>
+                    <span class="caption">maintenance @Settings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)</span>
                 </span>
-            </div>
-            <div class="inline baseline">
                 <span class="number md">@eaten.ToString("N0", CultureInfo.CurrentCulture)</span>
-                <span class="unit">of @Settings.CalorieGoal.ToString("N0", CultureInfo.CurrentCulture) goal</span>
             </div>
-            <div class="bar"><span style="width: @(Math.Min(100, eaten * 100 / Settings.CalorieGoal))%"></span></div>
-            <p class="caption">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over") · maintenance @Settings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)</p>
+            @{
+                // The meter runs to maintenance (or past it): ink up to the goal, hatching beyond it.
+                var scale = Math.Max(Settings.Maintenance, eaten);
+                var goalAt = Settings.CalorieGoal * 100.0 / scale;
+            }
+            <div class="meter" role="meter" aria-label="@($"Calories eaten, {eaten:N0} of {Settings.CalorieGoal:N0} goal")" aria-valuemin="0" aria-valuemax="@scale" aria-valuenow="@eaten">
+                <span class="meter-fill" style="width: @Percent(Math.Min(eaten, Settings.CalorieGoal) * 100.0 / scale)"></span>
+                @if (eaten > Settings.CalorieGoal)
+                {
+                    <span class="meter-over" style="left: @Percent(goalAt); width: @Percent((eaten - Settings.CalorieGoal) * 100.0 / scale)"></span>
+                }
+                <span class="meter-goal" style="left: @Percent(goalAt)"></span>
+            </div>
             @if (addingFood)
             {
-                <form class="inline" @onsubmit="AddFoodAsync">
-                    <label class="sr-only" for="calories">Calories to add</label>
-                    <input id="calories" class="field" type="number" inputmode="numeric" min="0" placeholder="Calories to add" @bind="foodAmount" />
-                    <button type="submit" class="btn tall">Save</button>
+                <form class="inline end" @onsubmit="AddFoodAsync">
+                    <div class="field-group grow">
+                        <label class="field-label" for="calories">Calories to add</label>
+                        <input id="calories" class="field number-field" type="number" inputmode="numeric" min="0" @bind="foodAmount" />
+                    </div>
+                    <button type="submit" class="btn tall fill">Save</button>
                     <button type="button" class="icon-btn plain" aria-label="Cancel" @onclick="() => addingFood = false"><Icon Name="close" /></button>
                 </form>
             }
@@ -86,53 +118,63 @@
                     {
                         <div @key="entry.Id">
                             <span class="inline baseline">
-                                <span class="body strong tabular">@entry.Calories.ToString("N0", CultureInfo.CurrentCulture)</span>
-                                <span class="caption">@entry.At.ToString("h:mm tt", CultureInfo.CurrentCulture)</span>
+                                <span class="name tabular">@entry.Calories.ToString("N0", CultureInfo.CurrentCulture)</span>
+                                <span class="note">at @entry.At.ToString("h:mm tt", CultureInfo.CurrentCulture)</span>
                             </span>
                             <ConfirmDelete Label="@($"Delete {entry.Calories} calories at {entry.At.ToString("h:mm tt", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteFoodAsync(entry)" />
                         </div>
                     }
                 </div>
             }
+            <div class="inline right">
+                @if (todayFood.Count > 0)
+                {
+                    <button type="button" class="btn-ghost" @onclick="() => editingFood = !editingFood">@(editingFood ? "Done" : "Edit")</button>
+                }
+                @if (!addingFood)
+                {
+                    <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="16" />Add</button>
+                }
+            </div>
         </section>
 
-        <section class="card" aria-labelledby="weight-heading">
+        <section class="block" aria-labelledby="weight-heading">
+            <h2 id="weight-heading" class="label">Body weight</h2>
             <div class="spread">
-                <h2 id="weight-heading" class="label">Body weight</h2>
-                <span class="inline">
-                    @if (weights.Count > 0)
-                    {
-                        <button type="button" class="btn @(editingWeights ? "accent" : "")" @onclick="() => editingWeights = !editingWeights">@(editingWeights ? "Done" : "Edit")</button>
-                    }
-                    @if (!weighing)
-                    {
-                        <button type="button" class="btn" @onclick="() => weighing = true">Weigh in</button>
-                    }
-                </span>
-            </div>
-            <div class="spread end">
-                @if (latestWeight is not null)
-                {
-                    <div class="inline baseline">
-                        <span class="number md">@latestWeight.Weight.ToString("0.#", CultureInfo.CurrentCulture)</span>
-                        <span class="unit">@UnitText</span>
-                    </div>
-                }
                 @if (sparkline is not null)
                 {
-                    <svg aria-hidden="true" viewBox="0 0 120 40" width="120" height="40">
-                        <polyline points="@sparkline.Value.Points" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linejoin="miter"></polyline>
-                        <circle cx="118" cy="@sparkline.Value.LastY" r="3.5" fill="var(--accent)"></circle>
+                    <svg class="spark" role="img" aria-label="@($"Body weight over the last 30 days, ending at {latestWeight?.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {UnitText}")" viewBox="0 0 136 48" width="136" height="48">
+                        <polyline points="@sparkline.Value.Points"></polyline>
+                        <circle cx="131" cy="@sparkline.Value.LastY" r="4"></circle>
                     </svg>
                 }
+                else
+                {
+                    <span></span>
+                }
+                @if (latestWeight is not null)
+                {
+                    <span class="inline baseline">
+                        <span class="number md">@latestWeight.Weight.ToString("0.#", CultureInfo.CurrentCulture)</span>
+                        <span class="unit big">@UnitText</span>
+                    </span>
+                }
             </div>
-            <p class="caption">@weightChangeText</p>
+            <p class="inline baseline">
+                @if (weightChange is not null)
+                {
+                    <span class="body strong tabular">@weightChange</span>
+                }
+                <span class="note">@weightChangeText</span>
+            </p>
             @if (weighing)
             {
-                <form class="inline" @onsubmit="WeighInAsync">
-                    <label class="sr-only" for="body-weight">Body weight in @UnitText</label>
-                    <input id="body-weight" class="field" type="number" inputmode="decimal" step="any" min="0" placeholder="Weight (@UnitText)" @bind="weightAmount" />
-                    <button type="submit" class="btn tall">Save</button>
+                <form class="inline end" @onsubmit="WeighInAsync">
+                    <div class="field-group grow">
+                        <label class="field-label" for="body-weight">Body weight (@UnitText)</label>
+                        <input id="body-weight" class="field number-field" type="number" inputmode="decimal" step="any" min="0" @bind="weightAmount" />
+                    </div>
+                    <button type="submit" class="btn tall fill">Save</button>
                     <button type="button" class="icon-btn plain" aria-label="Cancel" @onclick="() => weighing = false"><Icon Name="close" /></button>
                 </form>
             }
@@ -144,22 +186,27 @@
                         var unit = entry.WeightUnit == WeightUnit.Kilograms ? "kg" : "lb";
                         <div @key="entry.Id">
                             <span class="inline baseline">
-                                <span class="body strong tabular">@entry.Weight.ToString("0.#", CultureInfo.CurrentCulture) @unit</span>
-                                <span class="caption">@entry.At.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</span>
+                                <span class="name tabular">@entry.Weight.ToString("0.#", CultureInfo.CurrentCulture)</span>
+                                <span class="note">@unit on @entry.At.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</span>
                             </span>
                             <ConfirmDelete Label="@($"Delete {entry.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {unit} on {entry.At.ToString("MMM d", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteWeightAsync(entry)" />
                         </div>
                     }
                 </div>
             }
+            <div class="inline right">
+                @if (weights.Count > 0)
+                {
+                    <button type="button" class="btn-ghost" @onclick="() => editingWeights = !editingWeights">@(editingWeights ? "Done" : "Edit")</button>
+                }
+                @if (!weighing)
+                {
+                    <button type="button" class="btn" @onclick="() => weighing = true">Weigh in</button>
+                }
+            </div>
         </section>
 
         <div class="push-down">
-            @if (openSession is null && (wentToday || restDay))
-            {
-                <p class="caption center">@(wentToday ? "Done for today." : "Rest day. The streak keeps going.")</p>
-            }
-            <button type="button" class="btn-primary" @onclick="StartAsync">@startLabel</button>
             @if (routine is null)
             {
                 <a class="btn-ghost" href="routines?from=today">Set up a routine</a>
@@ -176,6 +223,7 @@
             {
                 <a class="btn-ghost" href="routines?from=today">Edit routine</a>
             }
+            <button type="button" class="btn-primary go" @onclick="StartAsync">@startLabel</button>
         </div>
     </div>
 }
@@ -195,7 +243,7 @@
     private int eaten;
     private int left;
     private BodyWeightEntry? latestWeight;
-    private (string Points, double LastY)? sparkline;
+    private (string Points, string LastY)? sparkline;
     private bool addingFood;
     private int? foodAmount;
     private bool weighing;
@@ -205,11 +253,17 @@
     private List<BodyWeightEntry> weights = [];
     private bool editingWeights;
 
-    private string weekText = "";
+    private string weekCount = "";
+    private string weekWords = "";
+    private int streak;
+    private string? weightChange;
     private string weightChangeText = "";
     private string startLabel = "";
 
     private string UnitText => (latestWeight?.WeightUnit ?? Settings.Unit) == WeightUnit.Kilograms ? "kg" : "lb";
+
+    // A CSS percentage, which takes a point whatever the phone's language.
+    private static string Percent(double value) => $"{value.ToString("0.##", CultureInfo.InvariantCulture)}%";
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -234,10 +288,10 @@
         restDay = planned && Schedule.On(routineWeek!, today) is null;
 
         var gymDaysThisWeek = week.Count(d => d);
-        var streak = planned ? Consistency.DayStreak(gymDays, routineWeek!, today) : Consistency.WeekStreak(gymDays, today);
+        streak = planned ? Consistency.DayStreak(gymDays, routineWeek!, today) : Consistency.WeekStreak(gymDays, today);
         var plannedDays = routineWeek?.Count(d => d is not null) ?? 0;
-        weekText = planned ? $"{gymDaysThisWeek} of {plannedDays} gym days this week" : gymDaysThisWeek == 0 ? "No gym days yet this week" : $"{gymDaysThisWeek} gym {(gymDaysThisWeek == 1 ? "day" : "days")} this week";
-        if (streak > 0) weekText += planned ? $" · {streak}-day streak" : $" · {streak}-week streak";
+        (weekCount, weekWords) = planned ? ($"{gymDaysThisWeek} of {plannedDays}", "gym days this week")
+            : gymDaysThisWeek == 0 ? ("", "No gym days yet this week") : (gymDaysThisWeek.ToString(CultureInfo.CurrentCulture), gymDaysThisWeek == 1 ? "gym day this week" : "gym days this week");
 
         var openName = openSession?.TemplateId is long openId ? templates.GetValueOrDefault(openId)?.Name : null;
         startLabel = openSession is not null ? $"Resume {openName ?? "workout"}" : todayTemplate is not null && !wentToday ? $"Start {todayTemplate.Name}" : "Start a workout";
@@ -249,21 +303,22 @@
 
         weights = await Store.GetBodyWeightsAsync();
         latestWeight = weights.MaxBy(w => w.At);
-        var weightChange = BodyWeight.Change(weights, now, 30);
-        weightChangeText = weightChange switch
+        var change = BodyWeight.Change(weights, now, 30);
+        weightChange = change is null or 0 ? null : $"{(change < 0 ? "−" : "+")}{Math.Abs(change.Value).ToString("0.#", CultureInfo.CurrentCulture)} {UnitText}";
+        weightChangeText = change switch
         {
             null when latestWeight is null => "Weigh in to start your trend.",
             null => "Weigh in again to see your trend.",
             0 => "No change in 30 days",
-            var change => $"{(change < 0 ? "−" : "+")}{Math.Abs(change.Value).ToString("0.#", CultureInfo.CurrentCulture)} {UnitText} in 30 days",
+            _ => "in 30 days",
         };
         var recent = weights.Where(w => w.At >= now.AddDays(-30)).OrderBy(w => w.At).ToList();
         if (recent.Count >= 2)
         {
             var (min, max) = (recent.Min(w => w.Weight), recent.Max(w => w.Weight));
-            var ys = recent.Select(w => max == min ? 20 : 4 + (max - w.Weight) / (max - min) * 32).ToList();
-            var points = string.Join(' ', ys.Select((y, i) => $"{(2 + i * 116.0 / (ys.Count - 1)).ToString("0.#", CultureInfo.InvariantCulture)},{y.ToString("0.#", CultureInfo.InvariantCulture)}"));
-            sparkline = (points, ys[^1]);
+            var ys = recent.Select(w => max == min ? 24 : 5 + (max - w.Weight) / (max - min) * 38).ToList();
+            var points = string.Join(' ', ys.Select((y, i) => $"{(5 + i * 126.0 / (ys.Count - 1)).ToString("0.#", CultureInfo.InvariantCulture)},{y.ToString("0.#", CultureInfo.InvariantCulture)}"));
+            sparkline = (points, ys[^1].ToString("0.#", CultureInfo.InvariantCulture));
         }
         else sparkline = null;
 

@@ -121,7 +121,7 @@ I can leave simple mode at any moment, like leaving full screen. **Advanced mode
 The break screen reads **Rest 0:48**: the word big beside the timer, counting up. **Tapping the time** turns it into a countdown (and back); the choice sticks for later rests.
 
 - **It learns:** the countdown after an exercise starts from the one I set for it last time; never set, from how long I usually rested after it last time (the middle rest, to the nearest 15 seconds); with nothing to go on, 1:30. **−15s** and **+15s** adjust it, and that's remembered.
-- **At zero** the watch buzzes, and the next set starts by itself. The phone buzzes and beeps instead only when no watch is connected (no heart rate in the last 15 seconds), so they never both go. The last ten seconds turn pink.
+- **At zero** the watch buzzes, and the next set starts by itself. The phone buzzes and beeps instead only when no watch is connected (no heart rate in the last 15 seconds), so they never both go. The last ten seconds turn red.
 - A countdown that ran out while I was on another screen, or while the phone slept, doesn't start anything; it shows how far over I am (**+0:23**).
 - Starting by itself and the phone's buzz need the app open on the break screen (the phone's screen can be off). The watch buzzes wherever the phone is.
 
@@ -294,6 +294,7 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 - A categorized exercise picker.
 - Macros.
 - Cloud backup with a Google account.
+- A second look: **Telemetry**, a dark instrument panel, switchable with Logbook in settings. The screens are ready for it (README, *Design*).
 
 ## Open questions
 
