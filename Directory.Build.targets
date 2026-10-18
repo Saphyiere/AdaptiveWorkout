@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    Visual Studio's design-time builds (the background builds behind IntelliSense) number an Android app's resources with their own
+    parser, which counts them differently from the real build. Once the app has been built, they write that numbering over the real
+    build's resource designer after a resource edit that adds no resources (a changed color, say), the next builds keep it, and the
+    app deployed with it looks its views up by the wrong ids: it stops on start with "No view found for id 0x7f0800f8 … for fragment
+    NavigationRootManager_ElementBasedFragment". Design-time builds keep their own copy instead, as they do before the first build.
+  -->
+  <Target Name="KeepDesignTimeResourceIdsApart" BeforeTargets="_SetupDesignerProperties" Condition="'$(DesignTimeBuild)' == 'true'">
+    <PropertyGroup>
+      <_DesignerIntermediateOutputPath>$(IntermediateOutputPath)designtime\</_DesignerIntermediateOutputPath>
+    </PropertyGroup>
+  </Target>
+
+</Project>

@@ -41,6 +41,8 @@ What the app does and how its data is shaped: [docs/concept.md](docs/concept.md)
 
 The app opens on Today. Debug builds run compiled code (`UseInterpreter` is off in both apps, which gives up C# Hot Reload on the devices), so they're quick enough to use. **Release** (Visual Studio's configuration dropdown, or `-c Release`) is still a little faster for everyday use.
 
+If the app stops as it opens with *No view found for id 0x… for fragment NavigationRootManager_ElementBasedFragment*, the build deployed resource ids that don't match the app's resources. `Directory.Build.targets` stops Visual Studio's background builds from causing that; if it happens anyway, delete the `artifacts` folder and build again. Don't uninstall the app to fix it: that deletes its data.
+
 ## Hello world on the watch (no USB needed)
 
 Galaxy Watch4 and newer run Wear OS, so they install apps over Wi-Fi with `adb`.
