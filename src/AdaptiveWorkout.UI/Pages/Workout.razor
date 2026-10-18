@@ -30,16 +30,20 @@
                     }
                 </div>
 
-                <section class="block" aria-label="@(exercise.Measure == ExerciseMeasure.Time ? "Time" : "Set time")">
+                <section class="block bare" aria-label="@(exercise.Measure == ExerciseMeasure.Time ? "Time" : "Set time")">
                     <p class="inline"><span class="live-dot"></span><span class="label">@(exercise.Measure == ExerciseMeasure.Time ? "Time" : "Set")</span></p>
                     <Clock Since="running.StartedAt!.Value" Class="number xl" />
+                    @if (Theme == Theme.Telemetry)
+                    {
+                        <SecondsRuler Since="running.StartedAt!.Value" />
+                    }
                 </section>
 
                 <section class="block" aria-label="Heart rate">
                     <HeartRate />
                 </section>
 
-                <section class="stack" aria-labelledby="history-heading">
+                <section class="block open" aria-labelledby="history-heading">
                     <h2 id="history-heading" class="label">Last 3 times</h2>
                     @if (history.Count == 0)
                     {
@@ -53,8 +57,8 @@
                             @foreach (var past in history)
                             {
                                 var weights = past.Sets.Select(s => s.Weight).Distinct().ToList();
-                                <div class="past" style="grid-template-columns: 96px repeat(@columns, 40px) minmax(0, 1fr)">
-                                    <span class="caption past-date">@past.Session.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</span>
+                                <div class="past" style="--columns: @columns">
+                                    <span class="caption past-date">@past.Session.StartedAt.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</span>
                                     @if (exercise.Measure == ExerciseMeasure.Weight && weights.Count == 1 && past.Sets.Count <= columns)
                                     {
                                         @for (var i = 0; i < columns; i++)
@@ -109,7 +113,7 @@
                 }
                 else
                 {
-                    <section class="block" aria-label="Rest">
+                    <section class="block bare" aria-label="Rest">
                         <RestTimer Since="logged.StoppedAt!.Value" ExerciseId="logged.ExerciseId" NextName="@(state.Next is { } upNext ? state.Exercises[upNext.ExerciseId].Name : null)" OnZero="StartNext" />
                     </section>
 
@@ -161,6 +165,8 @@
 
 @code {
     private WorkoutState? state;
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
 
     protected override async Task OnInitializedAsync()
     {

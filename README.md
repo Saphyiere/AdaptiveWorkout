@@ -75,20 +75,26 @@ If an Android build ever fails over output paths, temporarily remove the two art
 
 ## Design
 
-The phone app's look is **Logbook**: a printed training log on warm paper. Serif words and big serif numbers in fixed-width figures, ruled lines instead of cards, and one vermilion pen that marks what you did: a tick on each gym day, a circle around today, tally strokes for the streak and the sets done, a tick over Hit goal, and a bracket down a superset. The pen marks; it never grades a number.
+The phone app has two looks, switched in **Settings** (the icon at the top right of Today). The switch applies at once and is remembered.
 
-- Style directions (Logbook was picked; Telemetry, a dark instrument panel, is the next theme to try): https://claude.ai/artifact/2Z6jpTXARxNPY9AWAS2hxQ
+- **Logbook:** a printed training log on warm paper. Serif words and big serif numbers in fixed-width figures, ruled lines instead of cards, and one vermilion pen that marks what you did: a tick on each gym day, a circle around today, tally strokes for the streak and the sets done, a tick over Hit goal, and a bracket down a superset. The pen marks; it never grades a number.
+- **Telemetry:** the body as live instrument channels on a dark panel. Monospace readouts that never jitter (Martian Mono, slashed zero), words in Atkinson Hyperlegible Next, tiles, and every number on its own ruler in its channel's color: lime for training, amber for food, blue for body weight, coral for heart rate. The set's time fills a minute of seconds, the rest drains its countdown, calories sit on a ruler with the goal and maintenance marked, and the heart rate shows its last minute as a line.
+
+Design links:
+
+- Style directions, with both looks' mockups: https://claude.ai/artifact/2Z6jpTXARxNPY9AWAS2hxQ
 - The first design system (the mark and app icon): https://claude.ai/artifact/H9wJAoBQE834PEQ9qG4wmq
 
-**Themes.** `data-theme` on `<html>` picks the theme (`src/AdaptiveWorkout.Phone/wwwroot/index.html`). `src/AdaptiveWorkout.UI/wwwroot/app.css` gives each theme a block of tokens (paper, ink, pen, fonts, line weights, corner radius) under its `[data-theme]` selector, and every component uses only tokens. To add one, such as Telemetry:
+**How themes work.** `Themes/Theme.cs` lists the themes (id, name, whether it's dark, its background, its date style). `ThemeSetting` keeps the one in use with the other settings, and `MainLayout` puts its id in `data-theme` on `<html>` and hands the theme to every component as a cascading value. The theme also goes into local storage, which `index.html` reads before the first paint.
 
-1. Copy Logbook's token block under `[data-theme="telemetry"]` and change the values.
-2. Where its shapes differ, add rules under `[data-theme="telemetry"]` without touching Logbook's. The pen marks (`Components/Mark.razor`) draw in `--mark`, whatever the theme.
-3. Add its fonts to `wwwroot/fonts` with `@font-face` rules.
-4. The native shell follows the page: the page background in `MainPage.xaml`, the status and navigation bar icons in `MainActivity` (a dark theme makes them light), the splash color and `colors.xml`.
-5. Switch by setting `data-theme`; a setting can choose it at startup.
+- **Colors, fonts and line weights** are tokens in `src/AdaptiveWorkout.UI/wwwroot/app.css`, one block per theme under its `[data-theme]`. Fonts go by role: words, figures, labels, controls.
+- **Shapes** that differ are rules under the theme's own `[data-theme]` (Telemetry's tiles, boxed fields, chips, filled tick boxes), so neither theme's rules touch the other's.
+- **Pieces that draw differently** branch on the cascading theme inside their own component: the pen marks against Telemetry's checks (`Mark`), its rulers (`RulerTicks`, `SecondsRuler`, the rest and calorie rulers), the heart rate line, the workout header, Today's tiles, and the Gym chart.
+- **The phone around the page** follows too (`PhoneThemeSetting`): the status and navigation bar icons go light on a dark theme, and the background behind the page while it loads matches. Both start in the last theme, kept in the phone's preferences. The splash and app icon stay Logbook's (vermilion on paper), since Android draws them before the app can choose.
 
-Fonts: Newsreader and Schibsted Grotesk, in `src/AdaptiveWorkout.UI/wwwroot/fonts` under the SIL Open Font License (`OFL-*.txt`). The app icon and splash (the mark in vermilion on paper) are SVGs in `src/AdaptiveWorkout.Phone/Resources`.
+To add a theme: add it to `Theme.All`, give it a token block (and any shapes) in `app.css`, add its fonts to `wwwroot/fonts`, and branch the components above where it should draw differently.
+
+Fonts are in `src/AdaptiveWorkout.UI/wwwroot/fonts`, each under the SIL Open Font License (`OFL-*.txt`): Newsreader and Schibsted Grotesk for Logbook, Martian Mono and Atkinson Hyperlegible Next for Telemetry. The app icon and splash are SVGs in `src/AdaptiveWorkout.Phone/Resources`.
 
 The watch keeps its black screen with the pink accent: a dark screen suits the watch, and vermilion on black is too dim to read. Its colors are in `src/AdaptiveWorkout.Watch/Resources/values/colors.xml`, its icon in `Resources/drawable`, and its font is Archivo Expanded (SIL Open Font License, `src/AdaptiveWorkout.Watch/OFL-ArchivoExpanded.txt`).
 

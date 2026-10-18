@@ -3,16 +3,27 @@
 @{ var setsDone = State.Sets.Count(s => s.StoppedAt is not null); }
 <header class="masthead live">
     <div class="spread">
-        <div class="row-text">
-            <p class="title workout">@State.Name</p>
-            <span class="inline">
-                <span class="caption"><Clock Since="State.Session.StartedAt" /> · @setsDone @(setsDone == 1 ? "set" : "sets")</span>
-                @if (setsDone is > 0 and <= 25)
-                {
-                    <Mark Kind="MarkKind.Tally" Count="setsDone" Size="16" />
-                }
-            </span>
-        </div>
+        @if (Theme == Theme.Telemetry)
+        {
+            @* A live channel: the workout's name and LIVE, then mission time since Start. *@
+            <div class="row-text">
+                <p class="inline"><span class="title workout">@State.Name</span><span class="chip live">Live</span></p>
+                <span class="caption">T+<Clock Since="State.Session.StartedAt" /> · @setsDone @(setsDone == 1 ? "set" : "sets")</span>
+            </div>
+        }
+        else
+        {
+            <div class="row-text">
+                <p class="title workout">@State.Name</p>
+                <span class="inline">
+                    <span class="caption"><Clock Since="State.Session.StartedAt" /> · @setsDone @(setsDone == 1 ? "set" : "sets")</span>
+                    @if (setsDone is > 0 and <= 25)
+                    {
+                        <Mark Kind="MarkKind.Tally" Count="setsDone" Size="16" />
+                    }
+                </span>
+            </div>
+        }
         <div class="inline">
             @if (Advanced)
             {
@@ -40,6 +51,8 @@
 
 @code {
     private bool confirming;
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
 
     [Parameter, EditorRequired] public WorkoutState State { get; set; } = default!;
     [Parameter] public bool Advanced { get; set; }

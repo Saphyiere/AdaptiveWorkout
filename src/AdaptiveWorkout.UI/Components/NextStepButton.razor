@@ -8,7 +8,7 @@
     var sameExercise = State.ToLog?.ExerciseId == next.ExerciseId;
     @if (State.Plan.Count > 0)
     {
-        <div class="spread">
+        <div class="spread next-step">
             <div class="row-text">
                 <p class="label">Next</p>
                 <p class="body">@exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>

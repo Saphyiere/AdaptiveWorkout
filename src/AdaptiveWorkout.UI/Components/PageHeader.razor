@@ -1,14 +1,19 @@
-@* A screen's masthead: the way back, a small label, the title, and the rule under them. *@
+@* A screen's masthead: the way back, a small label, the title, and the rule under them, with any tools (like Settings) at the right. *@
 <header class="masthead @(Live ? "live" : "")">
     @if (Back is not null)
     {
         <a class="back" href="@Back"><Icon Name="arrow-left" Size="22" /><span>@BackText</span></a>
     }
-    @if (Label is not null)
-    {
-        <p class="label">@Label</p>
-    }
-    <h1 class="title @(Small ? "small" : "")">@Title</h1>
+    <div class="masthead-main">
+        <div class="masthead-text">
+            @if (Label is not null)
+            {
+                <p class="label">@Label</p>
+            }
+            <h1 class="title @(Small ? "small" : "")">@Title</h1>
+        </div>
+        @Tools
+    </div>
 </header>
 
 @code {
@@ -24,4 +29,7 @@
 
     /// <summary>A screen inside a running workout: its rule is in the pen's color, like the workout's own masthead.</summary>
     [Parameter] public bool Live { get; set; }
+
+    /// <summary>Buttons or links at the right of the title.</summary>
+    [Parameter] public RenderFragment? Tools { get; set; }
 }

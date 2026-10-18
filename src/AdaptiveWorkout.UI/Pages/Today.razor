@@ -8,13 +8,18 @@
 
 @if (loaded)
 {
+    var telemetry = Theme == Theme.Telemetry;
     <div class="screen">
-        <PageHeader Label="@today.ToString("dddd, MMMM d", CultureInfo.CurrentCulture)" Title="Today" />
+        <PageHeader Label="@today.ToString(Theme.TodayFormat, CultureInfo.CurrentCulture)" Title="Today">
+            <Tools>
+                <a class="icon-btn plain" href="settings" aria-label="Settings"><Icon Name="settings" Size="22" /></a>
+            </Tools>
+        </PageHeader>
 
         @* Opens Gym: the improvement trend, the routine, and every finished workout. *@
         <a class="block" href="gym" aria-labelledby="gym-heading">
             <div class="spread">
-                <h2 id="gym-heading" class="label">Gym today</h2>
+                <h2 id="gym-heading" class="label tag channel-train">@(telemetry ? "Gym" : "Gym today")</h2>
                 <span class="inline">
                     @if (openSession is null && wentToday)
                     {
@@ -22,7 +27,7 @@
                     }
                     else
                     {
-                        <span class="status-word">@(openSession is not null ? "In progress" : restDay ? "Rest day" : "Not yet")</span>
+                        <span class="status-word @(openSession is not null ? "live" : restDay ? "rest" : "")">@(openSession is not null ? "In progress" : restDay ? "Rest day" : "Not yet")</span>
                     }
                     <Icon Name="forward" Size="16" />
                 </span>
@@ -42,14 +47,14 @@
                                 <Mark Kind="MarkKind.Circle" Size="32" />
                             }
                         </span>
-                        <span class="day-cell @(isRest && !week[i] ? "rest" : "")">
+                        <span class="day-cell @(week[i] ? "done" : isRest ? "rest" : missed ? "missed" : "")">
                             @if (week[i])
                             {
                                 <Mark Kind="MarkKind.Tick" />
                             }
                             else if (isRest)
                             {
-                                @("rest")
+                                <span class="cell-word">rest</span>
                             }
                             else if (missed)
                             {
@@ -60,46 +65,108 @@
                     </div>
                 }
             </div>
-            <div class="spread">
-                <p class="body"><span class="strong">@weekCount</span> @weekWords</p>
-                @if (streak > 0)
-                {
-                    <span class="inline">
-                        @if (streak <= 10)
-                        {
-                            <Mark Kind="MarkKind.Tally" Count="streak" Size="22" />
-                        }
-                        <span class="label">@streak-@(planned ? "day" : "week") streak</span>
-                    </span>
-                }
-            </div>
+            @if (telemetry)
+            {
+                <div class="stats">
+                    <p class="row-text">
+                        <span class="number md">@daysThisWeek<span class="of">@(planned ? $"/{plannedDays}" : "")</span></span>
+                        <span class="label">@(daysThisWeek == 1 && !planned ? "Gym day this week" : "Gym days this week")</span>
+                    </p>
+                    <p class="row-text">
+                        <span class="number md">@streak</span>
+                        <span class="label">@(planned ? "Day" : "Week") streak</span>
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div class="spread">
+                    <p class="body"><span class="strong">@weekCount</span> @weekWords</p>
+                    @if (streak > 0)
+                    {
+                        <span class="inline">
+                            @if (streak <= 10)
+                            {
+                                <Mark Kind="MarkKind.Tally" Count="streak" Size="22" />
+                            }
+                            <span class="label">@streak-@(planned ? "day" : "week") streak</span>
+                        </span>
+                    }
+                </div>
+            }
         </a>
 
         <section class="block" aria-labelledby="calories-heading">
-            <div class="spread">
-                <h2 id="calories-heading" class="label">Calories eaten</h2>
-                <span class="note">of @Settings.CalorieGoal.ToString("N0", CultureInfo.CurrentCulture) goal</span>
-            </div>
-            <div class="spread end">
-                <span class="row-text">
-                    <span class="name big tabular">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span>
-                    <span class="caption">maintenance @Settings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)</span>
-                </span>
-                <span class="number md">@eaten.ToString("N0", CultureInfo.CurrentCulture)</span>
-            </div>
-            @{
+            @if (telemetry)
+            {
+                <div class="spread">
+                    <h2 id="calories-heading" class="label tag channel-fuel">Kcal</h2>
+                    @if (todayFood.Count > 0)
+                    {
+                        <button type="button" class="btn-ghost" @onclick="() => editingFood = !editingFood">@(editingFood ? "Done" : "Edit")</button>
+                    }
+                </div>
+                <div class="spread">
+                    <p class="inline baseline">
+                        <span class="number md">@eaten.ToString("N0", CultureInfo.CurrentCulture)</span>
+                        <span class="out-of">/ @Settings.CalorieGoal.ToString("N0", CultureInfo.CurrentCulture)</span>
+                    </p>
+                    @if (!addingFood)
+                    {
+                        <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="16" />Add</button>
+                    }
+                </div>
+                // The day on a ruler of 100-calorie ticks from 0 to a little past maintenance: the goal and maintenance marked
+                // and labelled, and the bar hatched past the goal.
+                var top = (Math.Max(Settings.Maintenance, eaten) + 99) / 100 * 100 + 200;
+                double X(int calories) => 0.5 + calories * 325.0 / top;
+                <svg class="ruler channel-fuel" viewBox="0 0 326 36" role="img" aria-label="@($"{eaten:N0} calories on a scale to {top:N0}, goal {Settings.CalorieGoal:N0}, maintenance {Settings.Maintenance:N0}")">
+                    <defs>
+                        <pattern id="over-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                            <rect class="value" width="1.5" height="4"></rect>
+                        </pattern>
+                    </defs>
+                    <RulerTicks Width="326" Bottom="36" Steps="@(top / 100)" MajorEvery="5" />
+                    <rect class="value" x="0" y="32" width="@N(X(Math.Min(eaten, Settings.CalorieGoal)))" height="4"></rect>
+                    @if (eaten > Settings.CalorieGoal)
+                    {
+                        <rect class="over" x="@N(X(Settings.CalorieGoal))" y="30" width="@N(X(eaten) - X(Settings.CalorieGoal))" height="6"></rect>
+                    }
+                    <rect class="value" x="@N(Math.Max(0, X(eaten) - 1))" y="16" width="2" height="20"></rect>
+                    <rect class="goal-mark" x="@N(X(Settings.CalorieGoal) - 1)" y="12" width="2" height="24"></rect>
+                    <rect class="maint-mark" x="@N(X(Settings.Maintenance) - 1)" y="12" width="2" height="24"></rect>
+                    <g>
+                        <text class="goal-label" x="@N(X(Settings.CalorieGoal))" y="9" text-anchor="middle">GOAL</text>
+                        <text class="maint-label" x="@N(X(Settings.Maintenance))" y="9" text-anchor="middle">MAINT</text>
+                    </g>
+                </svg>
+                <p class="note"><span class="ink strong">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span> · maintenance @Settings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)</p>
+            }
+            else
+            {
+                <div class="spread">
+                    <h2 id="calories-heading" class="label">Calories eaten</h2>
+                    <span class="note">of @Settings.CalorieGoal.ToString("N0", CultureInfo.CurrentCulture) goal</span>
+                </div>
+                <div class="spread end">
+                    <span class="row-text">
+                        <span class="name big tabular">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span>
+                        <span class="caption">maintenance @Settings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)</span>
+                    </span>
+                    <span class="number md">@eaten.ToString("N0", CultureInfo.CurrentCulture)</span>
+                </div>
                 // The meter runs to maintenance (or past it): ink up to the goal, hatching beyond it.
                 var scale = Math.Max(Settings.Maintenance, eaten);
                 var goalAt = Settings.CalorieGoal * 100.0 / scale;
+                <div class="meter" role="meter" aria-label="@($"Calories eaten, {eaten:N0} of {Settings.CalorieGoal:N0} goal")" aria-valuemin="0" aria-valuemax="@scale" aria-valuenow="@eaten">
+                    <span class="meter-fill" style="width: @Percent(Math.Min(eaten, Settings.CalorieGoal) * 100.0 / scale)"></span>
+                    @if (eaten > Settings.CalorieGoal)
+                    {
+                        <span class="meter-over" style="left: @Percent(goalAt); width: @Percent((eaten - Settings.CalorieGoal) * 100.0 / scale)"></span>
+                    }
+                    <span class="meter-goal" style="left: @Percent(goalAt)"></span>
+                </div>
             }
-            <div class="meter" role="meter" aria-label="@($"Calories eaten, {eaten:N0} of {Settings.CalorieGoal:N0} goal")" aria-valuemin="0" aria-valuemax="@scale" aria-valuenow="@eaten">
-                <span class="meter-fill" style="width: @Percent(Math.Min(eaten, Settings.CalorieGoal) * 100.0 / scale)"></span>
-                @if (eaten > Settings.CalorieGoal)
-                {
-                    <span class="meter-over" style="left: @Percent(goalAt); width: @Percent((eaten - Settings.CalorieGoal) * 100.0 / scale)"></span>
-                }
-                <span class="meter-goal" style="left: @Percent(goalAt)"></span>
-            </div>
             @if (addingFood)
             {
                 <form class="inline end" @onsubmit="AddFoodAsync">
@@ -126,47 +193,100 @@
                     }
                 </div>
             }
-            <div class="inline right">
-                @if (todayFood.Count > 0)
-                {
-                    <button type="button" class="btn-ghost" @onclick="() => editingFood = !editingFood">@(editingFood ? "Done" : "Edit")</button>
-                }
-                @if (!addingFood)
-                {
-                    <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="16" />Add</button>
-                }
-            </div>
+            @if (!telemetry)
+            {
+                <div class="inline right">
+                    @if (todayFood.Count > 0)
+                    {
+                        <button type="button" class="btn-ghost" @onclick="() => editingFood = !editingFood">@(editingFood ? "Done" : "Edit")</button>
+                    }
+                    @if (!addingFood)
+                    {
+                        <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="16" />Add</button>
+                    }
+                </div>
+            }
         </section>
 
         <section class="block" aria-labelledby="weight-heading">
-            <h2 id="weight-heading" class="label">Body weight</h2>
-            <div class="spread">
-                @if (sparkline is not null)
+            @if (telemetry)
+            {
+                <div class="spread">
+                    <h2 id="weight-heading" class="label tag channel-body">Weight</h2>
+                    @if (weights.Count > 0)
+                    {
+                        <button type="button" class="btn-ghost" @onclick="() => editingWeights = !editingWeights">@(editingWeights ? "Done" : "Edit")</button>
+                    }
+                </div>
+                <div class="spread">
+                    @if (latestWeight is not null)
+                    {
+                        <p class="inline baseline">
+                            <span class="number md">@latestWeight.Weight.ToString("0.#", CultureInfo.CurrentCulture)</span>
+                            <span class="unit">@UnitText</span>
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="note">@weightChangeText</p>
+                    }
+                    @if (!weighing)
+                    {
+                        <button type="button" class="btn" @onclick="() => weighing = true">Weigh in</button>
+                    }
+                </div>
+                @if (weightTrace is { } trace)
                 {
-                    <svg class="spark" role="img" aria-label="@($"Body weight over the last 30 days, ending at {latestWeight?.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {UnitText}")" viewBox="0 0 136 48" width="136" height="48">
-                        <polyline points="@sparkline.Value.Points"></polyline>
-                        <circle cx="131" cy="@sparkline.Value.LastY" r="4"></circle>
+                    @* Each weigh-in at its date on a ruler of the last 30 days, today at the right, a major tick each week back. *@
+                    <svg class="ruler channel-body" viewBox="0 0 326 32" role="img" aria-label="@($"Body weight over the last 30 days, ending at {latestWeight!.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {UnitText}")">
+                        <RulerTicks Width="326" Bottom="32" Steps="29" MajorEvery="7" MajorFrom="1" />
+                        <polyline class="trace" points="@trace.Points"></polyline>
+                        <circle class="trace-ring" cx="@trace.LastX" cy="@trace.LastY" r="6"></circle>
+                        <circle class="trace-dot" cx="@trace.LastX" cy="@trace.LastY" r="4"></circle>
                     </svg>
-                }
-                else
-                {
-                    <span></span>
                 }
                 @if (latestWeight is not null)
                 {
-                    <span class="inline baseline">
-                        <span class="number md">@latestWeight.Weight.ToString("0.#", CultureInfo.CurrentCulture)</span>
-                        <span class="unit big">@UnitText</span>
-                    </span>
+                    <p class="inline baseline">
+                        @if (weightChange is not null)
+                        {
+                            <span class="figure">@weightChange</span>
+                        }
+                        <span class="note">@weightChangeText</span>
+                    </p>
                 }
-            </div>
-            <p class="inline baseline">
-                @if (weightChange is not null)
-                {
-                    <span class="body strong tabular">@weightChange</span>
-                }
-                <span class="note">@weightChangeText</span>
-            </p>
+            }
+            else
+            {
+                <h2 id="weight-heading" class="label">Body weight</h2>
+                <div class="spread">
+                    @if (sparkline is not null)
+                    {
+                        <svg class="spark" role="img" aria-label="@($"Body weight over the last 30 days, ending at {latestWeight?.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {UnitText}")" viewBox="0 0 136 48" width="136" height="48">
+                            <polyline points="@sparkline.Value.Points"></polyline>
+                            <circle cx="131" cy="@sparkline.Value.LastY" r="4"></circle>
+                        </svg>
+                    }
+                    else
+                    {
+                        <span></span>
+                    }
+                    @if (latestWeight is not null)
+                    {
+                        <span class="inline baseline">
+                            <span class="number md">@latestWeight.Weight.ToString("0.#", CultureInfo.CurrentCulture)</span>
+                            <span class="unit big">@UnitText</span>
+                        </span>
+                    }
+                </div>
+                <p class="inline baseline">
+                    @if (weightChange is not null)
+                    {
+                        <span class="body strong tabular">@weightChange</span>
+                    }
+                    <span class="note">@weightChangeText</span>
+                </p>
+            }
             @if (weighing)
             {
                 <form class="inline end" @onsubmit="WeighInAsync">
@@ -194,16 +314,19 @@
                     }
                 </div>
             }
-            <div class="inline right">
-                @if (weights.Count > 0)
-                {
-                    <button type="button" class="btn-ghost" @onclick="() => editingWeights = !editingWeights">@(editingWeights ? "Done" : "Edit")</button>
-                }
-                @if (!weighing)
-                {
-                    <button type="button" class="btn" @onclick="() => weighing = true">Weigh in</button>
-                }
-            </div>
+            @if (!telemetry)
+            {
+                <div class="inline right">
+                    @if (weights.Count > 0)
+                    {
+                        <button type="button" class="btn-ghost" @onclick="() => editingWeights = !editingWeights">@(editingWeights ? "Done" : "Edit")</button>
+                    }
+                    @if (!weighing)
+                    {
+                        <button type="button" class="btn" @onclick="() => weighing = true">Weigh in</button>
+                    }
+                </div>
+            }
         </section>
 
         <div class="push-down">
@@ -244,6 +367,7 @@
     private int left;
     private BodyWeightEntry? latestWeight;
     private (string Points, string LastY)? sparkline;
+    private (string Points, string LastX, string LastY)? weightTrace;
     private bool addingFood;
     private int? foodAmount;
     private bool weighing;
@@ -255,15 +379,22 @@
 
     private string weekCount = "";
     private string weekWords = "";
+    private int daysThisWeek;
+    private int plannedDays;
     private int streak;
     private string? weightChange;
     private string weightChangeText = "";
     private string startLabel = "";
 
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
     private string UnitText => (latestWeight?.WeightUnit ?? Settings.Unit) == WeightUnit.Kilograms ? "kg" : "lb";
 
     // A CSS percentage, which takes a point whatever the phone's language.
     private static string Percent(double value) => $"{value.ToString("0.##", CultureInfo.InvariantCulture)}%";
+
+    // SVG numbers, likewise.
+    private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -287,11 +418,11 @@
         todayTemplate = planned && Schedule.On(routineWeek!, today) is long todayId ? templates.GetValueOrDefault(todayId) : null;
         restDay = planned && Schedule.On(routineWeek!, today) is null;
 
-        var gymDaysThisWeek = week.Count(d => d);
+        daysThisWeek = week.Count(d => d);
         streak = planned ? Consistency.DayStreak(gymDays, routineWeek!, today) : Consistency.WeekStreak(gymDays, today);
-        var plannedDays = routineWeek?.Count(d => d is not null) ?? 0;
-        (weekCount, weekWords) = planned ? ($"{gymDaysThisWeek} of {plannedDays}", "gym days this week")
-            : gymDaysThisWeek == 0 ? ("", "No gym days yet this week") : (gymDaysThisWeek.ToString(CultureInfo.CurrentCulture), gymDaysThisWeek == 1 ? "gym day this week" : "gym days this week");
+        plannedDays = routineWeek?.Count(d => d is not null) ?? 0;
+        (weekCount, weekWords) = planned ? ($"{daysThisWeek} of {plannedDays}", "gym days this week")
+            : daysThisWeek == 0 ? ("", "No gym days yet this week") : (daysThisWeek.ToString(CultureInfo.CurrentCulture), daysThisWeek == 1 ? "gym day this week" : "gym days this week");
 
         var openName = openSession?.TemplateId is long openId ? templates.GetValueOrDefault(openId)?.Name : null;
         startLabel = openSession is not null ? $"Resume {openName ?? "workout"}" : todayTemplate is not null && !wentToday ? $"Start {todayTemplate.Name}" : "Start a workout";
@@ -321,6 +452,15 @@
             sparkline = (points, ys[^1].ToString("0.#", CultureInfo.InvariantCulture));
         }
         else sparkline = null;
+
+        // Telemetry puts each weigh-in at its date on a 30-day ruler instead, today at the right.
+        if (recent.Count > 0)
+        {
+            var (min, max) = (recent.Min(w => w.Weight), recent.Max(w => w.Weight));
+            var points = recent.Select(w => (X: 0.5 + (29 - Math.Min(29, (now - w.At).TotalDays)) * 325 / 29, Y: max == min ? 10 : 2 + (max - w.Weight) / (max - min) * 16)).ToList();
+            weightTrace = (string.Join(' ', points.Select(p => $"{N(p.X)},{N(p.Y)}")), N(points[^1].X), N(points[^1].Y));
+        }
+        else weightTrace = null;
 
         loaded = true;
     }

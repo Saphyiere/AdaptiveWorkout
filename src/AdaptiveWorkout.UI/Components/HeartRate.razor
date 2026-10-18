@@ -2,12 +2,38 @@
 @inject WatchLink Watch
 @inject WorkoutFlow Flow
 @* Live heart rate from the watch. Without a recent reading, it offers to open the watch app again. *@
-@if (Watch.Connected && Watch.Latest is { } latest)
+@if (Watch.Connected && Watch.Latest is { } latest && Theme == Theme.Telemetry)
+{
+    @* The heart channel: its tag and number, and the last minute as a line over a ruler of 5-second ticks. *@
+    var minute = Watch.Recent.Where(r => latest.At - r.At <= TimeSpan.FromSeconds(60)).DefaultIfEmpty(latest).ToList();
+    var (low, high) = (minute.Min(r => r.Bpm) - 2, minute.Max(r => r.Bpm) + 2);
+    double X(HeartRateSample r) => 0.5 + (60 - (latest.At - r.At).TotalSeconds) * 149 / 60;
+    double Y(HeartRateSample r) => 2 + (high - r.Bpm) * 22.0 / (high - low);
+    <div class="spread heart-rate">
+        <p class="inline">
+            <span class="label tag channel-heart">HR</span>
+            <span class="inline baseline">
+                <span class="number sm">@latest.Bpm</span>
+                <span class="unit">bpm</span>
+            </span>
+        </p>
+        <svg class="ruler trace-60 channel-heart" viewBox="0 0 150 40" role="img" aria-label="@($"Heart rate over the last minute, from {minute[0].Bpm} to {latest.Bpm}")">
+            <RulerTicks Width="150" Bottom="40" Steps="12" MajorEvery="3" />
+            @if (minute.Count > 1)
+            {
+                <polyline class="trace" points="@string.Join(' ', minute.Select(r => $"{N(X(r))},{N(Y(r))}"))"></polyline>
+            }
+            <circle class="trace-ring" cx="@N(X(latest))" cy="@N(Y(latest))" r="6"></circle>
+            <circle class="trace-dot" cx="@N(X(latest))" cy="@N(Y(latest))" r="4"></circle>
+        </svg>
+    </div>
+}
+else if (Watch.Connected && Watch.Latest is { } reading)
 {
     <p class="inline heart-rate">
         <Icon Name="heart" Size="22" />
         <span class="inline baseline">
-            <span class="number sm">@latest.Bpm</span>
+            <span class="number sm">@reading.Bpm</span>
             <span class="unit">bpm</span>
         </span>
     </p>
@@ -25,6 +51,8 @@ else
 
 @code {
     private readonly CancellationTokenSource stop = new();
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
 
     protected override void OnInitialized()
     {
@@ -45,6 +73,9 @@ else
     }
 
     private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    // SVG numbers, which take a point whatever the phone's language.
+    private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
     private void OpenOnWatch()
     {

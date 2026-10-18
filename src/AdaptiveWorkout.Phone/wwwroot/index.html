@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>AdaptiveWorkout</title>
     <base href="/" />
+    <!-- The theme in use (MainLayout keeps it in local storage), set before the first paint so the app opens in it. -->
+    <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") ?? "logbook"; } catch { }</script>
     <link rel="stylesheet" href="_content/AdaptiveWorkout.UI/app.css" />
     <link rel="icon" href="data:,">
 </head>

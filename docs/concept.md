@@ -56,6 +56,15 @@ Am I getting better, and everything I've done:
 - **Edit routine** opens the routines, to edit one or switch.
 - **History:** every finished workout, newest first and grouped by month: its name, date, length, set count and improvement, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
 
+### Settings
+
+The icon at the top right of Today. For now it holds the look:
+
+- **Logbook:** a printed training log, warm paper and a red pen.
+- **Telemetry:** a dark instrument panel, with every number on a ruler.
+
+Choosing one switches the whole app at once, and it's remembered.
+
 ## Flows
 
 ### Start workout
@@ -260,7 +269,7 @@ A weigh-in whenever I step on the scale, charted over time.
 Routine            Id, Name
 RoutineDay         RoutineId, Day (Monday 0 to Sunday 6), TemplateId (empty = rest day)
 SessionTemplate    Id, Name, Order
-Setting            Key, Value                    (the routine in use)
+Setting            Key, Value                    (the routine in use, the theme, rest countdowns)
 TemplateExercise   TemplateId, ExerciseId, Order, PlannedSets (optional), SupersetGroup (optional)
 SessionExercise    SessionId, ExerciseId, Order, PlannedSets, SupersetGroup   (the workout's own copy, changed as it goes)
 Session            Id, TemplateId (empty = just tracking), StartedAt, FinishedAt, LoggedAfterward
@@ -294,7 +303,6 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 - A categorized exercise picker.
 - Macros.
 - Cloud backup with a Google account.
-- A second look: **Telemetry**, a dark instrument panel, switchable with Logbook in settings. The screens are ready for it (README, *Design*).
 
 ## Open questions
 

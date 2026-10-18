@@ -1,0 +1,49 @@
+@* A ruler's scale, drawn inside an <svg>: a hairline tick every step, taller majors, and the labelled majors tallest with their labels above. *@
+<path class="minor" d="@Ticks(i => !IsMajor(i), 6)"></path>
+<path class="major" d="@Ticks(i => IsMajor(i) && !IsLabelled(i), 10)"></path>
+<path class="major" d="@Ticks(IsLabelled, 14)"></path>
+@if (Label is not null)
+{
+    @for (var i = 0; i <= Steps; i += LabelEvery)
+    {
+        var text = Label(i);
+        @if (text.Length > 0)
+        {
+            @* In a group, since Razor reads a <text> that starts a code block's markup as its own text tag. *@
+            <g>
+                <text x="@N(X(i))" y="@N(Bottom - 22)" text-anchor="@(i == 0 ? "start" : i == Steps ? "end" : "middle")">@text</text>
+            </g>
+        }
+    }
+}
+
+@code {
+    /// <summary>The drawing's width; the ticks run from 0.5 to <c>Width - 0.5</c>.</summary>
+    [Parameter, EditorRequired] public double Width { get; set; }
+
+    /// <summary>Where the ticks stand, at the drawing's bottom.</summary>
+    [Parameter, EditorRequired] public double Bottom { get; set; }
+
+    [Parameter, EditorRequired] public int Steps { get; set; }
+    [Parameter] public int MajorEvery { get; set; } = 5;
+
+    /// <summary>Which tick the majors count from, so they can line up with the right end (today) instead of the left.</summary>
+    [Parameter] public int MajorFrom { get; set; }
+
+    /// <summary>Every how many ticks a label goes; it must be a multiple of <see cref="MajorEvery"/>.</summary>
+    [Parameter] public int LabelEvery { get; set; }
+
+    /// <summary>A labelled tick's text; empty leaves it out.</summary>
+    [Parameter] public Func<int, string>? Label { get; set; }
+
+    private double X(int i) => 0.5 + i * (Width - 1) / Steps;
+
+    private bool IsMajor(int i) => (i - MajorFrom) % MajorEvery == 0;
+
+    private bool IsLabelled(int i) => Label is not null && LabelEvery > 0 && i % LabelEvery == 0;
+
+    private string Ticks(Func<int, bool> which, double height) => string.Concat(Enumerable.Range(0, Steps + 1).Where(which).Select(i => $"M{N(X(i))} {N(Bottom - height)}V{N(Bottom)}"));
+
+    // SVG numbers, which take a point whatever the phone's language.
+    private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}

@@ -10,8 +10,20 @@ namespace AdaptiveWorkout.UI.Watch;
 /// </summary>
 public class WatchLink(WorkoutStore store)
 {
+    private readonly Lock recentGate = new();
+    private readonly List<HeartRateSample> recent = [];
+
     /// <summary>The newest reading, or null before any arrived.</summary>
     public HeartRateSample? Latest { get; private set; }
+
+    /// <summary>The two minutes of readings up to the newest, oldest first, for drawing the heart rate as a line.</summary>
+    public IReadOnlyList<HeartRateSample> Recent
+    {
+        get
+        {
+            lock (recentGate) return [.. recent];
+        }
+    }
 
     /// <summary>Raised when a reading arrives, on whatever thread it arrived on.</summary>
     public event Action? Changed;
@@ -41,6 +53,14 @@ public class WatchLink(WorkoutStore store)
 
         var newest = readings.MaxBy(r => r.At)!;
         if (Latest is null || newest.At >= Latest.At) Latest = newest;
+        var oldest = Latest.At - TimeSpan.FromMinutes(2);
+        lock (recentGate)
+        {
+            recent.AddRange([.. readings.Where(r => !recent.Exists(e => e.At == r.At))]);
+            recent.Sort((a, b) => a.At.CompareTo(b.At));
+            recent.RemoveAll(r => r.At < oldest);
+        }
+
         Changed?.Invoke();
         store.AddHeartRateAsync(readings).ContinueWith(t => Debug.WriteLine($"AdaptiveWorkout: saving heart rate failed: {t.Exception}"), TaskContinuationOptions.OnlyOnFaulted);
     }

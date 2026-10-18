@@ -1,0 +1,32 @@
+@page "/settings"
+@inject ThemeSetting ThemeSetting
+
+<PageTitle>Settings</PageTitle>
+
+<div class="screen">
+    <PageHeader Back="" BackText="Today" Title="Settings" />
+
+    <section class="stack" aria-labelledby="look-heading">
+        <h2 id="look-heading" class="label">Look</h2>
+        <div class="ledger">
+            @foreach (var theme in Theme.All)
+            {
+                var chosen = theme == ThemeSetting.Current;
+                <button type="button" class="row" aria-pressed="@(chosen ? "true" : "false")" @onclick="() => ThemeSetting.Choose(theme)">
+                    <span class="status">
+                        @if (chosen)
+                        {
+                            <Mark Kind="MarkKind.Tick" Size="28" />
+                        }
+                    </span>
+                    <span class="row-text">
+                        <span class="name">@theme.Name</span>
+                        <span class="note">@theme.Description</span>
+                    </span>
+                    @* A sample in the theme's own paper, ink and figures, whichever theme the page is in now. *@
+                    <span class="theme-sample" data-theme="@theme.Id" aria-hidden="true">1:12</span>
+                </button>
+            }
+        </div>
+    </section>
+</div>

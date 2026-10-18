@@ -1,27 +1,42 @@
-@* A pen mark in the theme's pen color, slightly uneven like a real pen: a tick, a circle around something, or tally strokes
-   (four upright, the fifth struck through). Decoration: what it marks is said in text too. *@
-@switch (Kind)
+@* A mark for what's done. In Logbook it's the pen, slightly uneven like a real one: a tick, a circle around something, or tally
+   strokes (four upright, the fifth struck through). Telemetry draws a plain check, and shows circles and tallies another way
+   (an outlined cell, a number), so it draws none. Decoration: what it marks is said in text too. *@
+@if (Theme == Theme.Telemetry)
 {
-    case MarkKind.Tick:
-        <svg class="pen" aria-hidden="true" viewBox="0 0 24 24" width="@Size" height="@Size" stroke-width="2.5">
-            <path d="M4 13.5C6 15.2 7.6 17.2 9.2 20C12 13.4 15.8 8 21 4"></path>
+    @if (Kind == MarkKind.Tick)
+    {
+        <svg class="pen" aria-hidden="true" viewBox="0 0 20 20" width="@Size" height="@Size" stroke-width="2">
+            <path d="M4.5 10.5L8.5 14.5L15.5 6.5"></path>
         </svg>
-        break;
-    case MarkKind.Circle:
-        <svg class="pen" aria-hidden="true" viewBox="0 0 40 32" width="@Size" height="@(Size * 4 / 5)" stroke-width="2.5">
-            <path d="M33 8C27 2.5 9 2.5 4.5 11C0.5 19 9 28.5 21 27.5C32 26.5 38 18.5 34.5 10.5L31 6.5"></path>
-        </svg>
-        break;
-    case MarkKind.Tally when Count > 0:
-        // From the first stroke to the last one (or the fifth's end), plus room for the pen's width.
-        var width = (Count - 1) / 5 * 36 + (Count % 5 == 0 ? 33 : 10 + (Count % 5 - 1) * 7);
-        <svg class="pen" aria-hidden="true" viewBox="-3 0 @width 22" width="@(width * Size / 22)" height="@Size" stroke-width="2.6">
-            <path d="@TallyPath"></path>
-        </svg>
-        break;
+    }
+}
+else
+{
+    @switch (Kind)
+    {
+        case MarkKind.Tick:
+            <svg class="pen" aria-hidden="true" viewBox="0 0 24 24" width="@Size" height="@Size" stroke-width="2.5">
+                <path d="M4 13.5C6 15.2 7.6 17.2 9.2 20C12 13.4 15.8 8 21 4"></path>
+            </svg>
+            break;
+        case MarkKind.Circle:
+            <svg class="pen" aria-hidden="true" viewBox="0 0 40 32" width="@Size" height="@(Size * 4 / 5)" stroke-width="2.5">
+                <path d="M33 8C27 2.5 9 2.5 4.5 11C0.5 19 9 28.5 21 27.5C32 26.5 38 18.5 34.5 10.5L31 6.5"></path>
+            </svg>
+            break;
+        case MarkKind.Tally when Count > 0:
+            // From the first stroke to the last one (or the fifth's end), plus room for the pen's width.
+            var width = (Count - 1) / 5 * 36 + (Count % 5 == 0 ? 33 : 10 + (Count % 5 - 1) * 7);
+            <svg class="pen" aria-hidden="true" viewBox="-3 0 @width 22" width="@(width * Size / 22)" height="@Size" stroke-width="2.6">
+                <path d="@TallyPath"></path>
+            </svg>
+            break;
+    }
 }
 
 @code {
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
     [Parameter, EditorRequired] public MarkKind Kind { get; set; }
     [Parameter] public int Size { get; set; } = 24;
 

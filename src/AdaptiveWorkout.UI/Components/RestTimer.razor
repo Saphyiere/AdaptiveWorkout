@@ -15,24 +15,51 @@
     var elapsed = DateTimeOffset.Now - Since;
     var left = target - elapsed;
     var lastSeconds = countdown && left <= TimeSpan.FromSeconds(10);
+    var time = countdown ? left >= TimeSpan.Zero ? TimeText.Format(left) : $"+{TimeText.Format(-left)}" : TimeText.Format(elapsed);
+    var telemetry = Theme == Theme.Telemetry;
 }
-<div class="spread">
-    <h2 class="label">Rest</h2>
-    <span class="note">@(countdown ? "counting down" : "counting up")</span>
-</div>
+@if (telemetry)
+{
+    <p class="inline">
+        <span class="label tag channel-train">Rest</span>
+        <span class="caption">@(countdown ? "countdown" : "count up")</span>
+    </p>
+}
+else
+{
+    <div class="spread">
+        <h2 class="label">Rest</h2>
+        <span class="note">@(countdown ? "counting down" : "counting up")</span>
+    </div>
+}
 <button type="button" class="rest-time" aria-label="@(countdown ? "Rest countdown. Tap to count up instead." : "Rest time. Tap to count down to the next set.")" @onclick="() => Flow.SetRestCountdown(!countdown)">
     <span class="rest-label">Rest</span>
-    <span class="number lg @(lastSeconds ? "live" : "")">@(countdown ? left >= TimeSpan.Zero ? TimeText.Format(left) : $"+{TimeText.Format(-left)}" : TimeText.Format(elapsed))</span>
+    <span class="number lg @(time.Length > 5 ? "longer" : time.Length > 4 ? "long" : "") @(lastSeconds ? "live" : "")">@time</span>
 </button>
 @if (countdown)
 {
-    var share = Math.Clamp(left / target, 0, 1);
-    <div class="stack tight">
-        <div class="time-left @(lastSeconds ? "live" : "")" role="progressbar" aria-label="@($"Rest left, {TimeText.Format(left)} of {TimeText.Format(target)}")" aria-valuemin="0" aria-valuemax="@((int)target.TotalSeconds)" aria-valuenow="@((int)Math.Max(0, left.TotalSeconds))">
-            <span style="width: @((share * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span>
+    @if (telemetry)
+    {
+        // The rest left on a ruler of the whole rest: 5-second ticks labelled every 15 (every minute past 2:30), draining to the left.
+        var total = (int)target.TotalSeconds;
+        var step = total <= 150 ? 5 : 15;
+        var x = Math.Clamp(left / target, 0, 1) * 357;
+        <svg class="ruler channel-train" viewBox="0 0 358 32" role="img" aria-label="@($"Rest left, {TimeText.Format(left)} of {TimeText.Format(target)}")">
+            <RulerTicks Width="358" Bottom="32" Steps="@(total / step)" MajorEvery="1" LabelEvery="@(step == 5 ? 3 : 4)" Label="@(i => i == 0 ? "0" : TimeText.Format(TimeSpan.FromSeconds(i * step)))" />
+            <rect class="value" x="0" y="28" width="@N(x)" height="4"></rect>
+            <rect class="value" x="@N(Math.Max(0, x - 1))" y="12" width="2" height="20"></rect>
+        </svg>
+    }
+    else
+    {
+        var share = Math.Clamp(left / target, 0, 1);
+        <div class="stack tight">
+            <div class="time-left @(lastSeconds ? "live" : "")" role="progressbar" aria-label="@($"Rest left, {TimeText.Format(left)} of {TimeText.Format(target)}")" aria-valuemin="0" aria-valuemax="@((int)target.TotalSeconds)" aria-valuenow="@((int)Math.Max(0, left.TotalSeconds))">
+                <span style="width: @((share * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span>
+            </div>
+            <span class="caption center-end">@TimeText.Format(target)</span>
         </div>
-        <span class="caption center-end">@TimeText.Format(target)</span>
-    </div>
+    }
     <div class="inline">
         <button type="button" class="btn tall adjust" aria-label="15 seconds less" @onclick="() => Flow.AdjustRestTarget(ExerciseId, -15)">−15s</button>
         <p class="note grow center"><span class="ink">@TimeText.Format(target)</span>@(NextName is null ? " rest" : $", then {NextName}")</p>
@@ -49,6 +76,8 @@ else if (Flow.RestCountdownUntried)
     private IJSObjectReference? alerts;
     private bool seenRunning;
     private bool done;
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
 
     [Parameter, EditorRequired] public DateTimeOffset Since { get; set; }
 
@@ -109,6 +138,9 @@ else if (Flow.RestCountdownUntried)
 
         await OnZero.InvokeAsync();
     }
+
+    // SVG numbers, which take a point whatever the phone's language.
+    private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
     public async ValueTask DisposeAsync()
     {

@@ -1,0 +1,45 @@
+@implements IDisposable
+@* Telemetry's ruler under the set's time: a minute of seconds, filling as the set runs and starting over each minute. *@
+@{
+    var elapsed = DateTimeOffset.Now - Since;
+    var x = 0.5 + elapsed.TotalSeconds % 60 * 357 / 60;
+    var minutes = (int)elapsed.TotalMinutes;
+}
+<svg class="ruler channel-train" viewBox="0 0 358 32" role="img" aria-label="@($"{(int)elapsed.TotalSeconds % 60} of 60 seconds")">
+    <RulerTicks Width="358" Bottom="32" Steps="60" MajorEvery="5" LabelEvery="15" Label="@(i => i == 60 ? "" : i.ToString(CultureInfo.InvariantCulture))" />
+    <rect class="value" x="0" y="28" width="@N(x)" height="4"></rect>
+    <rect class="value" x="@N(x - 1)" y="12" width="2" height="20"></rect>
+    @if (minutes > 0)
+    {
+        <g>
+            <text class="goal-label" x="358" y="10" text-anchor="end">+@minutes MIN</text>
+        </g>
+    }
+</svg>
+
+@code {
+    private readonly CancellationTokenSource stop = new();
+
+    [Parameter, EditorRequired] public DateTimeOffset Since { get; set; }
+
+    protected override void OnInitialized() => _ = Task.Run(async () =>
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stop.Token)) await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    });
+
+    // SVG numbers, which take a point whatever the phone's language.
+    private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    public void Dispose()
+    {
+        stop.Cancel();
+        stop.Dispose();
+    }
+}

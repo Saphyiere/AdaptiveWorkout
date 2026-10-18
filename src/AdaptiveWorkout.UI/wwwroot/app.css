@@ -28,6 +28,23 @@
     font-display: swap;
 }
 
+@font-face {
+    font-family: "Martian Mono";
+    src: url("fonts/MartianMono.woff2") format("woff2");
+    font-weight: 100 800;
+    font-stretch: 75% 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Atkinson Hyperlegible Next";
+    src: url("fonts/AtkinsonHyperlegibleNext.woff2") format("woff2");
+    font-weight: 200 800;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* Theme: Logbook, also the default. :where() takes the default's weight away, so any other theme's block wins wherever it sits. */
 :where(:root),
 [data-theme="logbook"] {
@@ -50,8 +67,15 @@
     --on-slab: #f3efe6;
     --slab-pressed: #000000;
 
-    --font-serif: "Newsreader", Georgia, "Times New Roman", serif;
-    --font-ui: "Schibsted Grotesk", system-ui, sans-serif;
+    /* Type by role: words (titles, body, notes), figures, small labels, and controls (buttons and links). */
+    --font-words: "Newsreader", Georgia, "Times New Roman", serif;
+    --font-numbers: "Newsreader", Georgia, "Times New Roman", serif;
+    --font-label: "Schibsted Grotesk", system-ui, sans-serif;
+    --font-control: "Schibsted Grotesk", system-ui, sans-serif;
+    --number-stretch: 100%;
+
+    /* The outline of buttons, fields and boxes. */
+    --control: #1a1814;
 
     /* A dropdown's arrow, in the ink: an image can't take its color from a token, so each theme draws its own. */
     --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6L8 10.5L12.5 6' fill='none' stroke='%231a1814' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -64,6 +88,50 @@
     --maui-status-bar-safe-area-background: var(--ground);
 }
 
+/* Theme: Telemetry. The body as live instrument channels: a dark panel (blue-black, softer than pure black), mono readouts
+   that never jitter, and every number on its own ruler in its channel's color. Its own shapes are further down. */
+[data-theme="telemetry"] {
+    color-scheme: dark;
+
+    --ground: #0b0f14;
+    --surface-1: #121820;
+    --surface-2: #1b232d;
+    --rule: #2a3542;
+    --ink: #e8eef2;
+    --ink-muted: #95a2af;
+    --control: #66768a;
+
+    /* The accent is the train channel's lime: what's live, what's done, the big button. */
+    --mark: #b8f04a;
+    --on-mark: #0b0f14;
+    --wash: #1b232d;
+
+    /* Channels, each only on its own tag, ruler and line: training, food, body weight, heart rate. */
+    --train: #b8f04a;
+    --fuel: #ffa53a;
+    --body: #4d9fff;
+    --heart: #ff6a5c;
+
+    --slab: #b8f04a;
+    --on-slab: #0b0f14;
+    --slab-pressed: #a3d93a;
+
+    --font-words: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+    --font-numbers: "Martian Mono", ui-monospace, monospace;
+    --font-label: "Martian Mono", ui-monospace, monospace;
+    --font-control: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+    --number-stretch: 75%;
+
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6L8 10.5L12.5 6' fill='none' stroke='%23e8eef2' stroke-width='1.5' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+
+    --line: 1px;
+    --masthead-rule: 0;
+    --radius: 6px;
+    --radius-slab: 8px;
+
+    --maui-status-bar-safe-area-background: var(--ground);
+}
+
 *, *::before, *::after {
     box-sizing: border-box;
 }
@@ -72,7 +140,7 @@ html, body {
     margin: 0;
     background: var(--ground);
     color: var(--ink);
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-size: 17px;
     line-height: 24px;
     -webkit-tap-highlight-color: transparent;
@@ -206,7 +274,7 @@ h1:focus {
 /* Type */
 
 .label {
-    font-family: var(--font-ui);
+    font-family: var(--font-label);
     font-size: 12px;
     line-height: 16px;
     font-weight: 700;
@@ -216,7 +284,7 @@ h1:focus {
 }
 
 .title {
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-size: 44px;
     line-height: 48px;
     font-weight: 600;
@@ -241,14 +309,14 @@ h1:focus {
 
 /* A month in the history: the serif in italics, like a ledger page's heading. */
 .month {
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-style: italic;
     font-size: 22px;
     line-height: 28px;
 }
 
 .body {
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-size: 17px;
     line-height: 24px;
 }
@@ -259,7 +327,7 @@ h1:focus {
 
 /* A name in a list or ledger. */
 .name {
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-size: 18px;
     line-height: 22px;
     font-weight: 600;
@@ -271,7 +339,7 @@ h1:focus {
 }
 
 .caption {
-    font-family: var(--font-ui);
+    font-family: var(--font-label);
     font-size: 13px;
     line-height: 18px;
     font-weight: 500;
@@ -281,7 +349,7 @@ h1:focus {
 
 /* Italic asides in the serif: units, "of 1,800 goal", "at bodyweight", "vs last time". */
 .note, .unit {
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-style: italic;
     font-size: 15px;
     line-height: 20px;
@@ -301,7 +369,7 @@ h1:focus {
 
 /* A status in words: "Not yet", "Rest day", "In progress". */
 .status-word {
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-style: italic;
     font-size: 20px;
     line-height: 24px;
@@ -311,7 +379,7 @@ h1:focus {
 
 /* The pen writing in the margin: a note it adds, like "you hit your goal last time". */
 .pen-note {
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-style: italic;
     font-size: 17px;
     line-height: 22px;
@@ -320,7 +388,8 @@ h1:focus {
 
 /* Numbers: the serif's big print, at a fixed optical size so the hairlines stay sturdy, in fixed-width digits. */
 .number {
-    font-family: var(--font-serif);
+    font-family: var(--font-numbers);
+    font-stretch: var(--number-stretch);
     font-weight: 700;
     font-optical-sizing: none;
     font-variation-settings: "opsz" 36;
@@ -335,10 +404,27 @@ h1:focus {
     letter-spacing: -0.02em;
 }
 
+/* Five and seven characters (10:32, 1:02:05): smaller, so they still fit the width. */
+.number.xl.long {
+    font-size: 124px;
+}
+
+.number.xl.longer {
+    font-size: 92px;
+}
+
 .number.lg {
     font-size: 116px;
     line-height: 116px;
     letter-spacing: -0.02em;
+}
+
+.number.lg.long {
+    font-size: 92px;
+}
+
+.number.lg.longer {
+    font-size: 68px;
 }
 
 .number.hero {
@@ -383,6 +469,20 @@ h1:focus {
     border-bottom: var(--masthead-rule) solid var(--ink);
 }
 
+.masthead-main {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.masthead-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 /* A workout is live: its masthead rule turns to the pen's color. */
 .masthead.live {
     border-bottom-color: var(--mark);
@@ -396,7 +496,7 @@ h1:focus {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-family: var(--font-ui);
+    font-family: var(--font-control);
     font-size: 15px;
     line-height: 20px;
     font-weight: 600;
@@ -503,11 +603,11 @@ a.block:active, button.block:active {
 .btn {
     height: 48px;
     padding: 0 16px;
-    border: var(--line) solid var(--ink);
+    border: var(--line) solid var(--control);
     border-radius: var(--radius);
     background: transparent;
     color: var(--ink);
-    font-family: var(--font-ui);
+    font-family: var(--font-control);
     font-size: 15px;
     line-height: 24px;
     font-weight: 700;
@@ -542,7 +642,7 @@ a.block:active, button.block:active {
     border: 0;
     background: transparent;
     color: var(--ink);
-    font-family: var(--font-ui);
+    font-family: var(--font-control);
     font-size: 15px;
     line-height: 20px;
     font-weight: 600;
@@ -568,7 +668,7 @@ a.block:active, button.block:active {
     border-radius: var(--radius-slab);
     background: var(--slab);
     color: var(--on-slab);
-    font-family: var(--font-ui);
+    font-family: var(--font-control);
     font-size: 20px;
     line-height: 24px;
     font-weight: 700;
@@ -610,7 +710,7 @@ a.block:active, button.block:active {
     width: 48px;
     height: 48px;
     flex-shrink: 0;
-    border: var(--line) solid var(--ink);
+    border: var(--line) solid var(--control);
     border-radius: var(--radius);
     background: transparent;
     color: var(--ink);
@@ -631,7 +731,7 @@ a.block:active, button.block:active {
     display: flex;
     align-items: center;
     gap: 12px;
-    font-family: var(--font-ui);
+    font-family: var(--font-control);
     font-size: 15px;
     line-height: 20px;
     font-weight: 600;
@@ -643,7 +743,7 @@ a.block:active, button.block:active {
     width: 22px;
     height: 22px;
     margin: 0;
-    border: var(--line) solid var(--ink);
+    border: var(--line) solid var(--control);
     border-radius: 2px;
     background: transparent;
     -webkit-appearance: none;
@@ -670,7 +770,7 @@ a.block:active, button.block:active {
 }
 
 .field-label {
-    font-family: var(--font-ui);
+    font-family: var(--font-label);
     font-size: 12px;
     line-height: 16px;
     font-weight: 700;
@@ -689,7 +789,7 @@ a.block:active, button.block:active {
     border-radius: 0;
     background: transparent;
     color: var(--ink);
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-size: 19px;
     line-height: 24px;
 }
@@ -701,6 +801,8 @@ a.block:active, button.block:active {
 
 .field.number-field {
     height: 56px;
+    font-family: var(--font-numbers);
+    font-stretch: var(--number-stretch);
     padding: 10px 0 0;
     font-size: 36px;
     line-height: 36px;
@@ -814,10 +916,10 @@ select.field {
 
 .segmented button {
     height: 48px;
-    border: var(--line) solid var(--ink);
+    border: var(--line) solid var(--control);
     border-radius: var(--radius);
     background: transparent;
-    font-family: var(--font-ui);
+    font-family: var(--font-control);
     font-size: 15px;
     font-weight: 700;
 }
@@ -834,7 +936,7 @@ select.field {
     border-radius: 2px;
     background: var(--mark);
     color: var(--on-mark);
-    font-family: var(--font-ui);
+    font-family: var(--font-label);
     font-size: 12px;
     line-height: 16px;
     font-weight: 700;
@@ -863,7 +965,7 @@ select.field {
     width: 22px;
     height: 22px;
     flex-shrink: 0;
-    border: var(--line) solid var(--ink);
+    border: var(--line) solid var(--control);
     border-radius: 2px;
     display: flex;
     align-items: center;
@@ -899,7 +1001,7 @@ select.field {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-ui);
+    font-family: var(--font-label);
     font-size: 12px;
     line-height: 16px;
     font-weight: 700;
@@ -924,7 +1026,7 @@ select.field {
     justify-content: center;
     border-top: 1px solid var(--rule);
     border-bottom: 1px solid var(--rule);
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-size: 20px;
     line-height: 20px;
     color: var(--ink-muted);
@@ -1004,7 +1106,7 @@ select.field {
 }
 
 .rest-label {
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-style: italic;
     font-size: 44px;
     line-height: 48px;
@@ -1028,6 +1130,7 @@ select.field {
 /* Last time, as a ledger: the date, a column per set, and what it was at. */
 .past {
     display: grid;
+    grid-template-columns: 96px repeat(var(--columns), 40px) minmax(0, 1fr);
     align-items: baseline;
     min-height: 44px;
     padding-top: 10px;
@@ -1058,7 +1161,7 @@ select.field {
     display: inline-flex;
     align-items: baseline;
     gap: 4px;
-    font-family: var(--font-serif);
+    font-family: var(--font-numbers);
     font-size: 20px;
     line-height: 24px;
     font-weight: 700;
@@ -1190,7 +1293,7 @@ a.link {
 
 .trend-chart .tick {
     fill: var(--ink-muted);
-    font-family: var(--font-ui);
+    font-family: var(--font-label);
     font-size: 12px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -1198,7 +1301,7 @@ a.link {
 
 .trend-chart .aside {
     fill: var(--ink-muted);
-    font-family: var(--font-serif);
+    font-family: var(--font-words);
     font-style: italic;
     font-size: 12px;
 }
@@ -1237,6 +1340,920 @@ a.link {
     padding: 0;
     border: 0;
     background: none;
+}
+
+/* Settings: a theme's own paper, ink, figures and pen, whichever theme the page is in (the sample carries its data-theme). */
+.theme-sample {
+    width: 76px;
+    height: 48px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--rule);
+    border-bottom: 3px solid var(--mark);
+    border-radius: var(--radius);
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-numbers);
+    font-stretch: var(--number-stretch);
+    font-size: 22px;
+    line-height: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Channels: Telemetry colors a tag, ruler or line by what it measures. */
+.channel-train {
+    --channel: var(--train);
+}
+
+.channel-fuel {
+    --channel: var(--fuel);
+}
+
+.channel-body {
+    --channel: var(--body);
+}
+
+.channel-heart {
+    --channel: var(--heart);
+}
+
+/* Telemetry's shapes: tiles instead of ruled sections, boxed fields and buttons, chips, and rulers under the numbers.
+   Everything else comes from its tokens above. */
+
+[data-theme="telemetry"],
+[data-theme="telemetry"] body {
+    font-size: 16px;
+}
+
+[data-theme="telemetry"] .screen {
+    padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    gap: 12px;
+}
+
+[data-theme="telemetry"] .label {
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+/* A channel's tag: a square in its color before the label. */
+[data-theme="telemetry"] .tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink);
+}
+
+[data-theme="telemetry"] .tag::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 1px;
+    background: var(--channel, var(--train));
+}
+
+[data-theme="telemetry"] .title {
+    font-size: 28px;
+    line-height: 32px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-variation-settings: normal;
+}
+
+[data-theme="telemetry"] .title.small {
+    font-size: 24px;
+    line-height: 28px;
+}
+
+/* The exercise now. */
+[data-theme="telemetry"] .step .title {
+    font-size: 32px;
+    line-height: 36px;
+}
+
+[data-theme="telemetry"] .title.workout {
+    font-size: 17px;
+    line-height: 24px;
+}
+
+[data-theme="telemetry"] .month {
+    font-family: var(--font-label);
+    font-style: normal;
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+[data-theme="telemetry"] .body {
+    font-size: 16px;
+}
+
+[data-theme="telemetry"] .strong {
+    font-weight: 700;
+}
+
+[data-theme="telemetry"] .name {
+    font-size: 16px;
+    line-height: 22px;
+    font-weight: 700;
+}
+
+[data-theme="telemetry"] .name.big {
+    font-size: 20px;
+    line-height: 26px;
+}
+
+/* Meta in mono capitals: "WED 14 OCT · 9:00 · 3 SETS". */
+[data-theme="telemetry"] .caption {
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 500;
+    font-stretch: 87.5%;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+[data-theme="telemetry"] .note {
+    font-style: normal;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-theme="telemetry"] .unit,
+[data-theme="telemetry"] .unit.big {
+    font-family: var(--font-label);
+    font-style: normal;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+[data-theme="telemetry"] .pen-note {
+    font-style: normal;
+    font-size: 15px;
+    line-height: 20px;
+    font-weight: 600;
+}
+
+[data-theme="telemetry"] .number {
+    font-variation-settings: normal;
+    letter-spacing: -0.02em;
+}
+
+[data-theme="telemetry"] .number.xl,
+[data-theme="telemetry"] .number.lg {
+    font-size: 144px;
+    line-height: 144px;
+    letter-spacing: -0.03em;
+}
+
+[data-theme="telemetry"] .number.xl.long,
+[data-theme="telemetry"] .number.lg.long {
+    font-size: 116px;
+    line-height: 144px;
+}
+
+[data-theme="telemetry"] .number.xl.longer,
+[data-theme="telemetry"] .number.lg.longer {
+    font-size: 86px;
+    line-height: 144px;
+}
+
+[data-theme="telemetry"] .number.hero {
+    font-size: 56px;
+    line-height: 56px;
+    color: var(--train);
+}
+
+[data-theme="telemetry"] .number.md,
+[data-theme="telemetry"] .number.sm {
+    font-size: 44px;
+    line-height: 44px;
+}
+
+[data-theme="telemetry"] .number.xs {
+    font-size: 20px;
+    line-height: 24px;
+    font-weight: 700;
+}
+
+/* Mastheads: no rule. A screen below Today has its way back as a square button, then the title, and the label at the far end. */
+[data-theme="telemetry"] .masthead {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 0;
+}
+
+[data-theme="telemetry"] .masthead > .spread {
+    flex: 1;
+    min-width: 0;
+}
+
+[data-theme="telemetry"] .masthead-main {
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+}
+
+[data-theme="telemetry"] .masthead-text {
+    flex: 1;
+}
+
+[data-theme="telemetry"] .masthead:has(.back) .masthead-text {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+}
+
+[data-theme="telemetry"] .masthead:has(.back) .masthead-text .title {
+    grid-row: 1;
+    grid-column: 1;
+}
+
+[data-theme="telemetry"] .masthead:has(.back) .masthead-text .label {
+    grid-row: 1;
+    grid-column: 2;
+    max-width: 160px;
+    text-align: right;
+}
+
+[data-theme="telemetry"] .back,
+[data-theme="telemetry"] .masthead .icon-btn.plain {
+    width: 48px;
+    height: 48px;
+    flex: none;
+    padding: 0;
+    justify-content: center;
+    background: var(--surface-2);
+    border: 1px solid var(--control);
+    border-radius: var(--radius);
+}
+
+[data-theme="telemetry"] .back span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* Tiles: a raised panel for each group, except the big readouts, which sit on the ground. */
+[data-theme="telemetry"] .block,
+[data-theme="telemetry"] .block.open {
+    gap: 8px;
+    padding: 15px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface-1);
+}
+
+[data-theme="telemetry"] .block.bare {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+}
+
+[data-theme="telemetry"] a.block:active {
+    background: var(--surface-2);
+}
+
+[data-theme="telemetry"] .ledger {
+    border-top: 0;
+}
+
+[data-theme="telemetry"] .ledger > *,
+[data-theme="telemetry"] .ledger > .row {
+    border-top: 1px solid var(--rule);
+    border-bottom: 0;
+}
+
+[data-theme="telemetry"] .row {
+    min-height: 60px;
+}
+
+/* A picked row is a panel within the list's edges. */
+[data-theme="telemetry"] .row.picked {
+    width: 100%;
+    margin: 0;
+    background: var(--surface-2);
+}
+
+[data-theme="telemetry"] .week-plan,
+[data-theme="telemetry"] .entries,
+[data-theme="telemetry"] .set-grid {
+    border-top-color: var(--rule);
+}
+
+/* Buttons: filled panels with a control outline. */
+[data-theme="telemetry"] .btn {
+    background: var(--surface-2);
+    border: 1px solid var(--control);
+    border-radius: var(--radius);
+    font-size: 15px;
+    letter-spacing: 0;
+}
+
+[data-theme="telemetry"] .btn.fill,
+[data-theme="telemetry"] .btn[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--ground);
+}
+
+[data-theme="telemetry"] .btn.adjust {
+    width: 96px;
+}
+
+/* The quiet link: mono capitals, muted, ending in a chevron. */
+[data-theme="telemetry"] .btn-ghost {
+    padding: 0;
+    gap: 4px;
+    color: var(--ink-muted);
+    font-family: var(--font-label);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+}
+
+[data-theme="telemetry"] .btn-ghost::after {
+    content: "";
+    width: 16px;
+    height: 16px;
+    flex: none;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7.5 4.5L13 10L7.5 15.5' fill='none' stroke='%23000' stroke-width='1.875' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7.5 4.5L13 10L7.5 15.5' fill='none' stroke='%23000' stroke-width='1.875' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+[data-theme="telemetry"] .push-down > .btn-ghost {
+    align-self: flex-start;
+}
+
+/* In a tile's header row the link keeps its 44px to tap, but takes only its text's height. */
+[data-theme="telemetry"] .block > .spread:first-child > .btn-ghost {
+    margin: -14px 0;
+}
+
+/* The big button: lime, its sign at the left before the words. */
+[data-theme="telemetry"] .btn-primary {
+    padding: 0 20px;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: 12px;
+    letter-spacing: 0;
+}
+
+[data-theme="telemetry"] .btn-primary.go::after,
+[data-theme="telemetry"] .btn-primary.stop::after,
+[data-theme="telemetry"] .btn-primary.save::after {
+    width: 20px;
+    height: 20px;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6 4L16 10L6 16Z' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6 4L16 10L6 16Z' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+[data-theme="telemetry"] .btn-primary.stop::after {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6.5 4.5H13.5L15.5 6.5V13.5L13.5 15.5H6.5L4.5 13.5V6.5Z' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6.5 4.5H13.5L15.5 6.5V13.5L13.5 15.5H6.5L4.5 13.5V6.5Z' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+}
+
+[data-theme="telemetry"] .btn-primary.save::after {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5L8.5 14.5L15.5 6.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5L8.5 14.5L15.5 6.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+}
+
+[data-theme="telemetry"] .icon-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--control);
+    border-radius: var(--radius);
+}
+
+[data-theme="telemetry"] .icon-btn.plain {
+    background: transparent;
+    border: 0;
+}
+
+/* Tick boxes: filled lime with a dark check when on. */
+[data-theme="telemetry"] .goal {
+    gap: 10px;
+    font-family: var(--font-words);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+[data-theme="telemetry"] .goal input,
+[data-theme="telemetry"] .status {
+    width: 24px;
+    height: 24px;
+    border: 1.5px solid var(--ink-muted);
+    border-radius: 2px;
+}
+
+[data-theme="telemetry"] .goal input:checked,
+[data-theme="telemetry"] .status:has(.pen) {
+    background: var(--mark);
+    border-color: var(--mark);
+}
+
+[data-theme="telemetry"] .goal input:checked::after {
+    left: 1.5px;
+    top: 1.5px;
+    width: 18px;
+    height: 18px;
+    background: var(--on-mark);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5L8.5 14.5L15.5 6.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5L8.5 14.5L15.5 6.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+[data-theme="telemetry"] .status .pen {
+    position: static;
+    width: 18px;
+    height: 18px;
+    stroke: var(--on-mark);
+}
+
+[data-theme="telemetry"] .pen {
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+}
+
+[data-theme="telemetry"] .icon path {
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+}
+
+/* Fields: a panel with the label inside at the top left, and the value under it. */
+[data-theme="telemetry"] .field-group {
+    min-height: 56px;
+    padding: 6px 12px;
+    justify-content: center;
+    gap: 2px;
+    background: var(--surface-2);
+    border: 1px solid var(--control);
+    border-radius: 4px;
+}
+
+[data-theme="telemetry"] .field-group:focus-within {
+    padding: 5px 11px;
+    border: 2px solid var(--mark);
+}
+
+[data-theme="telemetry"] .field-label {
+    font-size: 10px;
+    line-height: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+[data-theme="telemetry"] .field,
+[data-theme="telemetry"] .field:focus {
+    height: 28px;
+    padding: 0;
+    border: 0;
+    font-size: 17px;
+}
+
+[data-theme="telemetry"] .field.number-field {
+    height: 32px;
+    padding: 0;
+    font-size: 28px;
+    line-height: 28px;
+    letter-spacing: -0.02em;
+    font-variation-settings: normal;
+}
+
+[data-theme="telemetry"] .field::placeholder {
+    font-style: normal;
+    font-weight: 500;
+    font-size: 15px;
+}
+
+[data-theme="telemetry"] .writing,
+[data-theme="telemetry"] .writing:focus-within {
+    height: auto;
+    justify-content: space-between;
+    border: 0;
+}
+
+[data-theme="telemetry"] .field.day-pick,
+[data-theme="telemetry"] .field.day-pick:focus {
+    height: 44px;
+    padding: 0 28px 0 12px;
+    background-color: var(--surface-2);
+    background-position: right 8px center;
+    border: 1px solid var(--control);
+    border-radius: 4px;
+}
+
+[data-theme="telemetry"] .field.day-pick:focus {
+    border-color: var(--mark);
+}
+
+/* The set entry: weight and reps side by side, Hit goal under them. */
+[data-theme="telemetry"] .entry-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+[data-theme="telemetry"] .entry-weight,
+[data-theme="telemetry"] .entry-reps {
+    width: auto;
+}
+
+[data-theme="telemetry"] .entry-row .goal {
+    grid-column: 1 / -1;
+}
+
+[data-theme="telemetry"] .segmented button {
+    background: var(--surface-2);
+    border: 1px solid var(--control);
+    border-radius: var(--radius);
+}
+
+[data-theme="telemetry"] .segmented button[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--ground);
+}
+
+/* Chips for a status: outlined, DONE filled, REST DAY hatched, LIVE and IN PROGRESS lime with a square. */
+[data-theme="telemetry"] .status-word,
+[data-theme="telemetry"] .stamp,
+[data-theme="telemetry"] .chip {
+    height: 24px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--control);
+    border-radius: 2px;
+    background: none;
+    color: var(--ink);
+    font-family: var(--font-label);
+    font-style: normal;
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transform: none;
+}
+
+[data-theme="telemetry"] .stamp {
+    background: var(--train);
+    border-color: var(--train);
+    color: var(--on-mark);
+}
+
+[data-theme="telemetry"] .status-word.rest {
+    background: repeating-linear-gradient(135deg, var(--rule) 0 1px, transparent 1px 6px);
+}
+
+[data-theme="telemetry"] .status-word.live,
+[data-theme="telemetry"] .chip.live {
+    color: var(--train);
+}
+
+[data-theme="telemetry"] .status-word.live::before,
+[data-theme="telemetry"] .chip.live::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 1px;
+    background: var(--train);
+}
+
+/* Today's week: a cell per day over its letter. Done is lime with a check, missed is outlined, a rest day is hatched,
+   and today has a lime outline. */
+[data-theme="telemetry"] .week {
+    gap: 7px;
+}
+
+[data-theme="telemetry"] .day {
+    flex-direction: column-reverse;
+    gap: 6px;
+    padding-top: 0;
+}
+
+[data-theme="telemetry"] .day.today {
+    background: none;
+}
+
+[data-theme="telemetry"] .day-letter {
+    height: 14px;
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 600;
+}
+
+[data-theme="telemetry"] .day-cell,
+[data-theme="telemetry"] .day + .day .day-cell {
+    height: 40px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    font-family: var(--font-label);
+    font-size: 14px;
+}
+
+[data-theme="telemetry"] .day-cell.done {
+    background: var(--train);
+    border-color: var(--train);
+}
+
+[data-theme="telemetry"] .day-cell.done .pen {
+    width: 20px;
+    height: 20px;
+    stroke: var(--on-mark);
+}
+
+[data-theme="telemetry"] .day-cell.missed {
+    border-color: var(--control);
+}
+
+[data-theme="telemetry"] .day-cell.rest {
+    background: repeating-linear-gradient(135deg, var(--rule) 0 1px, transparent 1px 6px);
+}
+
+[data-theme="telemetry"] .day.today .day-cell {
+    border: 2px solid var(--train);
+}
+
+[data-theme="telemetry"] .cell-word {
+    display: none;
+}
+
+/* Stats side by side: "3/6" over GYM DAYS THIS WEEK. */
+[data-theme="telemetry"] .stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+[data-theme="telemetry"] .stats .number {
+    font-size: 40px;
+    line-height: 40px;
+}
+
+[data-theme="telemetry"] .of {
+    color: var(--ink-muted);
+}
+
+/* "/ 1,800" after the calories eaten. */
+[data-theme="telemetry"] .out-of {
+    font-family: var(--font-label);
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    white-space: nowrap;
+}
+
+/* A figure inside a line of words: "−1.8 lb in 30 days". */
+[data-theme="telemetry"] .figure {
+    font-family: var(--font-numbers);
+    font-stretch: 87.5%;
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+/* The set's and the rest's readouts. */
+[data-theme="telemetry"] .rest-label {
+    display: none;
+}
+
+[data-theme="telemetry"] .live-dot {
+    border-radius: 1px;
+    background: var(--train);
+}
+
+[data-theme="telemetry"] .heart-rate {
+    min-height: 44px;
+}
+
+/* Last time: the date, the reps in narrow columns, what it was at. */
+[data-theme="telemetry"] .past {
+    grid-template-columns: 96px repeat(var(--columns), 28px) minmax(0, 1fr);
+    align-items: center;
+    min-height: 40px;
+    padding-top: 0;
+}
+
+[data-theme="telemetry"] .past > .cell {
+    padding-right: 0;
+    border-left: 0;
+    align-self: auto;
+}
+
+[data-theme="telemetry"] .past > .past-date {
+    font-size: 13px;
+    line-height: 18px;
+}
+
+[data-theme="telemetry"] .past > .past-at {
+    font-family: var(--font-label);
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* Changes: up in lime, down muted with a triangle. */
+[data-theme="telemetry"] .delta {
+    gap: 4px;
+    align-items: center;
+    font-stretch: var(--number-stretch);
+    font-size: 18px;
+    line-height: 24px;
+    letter-spacing: -0.02em;
+    color: var(--train);
+}
+
+[data-theme="telemetry"] .delta::before,
+[data-theme="telemetry"] .delta.flat::before {
+    display: none;
+}
+
+[data-theme="telemetry"] .delta.down,
+[data-theme="telemetry"] .delta.flat {
+    color: var(--ink-muted);
+}
+
+[data-theme="telemetry"] .delta.down::before {
+    display: block;
+    width: 8px;
+    height: 6px;
+}
+
+/* Gym's history: the date moves into the line under the name. */
+[data-theme="telemetry"] .history-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 60px;
+}
+
+[data-theme="telemetry"] .history-row > :first-child {
+    display: none;
+}
+
+[data-theme="telemetry"] .history-row > :nth-child(2) {
+    padding: 6px 12px 6px 0;
+}
+
+[data-theme="telemetry"] .history-row.picked > :nth-child(2) {
+    padding-left: 8px;
+}
+
+/* The improvement chart: a lime line with square markers, and a crosshair on the workout picked. */
+[data-theme="telemetry"] .trend-chart .trend-line {
+    stroke: var(--train);
+}
+
+[data-theme="telemetry"] .trend-chart .tick {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+[data-theme="telemetry"] .trend-chart .axis {
+    stroke: var(--control);
+    stroke-width: 1;
+}
+
+[data-theme="telemetry"] .trend-chart .marker {
+    fill: var(--train);
+}
+
+[data-theme="telemetry"] .trend-chart .crosshair {
+    stroke: var(--ink);
+    stroke-width: 1;
+}
+
+[data-theme="telemetry"] .trend-chart .picked-frame {
+    fill: var(--ink);
+}
+
+/* Rulers: hairline ticks every step, control-colored majors with labels, and the value as a bar and needle in its channel's color. */
+.ruler {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.ruler .minor {
+    stroke: var(--rule);
+    stroke-width: 1;
+}
+
+.ruler .major {
+    stroke: var(--control);
+    stroke-width: 1;
+}
+
+.ruler text {
+    fill: var(--ink-muted);
+    font-family: var(--font-label);
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.ruler .value {
+    fill: var(--channel, var(--mark));
+}
+
+.ruler .over {
+    fill: url(#over-hatch);
+}
+
+.ruler .goal-mark {
+    fill: var(--ink);
+}
+
+.ruler .maint-mark {
+    fill: var(--ink-muted);
+}
+
+.ruler .goal-label,
+.ruler .maint-label {
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+.ruler .goal-label {
+    fill: var(--ink);
+}
+
+.ruler .trace {
+    fill: none;
+    stroke: var(--channel, var(--mark));
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ruler .trace-ring {
+    fill: var(--ground);
+}
+
+.ruler .trace-dot {
+    fill: var(--channel, var(--mark));
+}
+
+/* The heart rate's last minute beside its number. */
+.ruler.trace-60 {
+    width: 150px;
+    flex: none;
+}
+
+/* NEXT on the rest screen, set off by a hairline. */
+[data-theme="telemetry"] .next-step {
+    padding-top: 8px;
+    border-top: 1px solid var(--rule);
+}
+
+[data-theme="telemetry"] .superset {
+    border-left-color: var(--control);
+}
+
+[data-theme="telemetry"] .meter-over {
+    background: repeating-linear-gradient(135deg, var(--fuel) 0 1px, transparent 1px 4px);
+}
+
+/* Tiles never move; only the rulers do. */
+[data-theme="telemetry"] .screen,
+[data-theme="telemetry"] .step,
+[data-theme="telemetry"] .appear {
+    animation: none;
+}
+
+[data-theme="telemetry"] .btn:active:not(:disabled),
+[data-theme="telemetry"] .icon-btn:active:not(:disabled),
+[data-theme="telemetry"] .segmented button:active {
+    background-color: var(--rule);
 }
 
 /* Motion: buttons react the moment they're pressed, and each screen and workout step fades in quickly.

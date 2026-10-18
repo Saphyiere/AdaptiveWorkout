@@ -1,6 +1,7 @@
 @implements IDisposable
-@* Time since a moment, ticking once a second. Only this text re-renders. *@
-<span class="@Class">@TimeText.Format(DateTimeOffset.Now - Since)</span>
+@* Time since a moment, ticking once a second. Only this text re-renders. Past 9:59 it's marked long, so a big readout can shrink to fit. *@
+@{ var text = TimeText.Format(DateTimeOffset.Now - Since); }
+<span class="@Class @(text.Length > 5 ? "longer" : text.Length > 4 ? "long" : "")">@text</span>
 
 @code {
     private readonly CancellationTokenSource stop = new();

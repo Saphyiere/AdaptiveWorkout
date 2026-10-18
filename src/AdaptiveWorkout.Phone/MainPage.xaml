@@ -3,11 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:AdaptiveWorkout.Phone"
              xmlns:ui="clr-namespace:AdaptiveWorkout.UI;assembly=AdaptiveWorkout.UI"
-             x:Class="AdaptiveWorkout.Phone.MainPage"
-             BackgroundColor="#F3EFE6">
+             x:Class="AdaptiveWorkout.Phone.MainPage">
 
-    <!-- The theme's paper (app.css's ground) behind the page while it loads, so it opens without a flash. -->
-    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" BackgroundColor="#F3EFE6">
+    <!-- Its background and the page's follow the theme (MainPage.ShowTheme). -->
+    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
         <BlazorWebView.RootComponents>
             <RootComponent Selector="#app" ComponentType="{x:Type ui:Routes}" />
         </BlazorWebView.RootComponents>

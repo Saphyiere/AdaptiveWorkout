@@ -1,9 +1,12 @@
-@* Plain line icons: thin strokes with round caps and joins. Only the pen marks (Mark.razor) look hand-made. *@
-<svg aria-hidden="true" viewBox="0 0 24 24" width="@Size" height="@Size">
+@* Plain line icons: thin strokes with round caps and joins, or square ones with chamfered corners in Telemetry (app.css).
+   Only the pen marks (Mark.razor) look hand-made. *@
+<svg class="icon" aria-hidden="true" viewBox="0 0 24 24" width="@Size" height="@Size">
     <path d="@PathData" fill="none" stroke="@Color" stroke-width="@Stroke" stroke-linecap="round" stroke-linejoin="round"></path>
 </svg>
 
 @code {
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
     [Parameter, EditorRequired] public string Name { get; set; } = "";
     [Parameter] public int Size { get; set; } = 20;
     [Parameter] public string Color { get; set; } = "currentColor";
@@ -22,10 +25,12 @@
         "down" => "M6 9L12 15L18 9",
         "edit" => "M4 20H8L19 9L15 5L4 16Z",
         "trash" => "M4 7H20M9 7V4H15V7M6 7L7 20H17L18 7M10 11V16M14 11V16",
+        "heart" when Theme == Theme.Telemetry => "M12 20.4L3.6 12V7.2L7.2 3.6H10.8L12 5.4L13.2 3.6H16.8L20.4 7.2V12Z",
         "heart" => "M12 19.6C9.4 17.6 4.2 14 4.2 9.4C4.2 6.9 6.1 5 8.5 5C10 5 11.3 5.8 12 7.1C12.7 5.8 14 5 15.5 5C17.9 5 19.8 6.9 19.8 9.4C19.8 14 14.6 17.6 12 19.6Z",
         "list" => "M9.5 7H19M9.5 12H19M9.5 17H19M5.25 7H5.3M5.25 12H5.3M5.25 17H5.3",
         "page" => "M6 4H18V20H6ZM9 8.5H15M9 12H15",
         "pen" => "M4 20L5 15L15.5 4.5L19.5 8.5L9 19ZM13 7L17 11",
+        "settings" => "M4 7H11M17 7H20M4 17H7M13 17H20M11 4.5H17V9.5H11ZM7 14.5H13V19.5H7Z",
         _ => "",
     };
 }

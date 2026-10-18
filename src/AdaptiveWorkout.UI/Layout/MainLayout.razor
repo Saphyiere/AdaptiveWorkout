@@ -1,11 +1,61 @@
 @inherits LayoutComponentBase
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
 @inject WorkoutFlow Flow
+@inject ThemeSetting ThemeSetting
+@inject IJSRuntime JS
 
-<main>
-    @Body
-</main>
+@* Pages wait for the saved theme, so the components that draw per theme don't start in the wrong one. *@
+@if (themeLoaded)
+{
+    <CascadingValue Value="ThemeSetting.Current">
+        <main>
+            @Body
+        </main>
+    </CascadingValue>
+}
 
 @code {
-    // Warm up storage and the open workout in the background, so the first tap is already fast.
-    protected override void OnInitialized() => _ = Flow.LoadAsync();
+    private bool themeLoaded;
+    private string? shownTheme;
+    private IJSObjectReference? page;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Warm up storage and the open workout in the background, so the first tap is already fast.
+        _ = Flow.LoadAsync();
+        ThemeSetting.Changed += OnThemeChanged;
+        await ThemeSetting.LoadAsync();
+        themeLoaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The page's colors, fonts and shapes follow data-theme on <html>, which index.html restores before the first paint.
+        if (!themeLoaded || shownTheme == ThemeSetting.Current.Id) return;
+
+        shownTheme = ThemeSetting.Current.Id;
+        try
+        {
+            page ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/AdaptiveWorkout.UI/Layout/MainLayout.razor.js");
+            await page.InvokeVoidAsync("showTheme", shownTheme);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+
+    private void OnThemeChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public async ValueTask DisposeAsync()
+    {
+        ThemeSetting.Changed -= OnThemeChanged;
+        try
+        {
+            if (page is not null) await page.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
 }
