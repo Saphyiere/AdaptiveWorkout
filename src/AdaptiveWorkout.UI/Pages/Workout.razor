@@ -10,7 +10,36 @@
     <div class="screen">
         <WorkoutHeader State="state" OnFinish="FinishAsync" />
 
-        @if (state.Running is { } running)
+        @if (state.WarmingUp || state.CoolingDown)
+        {
+            @* Before the first exercise and after the last: timed, with heart rate, and nothing to enter. *@
+            var title = state.WarmingUp ? "Warm-up" : "Cool-down";
+            var since = state.Session.CoolDownStartedAt ?? state.Session.StartedAt;
+            <div class="step" @key="title">
+                <div class="stack tight">
+                    <p class="label">@(state.WarmingUp ? "Before the first exercise" : "After the last exercise")</p>
+                    <h1 class="title">@title</h1>
+                </div>
+
+                <section class="block bare" aria-label="@title time">
+                    <p class="inline"><span class="live-dot"></span><span class="label">Time</span></p>
+                    <Clock Since="since" Class="number xl" />
+                    @if (Theme == Theme.Telemetry)
+                    {
+                        <SecondsRuler Since="since" />
+                    }
+                </section>
+
+                <section class="block" aria-label="Heart rate">
+                    <HeartRate />
+                </section>
+
+                <div class="push-down">
+                    <NextStepButton State="state" OnStarted="() => { }" OnFinish="FinishAsync" />
+                </div>
+            </div>
+        }
+        else if (state.Running is { } running)
         {
             var exercise = state.Exercises[running.ExerciseId];
             var step = state.Describe(running);
@@ -135,6 +164,13 @@
                                 <button type="button" class="btn-ghost" @onclick="Flow.EditRound">Edit</button>
                             </div>
                             <div class="ledger">
+                                @if (state.Session.WarmUpEndedAt is { } warmedUpAt)
+                                {
+                                    <div class="spread row">
+                                        <span class="name big">Warm-up</span>
+                                        <span class="name big tabular">@TimeText.Format(warmedUpAt - state.Session.StartedAt)</span>
+                                    </div>
+                                }
                                 @foreach (var exerciseSets in state.Sets.Where(s => s.StoppedAt is not null).GroupBy(s => s.ExerciseId))
                                 {
                                     var exercise = state.Exercises[exerciseSets.Key];
@@ -173,7 +209,7 @@
         Flow.Changed += OnFlowChanged;
         state = Flow.Current ?? await Flow.LoadAsync();
         if (state is null) await Navigation.HomeAsync();
-        else if (state.Sets.Count == 0) Navigation.Replace("workout/exercise");
+        else if (state is { Sets.Count: 0, WarmingUp: false, CoolingDown: false }) Navigation.Replace("workout/exercise");
     }
 
     private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";

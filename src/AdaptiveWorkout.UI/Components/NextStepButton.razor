@@ -1,8 +1,13 @@
 @inject WorkoutFlow Flow
 @inject AppNavigation Navigation
-@* The break screen's buttons: the next set or exercise, and Finish once there's nothing left to do. *@
+@* The break screen's buttons: the next set or exercise, and Finish once there's nothing left to do. A planned cool-down starts in
+   Finish's place, and Finish ends it. During the warm-up, the big button starts the first exercise. *@
 
-@if (State.Next is { } next)
+@if (State.CoolingDown)
+{
+    <button type="button" class="btn-primary save" @onclick="OnFinish">Finish workout</button>
+}
+else if (State.Next is { } next)
 {
     var exercise = State.Exercises[next.ExerciseId];
     var sameExercise = State.ToLog?.ExerciseId == next.ExerciseId;
@@ -21,46 +26,61 @@
         <p class="note center">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
     }
 
-    @* Other ways on sit above the big button, which stays in the same place on every screen. *@
+    @* Other ways on sit above the big button, which stays in the same place on every screen. The warm-up has nothing to move on from. *@
     @if (State.Plan.Count == 0)
     {
         <div class="grid-2">
             <button type="button" class="btn tall" @onclick="@(() => Navigation.Open("workout/exercise"))">Different exercise</button>
-            <button type="button" class="btn tall" @onclick="OnFinish">Finish workout</button>
+            <button type="button" class="btn tall" @onclick="FinishAsync">@FinishText</button>
         </div>
     }
-    else if (State.CanMoveOn && State.MoveOn is { } moveOn)
+    else if (State is { CanMoveOn: true, WarmingUp: false, MoveOn: { } moveOn })
     {
         var after = State.Exercises[moveOn.ExerciseId];
         <button type="button" class="btn tall" @onclick="() => Start(after)">Move on to @after.Name</button>
     }
-    else if (State.CanMoveOn)
+    else if (State is { CanMoveOn: true, WarmingUp: false })
     {
         <div class="grid-2">
             <a class="btn tall" href="workout/add">Add more</a>
-            <button type="button" class="btn tall" @onclick="OnFinish">Finish workout</button>
+            <button type="button" class="btn tall" @onclick="FinishAsync">@FinishText</button>
         </div>
     }
     <button type="button" class="btn-primary go" @onclick="() => Start(exercise)">@(sameExercise ? $"Start set {next.SetNumber}" : $"Start {exercise.Name}")</button>
+}
+else if (State.WarmingUp)
+{
+    <button type="button" class="btn-primary go" @onclick="@(() => Navigation.Open("workout/exercise"))">Pick an exercise</button>
 }
 else
 {
     <p class="note center">Every planned exercise is done.</p>
     <a class="btn tall" href="workout/add">Add more</a>
-    <button type="button" class="btn-primary save" @onclick="OnFinish">Finish workout</button>
+    <button type="button" class="btn-primary @(State.CoolDownNext ? "go" : "save")" @onclick="FinishAsync">@FinishText</button>
 }
 
 @code {
     [Parameter, EditorRequired] public WorkoutState State { get; set; } = default!;
 
-    /// <summary>Called after a set starts, so the page re-renders.</summary>
+    /// <summary>Called after a set or the cool-down starts, so the page re-renders.</summary>
     [Parameter] public EventCallback OnStarted { get; set; }
 
     [Parameter] public EventCallback OnFinish { get; set; }
 
+    private string FinishText => State.CoolDownNext ? "Start cool-down" : "Finish workout";
+
     private Task Start(Exercise exercise)
     {
         Flow.StartSet(exercise);
+        return OnStarted.InvokeAsync();
+    }
+
+    // With a cool-down planned, finishing starts it instead.
+    private Task FinishAsync()
+    {
+        if (!State.CoolDownNext) return OnFinish.InvokeAsync();
+
+        Flow.StartCoolDown();
         return OnStarted.InvokeAsync();
     }
 }

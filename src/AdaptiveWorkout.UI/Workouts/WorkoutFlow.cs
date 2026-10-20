@@ -31,9 +31,12 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         get
         {
             if (Current is not { } state) return null;
+            if (state.Session.CoolDownStartedAt is { } coolingSince) return new WorkoutStatus(false, "Cool-down", coolingSince, null, null);
             if (state.Running is { } running) return new WorkoutStatus(false, state.Exercises[running.ExerciseId].Name, running.StartedAt!.Value, null, null);
 
+            // The warm-up waits for the first exercise like a rest, counting up, so the watch can start it too.
             var next = state.Next is { } step ? state.Exercises[step.ExerciseId].Name : null;
+            if (state.WarmingUp) return new WorkoutStatus(true, "Warm-up", state.Session.StartedAt, null, next);
             if (state.ToLog is not { } logged) return new WorkoutStatus(true, state.Name, state.Session.StartedAt, null, next);
             if (state.Next is { AfterBreak: false }) return new WorkoutStatus(true, $"{state.Exercises[logged.ExerciseId].Name} done", logged.StoppedAt!.Value, null, next);
 
@@ -49,18 +52,28 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         return Current;
     }
 
-    /// <summary>Starts a session now, or resumes the open one. With a planned first exercise, its first set starts right away.</summary>
+    /// <summary>
+    /// Starts a session now, or resumes the open one. A session with a warm-up starts with it, until the big button starts the first
+    /// exercise; otherwise a planned first exercise's first set starts right away.
+    /// </summary>
     public async Task StartSessionAsync(long? templateId)
     {
         if (await LoadAsync() is not null) return;
 
-        var session = new WorkoutSession { TemplateId = templateId, StartedAt = DateTimeOffset.Now };
+        var template = templateId is long id ? await store.GetTemplateAsync(id) : null;
+        var session = new WorkoutSession
+        {
+            TemplateId = templateId,
+            StartedAt = DateTimeOffset.Now,
+            WarmUp = template?.WarmUp == true,
+            CoolDown = template?.CoolDown == true,
+        };
         Save(store.StartSessionAsync(session));
-        var plan = templateId is long id ? PlanEdits.Copy(await store.GetTemplateExercisesAsync(id)) : [];
+        var plan = template is not null ? PlanEdits.Copy(await store.GetTemplateExercisesAsync(template.Id)) : [];
         Save(store.SaveSessionPlanAsync(session, plan));
         Current = await CreateStateAsync(session, [], plan);
         watch.Open(session);
-        if (Current.Next is { } first) StartSet(Current.Exercises[first.ExerciseId]);
+        if (!session.WarmUp && Current.Next is { } first) StartSet(Current.Exercises[first.ExerciseId]);
         else Announce();
     }
 
@@ -68,6 +81,16 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
     public void StartSet(Exercise exercise)
     {
         if (Current is not { } state) return;
+
+        // The first exercise ends the warm-up as it starts. A set started during the cool-down puts the cool-down off until the end again.
+        var now = DateTimeOffset.Now;
+        if (state.WarmingUp || state.CoolingDown)
+        {
+            if (state.WarmingUp) state.Session.WarmUpEndedAt = now;
+            state.Session.CoolDownStartedAt = null;
+            Save(store.SaveWarmUpAndCoolDownAsync(state.Session));
+        }
+
         if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
 
         // Starting from a rest closes that rest's entries. The second half of a superset round doesn't, so the round is entered together.
@@ -85,7 +108,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         {
             ExerciseId = exercise.Id,
             Order = state.Sets.Count + 1,
-            StartedAt = DateTimeOffset.Now,
+            StartedAt = now,
             Weight = values?.Weight,
             WeightUnit = values?.Unit ?? settings.Unit,
             Reps = values?.Reps,
@@ -145,7 +168,20 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Announce();
     }
 
-    /// <summary>Stops a running set, saves the one being logged, and closes the session.</summary>
+    /// <summary>After the last exercise: saves the set being logged and starts the cool-down, which runs until Finish.</summary>
+    public void StartCoolDown()
+    {
+        if (Current is not { Running: null, WarmingUp: false, CoolDownNext: true } state) return;
+
+        if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
+        state.LoggedThrough = state.Sets.Count;
+        state.Confirmed.Clear();
+        state.Session.CoolDownStartedAt = DateTimeOffset.Now;
+        Save(store.SaveWarmUpAndCoolDownAsync(state.Session));
+        Announce();
+    }
+
+    /// <summary>Stops a running set, saves the one being logged, and closes the session; a cool-down ends with it.</summary>
     public void Finish()
     {
         if (Current is not { } state) return;
@@ -153,6 +189,14 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         StopSet();
         if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
         state.Session.FinishedAt = DateTimeOffset.Now;
+
+        // Finished during the warm-up: it was all warm-up.
+        if (state.WarmingUp)
+        {
+            state.Session.WarmUpEndedAt = state.Session.FinishedAt;
+            Save(store.SaveWarmUpAndCoolDownAsync(state.Session));
+        }
+
         Save(store.FinishSessionAsync(state.Session));
         pastSessions.Add(state.Session);
         pastSets.AddRange(state.Sets);

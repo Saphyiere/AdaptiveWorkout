@@ -12,13 +12,41 @@
     var stopped = state.Sets.Where(s => s.StoppedAt is not null).ToList();
     var planIds = state.Plan.Select(e => e.ExerciseId).ToHashSet();
     var extraIds = stopped.Select(s => s.ExerciseId).Where(id => !planIds.Contains(id)).Distinct().ToList();
+    var current = state.WarmingUp || state.CoolingDown ? null : running?.ExerciseId ?? next?.ExerciseId;
     <div class="screen">
         <WorkoutHeader State="state" Advanced="true" OnFinish="FinishAsync" />
 
-        @* Each exercise's box: ticked in pen once it has sets, the pen's dot while it's the one now, empty until then. *@
-        @if (state.Plan.Count > 0)
+        @* Each exercise's box: ticked in pen once it has sets, the pen's dot while it's the one now, empty until then. A warm-up and a
+           cool-down are boxes of their own at either end. *@
+        @if (state.Plan.Count > 0 || state.Session.WarmUp || state.Session.CoolDown)
         {
             <section class="ledger" aria-label="Plan">
+                @if (state.Session.WarmUp)
+                {
+                    <div class="row @(state.WarmingUp ? "picked" : "")">
+                        <span class="status">
+                            @if (state.WarmingUp)
+                            {
+                                <span class="live-dot"></span>
+                            }
+                            else
+                            {
+                                <Mark Kind="MarkKind.Tick" Size="28" />
+                            }
+                        </span>
+                        <span class="row-text">
+                            <span class="name">Warm-up</span>
+                            @if (state.Session.WarmUpEndedAt is { } warmedUpAt)
+                            {
+                                <span class="caption">@TimeText.Format(warmedUpAt - state.Session.StartedAt)</span>
+                            }
+                            else
+                            {
+                                <span class="caption"><Clock Since="state.Session.StartedAt" /> · now</span>
+                            }
+                        </span>
+                    </div>
+                }
                 @foreach (var block in WorkoutPlan.Blocks(state.Plan))
                 {
                     <div class="@(block.Count > 1 ? "superset" : "")">
@@ -30,7 +58,7 @@
                         {
                             var exercise = state.Exercises[entry.ExerciseId];
                             var done = stopped.Where(s => s.ExerciseId == entry.ExerciseId).ToList();
-                            var isCurrent = (running?.ExerciseId ?? next?.ExerciseId) == entry.ExerciseId;
+                            var isCurrent = current == entry.ExerciseId;
                             var last = done.Count == 0 ? state.History(entry.ExerciseId).FirstOrDefault() : null;
                             <div class="row @(isCurrent ? "picked" : "")">
                                 <span class="status">
@@ -62,6 +90,28 @@
                                 </span>
                             </div>
                         }
+                    </div>
+                }
+                @if (state.Session.CoolDown)
+                {
+                    <div class="row @(state.CoolingDown ? "picked" : "")">
+                        <span class="status">
+                            @if (state.CoolingDown)
+                            {
+                                <span class="live-dot"></span>
+                            }
+                        </span>
+                        <span class="row-text">
+                            <span class="name">Cool-down</span>
+                            @if (state.Session.CoolDownStartedAt is { } coolingSince)
+                            {
+                                <span class="caption"><Clock Since="coolingSince" /> · now</span>
+                            }
+                            else
+                            {
+                                <span class="caption">After the last exercise</span>
+                            }
+                        </span>
                     </div>
                 }
             </section>

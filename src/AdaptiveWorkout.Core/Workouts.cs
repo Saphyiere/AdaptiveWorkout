@@ -25,6 +25,12 @@ public sealed class SessionTemplate
     public long Id { get; set; }
     public string Name { get; set; } = "";
     public int Order { get; set; }
+
+    /// <summary>Its workouts start with a warm-up: timed, with heart rate, until the first exercise starts.</summary>
+    public bool WarmUp { get; set; }
+
+    /// <summary>Its workouts end with a cool-down: timed, with heart rate, from after the last exercise until Finish.</summary>
+    public bool CoolDown { get; set; }
 }
 
 /// <summary>One exercise in a plan, in order: a session template's, or one workout's own copy of it.</summary>
@@ -61,6 +67,18 @@ public sealed class WorkoutSession
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public bool LoggedAfterward { get; set; }
+
+    /// <summary>It starts with a warm-up, copied from its session at Start, that runs until <see cref="WarmUpEndedAt"/>.</summary>
+    public bool WarmUp { get; set; }
+
+    /// <summary>When the warm-up ended, as the first exercise started. Empty while warming up, or without a warm-up.</summary>
+    public DateTimeOffset? WarmUpEndedAt { get; set; }
+
+    /// <summary>It ends with a cool-down, copied from its session at Start, that runs from <see cref="CoolDownStartedAt"/> until Finish.</summary>
+    public bool CoolDown { get; set; }
+
+    /// <summary>When the cool-down started. Empty until then, or without a cool-down.</summary>
+    public DateTimeOffset? CoolDownStartedAt { get; set; }
 
     /// <summary>
     /// How this workout compared with the last time of each of its exercises, worked out once after Finish (see

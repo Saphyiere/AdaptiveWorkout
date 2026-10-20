@@ -46,6 +46,11 @@
             </div>
         </section>
 
+        @if (session.WarmUpEndedAt is { } warmedUpAt)
+        {
+            @Phase("Warm-up", session.StartedAt, warmedUpAt)
+        }
+
         @foreach (var exerciseSets in sets.GroupBy(s => s.ExerciseId))
         {
             var exercise = exercises[exerciseSets.Key];
@@ -77,6 +82,11 @@
                     }
                 </div>
             </section>
+        }
+
+        @if (session.CoolDownStartedAt is { } cooledFrom)
+        {
+            @Phase("Cool-down", cooledFrom, session.FinishedAt!.Value)
         }
 
         <div class="push-down">
@@ -125,6 +135,19 @@
     }
 
     private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";
+
+    // The warm-up or the cool-down: how long it took, and the heart rate through it.
+    private RenderFragment Phase(string title, DateTimeOffset from, DateTimeOffset to) =>
+        @<section class="block" aria-label="@title">
+            <div class="spread baseline">
+                <h2 class="name big">@title</h2>
+                <span class="name big tabular">@TimeText.Format(to - from)</span>
+            </div>
+            @if (WorkoutStats.HeartRate(samples, from, to) is { } bpm)
+            {
+                <p class="caption">@bpm.Average bpm avg · @bpm.Max max</p>
+            }
+        </section>;
 
     private async Task DeleteAsync()
     {

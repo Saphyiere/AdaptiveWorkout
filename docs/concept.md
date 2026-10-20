@@ -35,6 +35,7 @@ Build the foundation first, then add on.
 | Set | One bout of an exercise: when it started and stopped, and what I did (weight × reps, or a duration). A 20-minute bike ride without stopping is one set. |
 | Superset | Exercises done alternately as one block: pull-ups, dips, pull-ups, dips. |
 | Rest | The gap between stopping one set and starting the next. Derived, never entered. |
+| Warm-up, cool-down | Time at the start and end of a workout, with heart rate and nothing to enter. Each session turns them on or off. |
 | Gym day | A day with at least one session, whatever it was, a walk included. |
 
 ## Today
@@ -54,7 +55,7 @@ Am I getting better, and everything I've done:
 
 - **Improvement:** how much better my exercises are than the first time I did them, on average (**+12.8%** over 13 workouts), with the line of how it got there. Tapping the line picks a workout: its name, date and how it did against the last time. See *Adaptive* for how it's worked out.
 - **Edit routine** opens the routines, to edit one or switch.
-- **History:** every finished workout, newest first and grouped by month: its name, date, length, set count and improvement, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
+- **History:** every finished workout, newest first and grouped by month: its name, date, length, set count and improvement, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. A warm-up comes before the exercises and a cool-down after them, each with how long it took and its average and highest heart rate. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
 
 ### Settings
 
@@ -83,7 +84,7 @@ Next to it, one step away (**Other session**), the session picker:
 
 With no routine, the button reads **Start a workout** and opens the picker, and **Set up a routine** sits under it.
 
-The session's clock starts the moment I tap it. With a template, it goes straight to the first exercise (e.g. "Overhand rows") and its first set starts.
+The session's clock starts the moment I tap it. With a template, it goes straight to the first exercise (e.g. "Overhand rows") and its first set starts, unless the session starts with a warm-up (see *Warm-up and cool-down*).
 
 While a workout is open, the session picker shows it at the top with **Resume**, **Finish** and **Cancel session**. Cancel deletes the workout and its sets, after asking once.
 
@@ -103,6 +104,8 @@ When creating a session template, I add exercises one by one: type a name and ta
 - a **Sets** counter (− and +). "Auto" means as many sets as last time.
 - up and down buttons to reorder, and a remove button.
 - **Superset with the next exercise**, which joins it to the one below. The first exercise of a superset counts **Rounds** for all of them.
+
+**Warm-up first** sits above the exercises and **Cool-down last** below them, where each one happens.
 
 **(later)** With many exercises, a picker grouped into categories.
 
@@ -157,7 +160,16 @@ What the big button offers after each set:
 
 In a superset, the next step alternates through its exercises (pull-ups, dips, pull-ups, dips…) and a round counts as one set of each.
 
-When nothing planned is left, the big button is **Finish workout**, with **Add more** under it. When just tracking, the break screen always offers **Different exercise** and **Finish workout** under the big button.
+When nothing planned is left, the big button is **Finish workout**, with **Add more** under it. When just tracking, the break screen always offers **Different exercise** and **Finish workout** under the big button. With a cool-down, each of those reads **Start cool-down** instead.
+
+### Warm-up and cool-down
+
+A session can start with a warm-up and end with a cool-down, each turned on in its list of exercises. Both are only time and heart rate: nothing to enter.
+
+- **Warm-up:** Start opens it in place of the first set: the time since Start, live heart rate, and what's next with **Change**. The big button, **Start overhand rows**, ends it and starts the first set. The watch and the notification show **Warm-up** like a rest, so the watch's **Start overhand rows** works too.
+- **Cool-down:** where the big button would finish the workout, it reads **Start cool-down**. The cool-down shows its time and live heart rate, and its big button is **Finish workout**. A set started during it (another exercise, or another set from advanced mode) puts the cool-down off until the end again.
+- **Finish** in the masthead still finishes at once, with no cool-down. Finishing during the warm-up makes the whole workout warm-up.
+- Advanced mode lists them as the first and last boxes of the plan; **Today so far** starts with the warm-up's time.
 
 ### Changing today's workout
 
@@ -244,6 +256,7 @@ Derived from session dates alone:
 The watch streams heart rate (about once a second) for the whole session, sets and breaks alike. The phone tells the watch when a session starts and finishes. From one stream the app derives:
 
 - heart rate during each set (readings between the set's start and stop)
+- heart rate during the warm-up and the cool-down
 - heart rate while resting (readings between sets)
 - the whole session's curve
 
@@ -275,11 +288,13 @@ A weigh-in whenever I step on the scale, charted over time.
 ```
 Routine            Id, Name
 RoutineDay         RoutineId, Day (Monday 0 to Sunday 6), TemplateId (empty = rest day)
-SessionTemplate    Id, Name, Order
+SessionTemplate    Id, Name, Order, WarmUp, CoolDown
 Setting            Key, Value                    (the routine in use, the theme, rest countdowns)
 TemplateExercise   TemplateId, ExerciseId, Order, PlannedSets (optional), SupersetGroup (optional)
 SessionExercise    SessionId, ExerciseId, Order, PlannedSets, SupersetGroup   (the workout's own copy, changed as it goes)
 Session            Id, TemplateId (empty = just tracking), StartedAt, FinishedAt, LoggedAfterward
+                   WarmUp, WarmUpEndedAt         (copied from the template at Start; warming up from StartedAt until the first set)
+                   CoolDown, CoolDownStartedAt   (cooling down from Start cool-down until FinishedAt)
 Exercise           Id, Name (unique, ignoring case and extra spaces), Measure (Weight | Time)
 Set                Id, SessionId, ExerciseId, Order,
                    StartedAt, StoppedAt         (empty when logged afterward)

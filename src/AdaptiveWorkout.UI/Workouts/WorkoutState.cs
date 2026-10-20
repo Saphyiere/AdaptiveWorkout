@@ -41,6 +41,15 @@ public sealed class WorkoutState
 
     public string Name => Template?.Name ?? "Workout";
 
+    /// <summary>Warming up: the workout started with a warm-up, and no exercise has started yet.</summary>
+    public bool WarmingUp => Session is { WarmUp: true, WarmUpEndedAt: null };
+
+    /// <summary>Cooling down, from Start cool-down until Finish.</summary>
+    public bool CoolingDown => Session.CoolDownStartedAt is not null;
+
+    /// <summary>A cool-down is planned and hasn't started, so finishing starts it instead.</summary>
+    public bool CoolDownNext => Session is { CoolDown: true, CoolDownStartedAt: null };
+
     public WorkoutSet? Running => Sets.Count > 0 && Sets[^1].StoppedAt is null ? Sets[^1] : null;
 
     /// <summary>The set the break screen logs: the last one, once stopped.</summary>

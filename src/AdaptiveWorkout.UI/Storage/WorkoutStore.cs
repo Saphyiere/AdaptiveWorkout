@@ -15,12 +15,12 @@ public sealed class WorkoutStore(string databasePath)
 {
     private const string Schema = """
         CREATE TABLE IF NOT EXISTS Routine (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS SessionTemplate (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, "Order" INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS SessionTemplate (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, "Order" INTEGER NOT NULL, WarmUp INTEGER NOT NULL DEFAULT 0, CoolDown INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS RoutineDay (RoutineId INTEGER NOT NULL REFERENCES Routine (Id) ON DELETE CASCADE, Day INTEGER NOT NULL, TemplateId INTEGER REFERENCES SessionTemplate (Id), PRIMARY KEY (RoutineId, Day));
         CREATE TABLE IF NOT EXISTS Setting (Key TEXT PRIMARY KEY, Value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS Exercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, NameKey TEXT NOT NULL UNIQUE, Measure INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS TemplateExercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, TemplateId INTEGER NOT NULL REFERENCES SessionTemplate (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, PlannedSets INTEGER, SupersetGroup INTEGER);
-        CREATE TABLE IF NOT EXISTS WorkoutSession (Id INTEGER PRIMARY KEY AUTOINCREMENT, TemplateId INTEGER REFERENCES SessionTemplate (Id), StartedAt TEXT NOT NULL, FinishedAt TEXT, LoggedAfterward INTEGER NOT NULL DEFAULT 0, Improvement REAL, ExercisesCompared INTEGER);
+        CREATE TABLE IF NOT EXISTS WorkoutSession (Id INTEGER PRIMARY KEY AUTOINCREMENT, TemplateId INTEGER REFERENCES SessionTemplate (Id), StartedAt TEXT NOT NULL, FinishedAt TEXT, LoggedAfterward INTEGER NOT NULL DEFAULT 0, Improvement REAL, ExercisesCompared INTEGER, WarmUp INTEGER NOT NULL DEFAULT 0, WarmUpEndedAt TEXT, CoolDown INTEGER NOT NULL DEFAULT 0, CoolDownStartedAt TEXT);
         CREATE TABLE IF NOT EXISTS WorkoutSet (Id INTEGER PRIMARY KEY AUTOINCREMENT, SessionId INTEGER NOT NULL REFERENCES WorkoutSession (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, StartedAt TEXT, StoppedAt TEXT, Weight REAL, WeightUnit INTEGER NOT NULL, Reps INTEGER, DurationSeconds INTEGER, HitGoal INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS FoodEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Calories INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS BodyWeightEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Weight REAL NOT NULL, WeightUnit INTEGER NOT NULL);
@@ -46,6 +46,18 @@ public sealed class WorkoutStore(string databasePath)
 
     // Workouts got their improvement (worked out once, after Finish) after the table existed.
     private const string SessionImprovement = "ALTER TABLE WorkoutSession ADD COLUMN Improvement REAL; ALTER TABLE WorkoutSession ADD COLUMN ExercisesCompared INTEGER;";
+
+    // Sessions got an optional warm-up and cool-down, and workouts the times of theirs, after the tables existed. All or nothing.
+    private const string WarmUpAndCoolDown = """
+        BEGIN;
+        ALTER TABLE SessionTemplate ADD COLUMN WarmUp INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE SessionTemplate ADD COLUMN CoolDown INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE WorkoutSession ADD COLUMN WarmUp INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE WorkoutSession ADD COLUMN WarmUpEndedAt TEXT;
+        ALTER TABLE WorkoutSession ADD COLUMN CoolDown INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE WorkoutSession ADD COLUMN CoolDownStartedAt TEXT;
+        COMMIT;
+        """;
 
     private const string ActiveRoutineKey = "ActiveRoutineId";
 
@@ -109,20 +121,20 @@ public sealed class WorkoutStore(string databasePath)
 
     /// <summary>Every session, whichever routines use them.</summary>
     public Task<List<SessionTemplate>> GetTemplatesAsync() => RunAsync(async c =>
-        (await c.QueryAsync<SessionTemplate>("""SELECT Id, Name, "Order" FROM SessionTemplate ORDER BY "Order", Id""")).AsList());
+        (await c.QueryAsync<SessionTemplate>("""SELECT Id, Name, "Order", WarmUp, CoolDown FROM SessionTemplate ORDER BY "Order", Id""")).AsList());
 
     public Task<SessionTemplate?> GetTemplateAsync(long id) => RunAsync(c =>
-        c.QueryFirstOrDefaultAsync<SessionTemplate?>("""SELECT Id, Name, "Order" FROM SessionTemplate WHERE Id = @id""", new { id }));
+        c.QueryFirstOrDefaultAsync<SessionTemplate?>("""SELECT Id, Name, "Order", WarmUp, CoolDown FROM SessionTemplate WHERE Id = @id""", new { id }));
 
     public Task<List<TemplateExercise>> GetTemplateExercisesAsync(long templateId) => RunAsync(async c =>
         (await c.QueryAsync<TemplateExercise>("""SELECT Id, TemplateId, ExerciseId, "Order", PlannedSets, SupersetGroup FROM TemplateExercise WHERE TemplateId = @templateId ORDER BY "Order" """, new { templateId })).AsList());
 
-    /// <summary>Saves a template's name and replaces its exercise list. A new template goes last.</summary>
+    /// <summary>Saves a template's name, warm-up and cool-down, and replaces its exercise list. A new template goes last.</summary>
     public Task SaveTemplateAsync(SessionTemplate template, IReadOnlyList<TemplateExercise> entries) => RunAsync(async c =>
     {
         await using var transaction = (SqliteTransaction)await c.BeginTransactionAsync();
-        if (template.Id == 0) template.Id = await c.ExecuteScalarAsync<long>("""INSERT INTO SessionTemplate (Name, "Order") VALUES (@Name, (SELECT COALESCE(MAX("Order"), -1) + 1 FROM SessionTemplate)); SELECT last_insert_rowid();""", template, transaction);
-        else await c.ExecuteAsync("UPDATE SessionTemplate SET Name = @Name WHERE Id = @Id", template, transaction);
+        if (template.Id == 0) template.Id = await c.ExecuteScalarAsync<long>("""INSERT INTO SessionTemplate (Name, "Order", WarmUp, CoolDown) VALUES (@Name, (SELECT COALESCE(MAX("Order"), -1) + 1 FROM SessionTemplate), @WarmUp, @CoolDown); SELECT last_insert_rowid();""", template, transaction);
+        else await c.ExecuteAsync("UPDATE SessionTemplate SET Name = @Name, WarmUp = @WarmUp, CoolDown = @CoolDown WHERE Id = @Id", template, transaction);
 
         foreach (var entry in entries) entry.TemplateId = template.Id;
         await c.ExecuteAsync("DELETE FROM TemplateExercise WHERE TemplateId = @Id", template, transaction);
@@ -145,17 +157,21 @@ public sealed class WorkoutStore(string databasePath)
     });
 
     public Task<List<WorkoutSession>> GetSessionsAsync() => RunAsync(async c =>
-        (await c.QueryAsync<WorkoutSession>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared FROM WorkoutSession ORDER BY Id")).AsList());
+        (await c.QueryAsync<WorkoutSession>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared, WarmUp, WarmUpEndedAt, CoolDown, CoolDownStartedAt FROM WorkoutSession ORDER BY Id")).AsList());
 
     /// <summary>One workout, or null when there's none with that id.</summary>
     public Task<WorkoutSession?> GetSessionAsync(long id) => RunAsync(c =>
-        c.QueryFirstOrDefaultAsync<WorkoutSession?>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared FROM WorkoutSession WHERE Id = @id", new { id }));
+        c.QueryFirstOrDefaultAsync<WorkoutSession?>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared, WarmUp, WarmUpEndedAt, CoolDown, CoolDownStartedAt FROM WorkoutSession WHERE Id = @id", new { id }));
 
     /// <summary>Saves a new session and fills in its Id.</summary>
     public Task StartSessionAsync(WorkoutSession session) => RunAsync(async c =>
-        session.Id = await c.ExecuteScalarAsync<long>("INSERT INTO WorkoutSession (TemplateId, StartedAt) VALUES (@TemplateId, @StartedAt); SELECT last_insert_rowid();", session));
+        session.Id = await c.ExecuteScalarAsync<long>("INSERT INTO WorkoutSession (TemplateId, StartedAt, WarmUp, CoolDown) VALUES (@TemplateId, @StartedAt, @WarmUp, @CoolDown); SELECT last_insert_rowid();", session));
 
     public Task FinishSessionAsync(WorkoutSession session) => RunAsync(c => c.ExecuteAsync("UPDATE WorkoutSession SET FinishedAt = @FinishedAt WHERE Id = @Id", session));
+
+    /// <summary>Saves when the warm-up ended and the cool-down started. The session may still be waiting to be saved; its Id is read when this runs.</summary>
+    public Task SaveWarmUpAndCoolDownAsync(WorkoutSession session) =>
+        RunAsync(c => c.ExecuteAsync("UPDATE WorkoutSession SET WarmUpEndedAt = @WarmUpEndedAt, CoolDownStartedAt = @CoolDownStartedAt WHERE Id = @Id", session));
 
     public Task SaveImprovementAsync(WorkoutSession session) =>
         RunAsync(c => c.ExecuteAsync("UPDATE WorkoutSession SET Improvement = @Improvement, ExercisesCompared = @ExercisesCompared WHERE Id = @Id", session));
@@ -246,6 +262,7 @@ public sealed class WorkoutStore(string databasePath)
                     await connection.ExecuteAsync(Schema);
                     if (await connection.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM pragma_table_info('SessionTemplate') WHERE name = 'RoutineId'") > 0) await connection.ExecuteAsync(SessionsWithoutRoutine);
                     if (await connection.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM pragma_table_info('WorkoutSession') WHERE name = 'Improvement'") == 0) await connection.ExecuteAsync(SessionImprovement);
+                    if (await connection.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM pragma_table_info('WorkoutSession') WHERE name = 'WarmUp'") == 0) await connection.ExecuteAsync(WarmUpAndCoolDown);
                     schemaReady = true;
                 }
 

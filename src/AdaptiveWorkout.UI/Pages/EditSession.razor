@@ -17,6 +17,14 @@
 
         <section class="stack" aria-labelledby="exercises-heading">
             <h2 id="exercises-heading" class="label">Exercises, in order</h2>
+            @* A warm-up and a cool-down sit where they happen: before the first exercise and after the last. *@
+            <label class="goal">
+                <input type="checkbox" @bind="template.WarmUp" />
+                <span class="row-text">
+                    <span class="name">Warm-up first</span>
+                    <span class="note">Timed, with heart rate. The big button then starts the first exercise.</span>
+                </span>
+            </label>
             @if (entries.Count == 0)
             {
                 <p class="note">Add the exercises you do in this session. Start workout goes through them in this order.</p>
@@ -73,6 +81,13 @@
                     }
                 </div>
             }
+            <label class="goal">
+                <input type="checkbox" @bind="template.CoolDown" />
+                <span class="row-text">
+                    <span class="name">Cool-down last</span>
+                    <span class="note">Timed, with heart rate, from after the last exercise until Finish.</span>
+                </span>
+            </label>
         </section>
 
         <div class="field-group">
