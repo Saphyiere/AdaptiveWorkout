@@ -39,32 +39,52 @@
                 </div>
             </div>
         }
-        else if (state.Running is { } running)
+        else if (state.Running is [var first, ..] running)
         {
-            var exercise = state.Exercises[running.ExerciseId];
-            var step = state.Describe(running);
-            var history = state.History(running.ExerciseId);
-            var firstToday = state.Sets.First(s => s.ExerciseId == running.ExerciseId);
+            var step = state.Describe(first);
+            var round = running.Count > 1;
+            var measure = state.Exercises[first.ExerciseId].Measure;
             @* Keyed by the set, so each new step is a fresh element and its entrance animation plays. *@
-            <div class="step" @key="@($"running-{running.Order}")">
+            <div class="step" @key="@($"running-{first.Order}")">
                 <div class="stack tight">
                     <p class="label">@WorkoutState.StepLabel(step)</p>
-                    <div class="spread">
-                        <h1 class="title">@exercise.Name</h1>
-                        <a class="btn-ghost" href="workout/change">Change</a>
-                    </div>
-                    @if (state.SuggestionFor(firstToday)?.RaisedForGoal == true)
+                    @if (round)
                     {
-                        <p class="pen-note">@SetSummary.WeightText(firstToday.Weight) @Unit(firstToday.WeightUnit) today: you hit your goal last time</p>
+                        @* A superset's round: its exercises side by side, done back to back with one time and one Stop. *@
+                        <h1 class="sr-only">@state.Names(running.Select(s => s.ExerciseId))</h1>
+                        <div class="split" style="--parts: @running.Count">
+                            @foreach (var set in running)
+                            {
+                                <div class="split-part">
+                                    <p class="title small" aria-hidden="true">@state.Exercises[set.ExerciseId].Name</p>
+                                    <a class="btn-ghost" href="workout/change?exercise=@set.ExerciseId" aria-label="Change @state.Exercises[set.ExerciseId].Name">Change</a>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="spread">
+                            <h1 class="title">@state.Exercises[first.ExerciseId].Name</h1>
+                            <a class="btn-ghost" href="workout/change">Change</a>
+                        </div>
+                    }
+                    @foreach (var set in running)
+                    {
+                        var firstToday = state.Sets.First(s => s.ExerciseId == set.ExerciseId);
+                        @if (state.SuggestionFor(firstToday)?.RaisedForGoal == true)
+                        {
+                            <p class="pen-note">@(round ? $"{state.Exercises[set.ExerciseId].Name}: " : "")@SetSummary.WeightText(firstToday.Weight) @Unit(firstToday.WeightUnit) today: you hit your goal last time</p>
+                        }
                     }
                 </div>
 
-                <section class="block bare" aria-label="@(exercise.Measure == ExerciseMeasure.Time ? "Time" : "Set time")">
-                    <p class="inline"><span class="live-dot"></span><span class="label">@(exercise.Measure == ExerciseMeasure.Time ? "Time" : "Set")</span></p>
-                    <Clock Since="running.StartedAt!.Value" Class="number xl" />
+                <section class="block bare" aria-label="@(round ? "Round time" : measure == ExerciseMeasure.Time ? "Time" : "Set time")">
+                    <p class="inline"><span class="live-dot"></span><span class="label">@(round ? "Round" : measure == ExerciseMeasure.Time ? "Time" : "Set")</span></p>
+                    <Clock Since="first.StartedAt!.Value" Class="number xl" />
                     @if (Theme == Theme.Telemetry)
                     {
-                        <SecondsRuler Since="running.StartedAt!.Value" />
+                        <SecondsRuler Since="first.StartedAt!.Value" />
                     }
                 </section>
 
@@ -74,13 +94,43 @@
 
                 <section class="block" aria-labelledby="history-heading">
                     <h2 id="history-heading" class="label">Last 3 times</h2>
-                    @if (history.Count == 0)
+                    @if (round)
+                    {
+                        <div class="split" style="--parts: @running.Count">
+                            @foreach (var set in running)
+                            {
+                                var exercise = state.Exercises[set.ExerciseId];
+                                var history = state.History(set.ExerciseId);
+                                <div class="split-part">
+                                    <p class="name">@exercise.Name</p>
+                                    @if (history.Count == 0)
+                                    {
+                                        <p class="note">First time doing this one.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="ledger split-ledger">
+                                            @foreach (var past in history)
+                                            {
+                                                <div class="row-text">
+                                                    <span class="caption">@past.Session.StartedAt.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</span>
+                                                    <span class="name tabular">@SetSummary.Format(past.Sets, exercise.Measure)</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (state.History(first.ExerciseId) is { Count: 0 })
                     {
                         <p class="note">First time doing this one.</p>
                     }
                     else
                     {
                         // A column per set when they were all at one weight, so last time reads like a results table.
+                        var history = state.History(first.ExerciseId);
                         var columns = Math.Min(5, history.Max(h => h.Sets.Count));
                         <div class="ledger">
                             @foreach (var past in history)
@@ -88,7 +138,7 @@
                                 var weights = past.Sets.Select(s => s.Weight).Distinct().ToList();
                                 <div class="past" style="--columns: @columns">
                                     <span class="caption past-date">@past.Session.StartedAt.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</span>
-                                    @if (exercise.Measure == ExerciseMeasure.Weight && weights.Count == 1 && past.Sets.Count <= columns)
+                                    @if (measure == ExerciseMeasure.Weight && weights.Count == 1 && past.Sets.Count <= columns)
                                     {
                                         @for (var i = 0; i < columns; i++)
                                         {
@@ -98,7 +148,7 @@
                                     }
                                     else
                                     {
-                                        <span class="name tabular past-summary">@SetSummary.Format(past.Sets, exercise.Measure)</span>
+                                        <span class="name tabular past-summary">@SetSummary.Format(past.Sets, measure)</span>
                                     }
                                 </div>
                             }
@@ -113,82 +163,54 @@
         }
         else if (state.ToLog is { } logged)
         {
-            var handoff = state.Next is { AfterBreak: false };
             var toConfirm = state.ToConfirm;
             <div class="step" @key="@($"break-{logged.Order}")">
-                @if (handoff && state.Next is { } next)
+                <section class="block bare" aria-label="Rest">
+                    <RestTimer Since="logged.StoppedAt!.Value" ExerciseId="logged.ExerciseId" NextName="@(state.Next is { } upNext ? state.Names(upNext.ExerciseIds) : null)" OnZero="StartNext" />
+                </section>
+
+                <section class="block" aria-label="Heart rate">
+                    <HeartRate />
+                </section>
+
+                @foreach (var set in toConfirm)
                 {
-                    @* Mid-superset: straight on to the other half. Both are entered at the rest after the round. *@
-                    var exercise = state.Exercises[logged.ExerciseId];
-                    var nextExercise = state.Exercises[next.ExerciseId];
-                    var last = state.History(next.ExerciseId).FirstOrDefault();
-                    <div class="stack tight">
-                        <p class="label">@WorkoutState.StepLabel(state.Describe(logged))</p>
-                        <h1 class="title">@exercise.Name done</h1>
-                        <p class="note">@TimeText.Format(logged.StoppedAt!.Value - logged.StartedAt!.Value). No break inside a superset: you'll enter the round at the rest.</p>
-                    </div>
+                    <SetEntry State="state" Set="set" OnSaved="() => { }" @key="set.Order" />
+                }
 
-                    <section class="block" aria-label="Heart rate">
-                        <HeartRate />
-                    </section>
-
-                    <section class="block" aria-labelledby="next-heading">
-                        <h2 id="next-heading" class="label">Up next</h2>
-                        <div class="spread baseline">
-                            <span class="name big">@nextExercise.Name</span>
-                            <span class="note">@(last is null ? "first time" : $"last: {SetSummary.Format(last.Sets, nextExercise.Measure)}")</span>
+                @if (toConfirm.Count == 0)
+                {
+                    @* Everything entered: the rest screen becomes a look at the whole workout so far. *@
+                    <section class="block appear" aria-labelledby="today-heading">
+                        <div class="spread">
+                            <h2 id="today-heading" class="label">Today so far</h2>
+                            <button type="button" class="btn-ghost" @onclick="Flow.EditRound">Edit</button>
+                        </div>
+                        <div class="ledger">
+                            @if (state.Session.WarmUpEndedAt is { } warmedUpAt)
+                            {
+                                <div class="spread row">
+                                    <span class="name big">Warm-up</span>
+                                    <span class="name big tabular">@TimeText.Format(warmedUpAt - state.Session.StartedAt)</span>
+                                </div>
+                            }
+                            @foreach (var exerciseSets in state.Sets.Where(s => s.StoppedAt is not null).GroupBy(s => s.ExerciseId))
+                            {
+                                var exercise = state.Exercises[exerciseSets.Key];
+                                <div class="spread row">
+                                    <span class="inline name big">
+                                        @exercise.Name
+                                        @if (exerciseSets.Any(s => s.HitGoal))
+                                        {
+                                            <Mark Kind="MarkKind.Tick" Size="22" />
+                                            <span class="sr-only">, hit goal</span>
+                                        }
+                                    </span>
+                                    <span class="name big tabular">@SetSummary.Format([.. exerciseSets], exercise.Measure)</span>
+                                </div>
+                            }
                         </div>
                     </section>
-                }
-                else
-                {
-                    <section class="block bare" aria-label="Rest">
-                        <RestTimer Since="logged.StoppedAt!.Value" ExerciseId="logged.ExerciseId" NextName="@(state.Next is { } upNext ? state.Exercises[upNext.ExerciseId].Name : null)" OnZero="StartNext" />
-                    </section>
-
-                    <section class="block" aria-label="Heart rate">
-                        <HeartRate />
-                    </section>
-
-                    @foreach (var set in toConfirm)
-                    {
-                        <SetEntry State="state" Set="set" OnSaved="() => { }" @key="set.Order" />
-                    }
-
-                    @if (toConfirm.Count == 0)
-                    {
-                        @* Everything entered: the rest screen becomes a look at the whole workout so far. *@
-                        <section class="block appear" aria-labelledby="today-heading">
-                            <div class="spread">
-                                <h2 id="today-heading" class="label">Today so far</h2>
-                                <button type="button" class="btn-ghost" @onclick="Flow.EditRound">Edit</button>
-                            </div>
-                            <div class="ledger">
-                                @if (state.Session.WarmUpEndedAt is { } warmedUpAt)
-                                {
-                                    <div class="spread row">
-                                        <span class="name big">Warm-up</span>
-                                        <span class="name big tabular">@TimeText.Format(warmedUpAt - state.Session.StartedAt)</span>
-                                    </div>
-                                }
-                                @foreach (var exerciseSets in state.Sets.Where(s => s.StoppedAt is not null).GroupBy(s => s.ExerciseId))
-                                {
-                                    var exercise = state.Exercises[exerciseSets.Key];
-                                    <div class="spread row">
-                                        <span class="inline name big">
-                                            @exercise.Name
-                                            @if (exerciseSets.Any(s => s.HitGoal))
-                                            {
-                                                <Mark Kind="MarkKind.Tick" Size="22" />
-                                                <span class="sr-only">, hit goal</span>
-                                            }
-                                        </span>
-                                        <span class="name big tabular">@SetSummary.Format([.. exerciseSets], exercise.Measure)</span>
-                                    </div>
-                                }
-                            </div>
-                        </section>
-                    }
                 }
 
                 <div class="push-down">

@@ -10,9 +10,13 @@
     var next = state.Next;
     var running = state.Running;
     var stopped = state.Sets.Where(s => s.StoppedAt is not null).ToList();
-    var planIds = state.Plan.Select(e => e.ExerciseId).ToHashSet();
-    var extraIds = stopped.Select(s => s.ExerciseId).Where(id => !planIds.Contains(id)).Distinct().ToList();
-    var current = state.WarmingUp || state.CoolingDown ? null : running?.ExerciseId ?? next?.ExerciseId;
+    var blocks = WorkoutPlan.Blocks(state.Plan);
+    var counted = state.CountedSets();
+    var extra = stopped.Where(s => !counted.Any(c => c.Contains(s))).ToList();
+
+    // The entry on now: the running set's (or round's), else the next step's. An exercise can be in the plan twice.
+    var currentBlock = state.WarmingUp || state.CoolingDown ? -1 : running.Count > 0 ? counted.FindIndex(c => c.Contains(running[0])) : state.NextBlock ?? -1;
+    HashSet<long> current = running.Count > 0 ? [.. running.Select(s => s.ExerciseId)] : [.. next?.ExerciseIds ?? []];
     <div class="screen">
         <WorkoutHeader State="state" Advanced="true" OnFinish="FinishAsync" />
 
@@ -47,8 +51,11 @@
                         </span>
                     </div>
                 }
-                @foreach (var block in WorkoutPlan.Blocks(state.Plan))
+                @for (var b = 0; b < blocks.Count; b++)
                 {
+                    var block = blocks[b];
+                    var blockSets = counted[b];
+                    var isCurrentBlock = b == currentBlock;
                     <div class="@(block.Count > 1 ? "superset" : "")">
                         @if (block.Count > 1)
                         {
@@ -57,8 +64,8 @@
                         @foreach (var entry in block)
                         {
                             var exercise = state.Exercises[entry.ExerciseId];
-                            var done = stopped.Where(s => s.ExerciseId == entry.ExerciseId).ToList();
-                            var isCurrent = current == entry.ExerciseId;
+                            var done = blockSets.Where(s => s.ExerciseId == entry.ExerciseId && s.StoppedAt is not null).ToList();
+                            var isCurrent = isCurrentBlock && current.Contains(entry.ExerciseId);
                             var last = done.Count == 0 ? state.History(entry.ExerciseId).FirstOrDefault() : null;
                             <div class="row @(isCurrent ? "picked" : "")">
                                 <span class="status">
@@ -117,19 +124,19 @@
             </section>
         }
 
-        @if (extraIds.Count > 0)
+        @if (extra.Count > 0)
         {
             <section class="stack" aria-labelledby="extra-heading">
                 <h2 id="extra-heading" class="label">@(state.Plan.Count > 0 ? "Also done" : "Done so far")</h2>
                 <div class="ledger">
-                    @foreach (var id in extraIds)
+                    @foreach (var sets in extra.GroupBy(s => s.ExerciseId))
                     {
-                        var exercise = state.Exercises[id];
+                        var exercise = state.Exercises[sets.Key];
                         <div class="row">
                             <span class="status"><Mark Kind="MarkKind.Tick" Size="28" /></span>
                             <span class="row-text">
                                 <span class="name">@exercise.Name</span>
-                                <span class="caption">@SetSummary.Format([.. stopped.Where(s => s.ExerciseId == id)], exercise.Measure)</span>
+                                <span class="caption">@SetSummary.Format([.. sets], exercise.Measure)</span>
                             </span>
                         </div>
                     }
@@ -138,16 +145,16 @@
         }
 
         <div class="grid-2">
-            <button type="button" class="btn tall" disabled="@(running is not null || stopped.Count == 0)" @onclick="AddSet">Add a set</button>
-            <button type="button" class="btn tall" disabled="@(running is not null)" @onclick="@(() => Navigation.Open("workout/exercise"))">Different exercise</button>
-            <button type="button" class="btn tall" disabled="@(running is not null || next is null || state.Plan.Count == 0)" @onclick="() => Flow.Skip(next!.ExerciseId)">Skip @(next is null ? "exercise" : state.Exercises[next.ExerciseId].Name)</button>
+            <button type="button" class="btn tall" disabled="@(running.Count > 0 || stopped.Count == 0)" @onclick="AddSet">Add a set</button>
+            <button type="button" class="btn tall" disabled="@(running.Count > 0)" @onclick="@(() => Navigation.Open("workout/exercise"))">Different exercise</button>
+            <button type="button" class="btn tall" disabled="@(running.Count > 0 || next is null || state.Plan.Count == 0)" @onclick="() => Flow.Skip(next!.ExerciseIds)">Skip @(next is null ? "exercise" : state.Names(next.ExerciseIds))</button>
             <a class="btn tall" href="workout" @onclick="@(() => Navigation.Replace("workout"))" @onclick:preventDefault>Back to simple</a>
         </div>
 
         <div class="push-down">
-            @if (running is not null)
+            @if (running.Count > 0)
             {
-                <button type="button" class="btn-primary stop" @onclick="Stop">Stop @state.Exercises[running.ExerciseId].Name</button>
+                <button type="button" class="btn-primary stop" @onclick="Stop">Stop @state.Names(running.Select(s => s.ExerciseId))</button>
             }
             else
             {
@@ -172,9 +179,10 @@
 
     public void Dispose() => Flow.Changed -= OnFlowChanged;
 
+    // Another set of the last exercise, or another round of its superset.
     private void AddSet()
     {
-        Flow.StartSet(state!.Exercises[state.Sets[^1].ExerciseId]);
+        Flow.StartAnother();
         Navigation.Replace("workout");
     }
 

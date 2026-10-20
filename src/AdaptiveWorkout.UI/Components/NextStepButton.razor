@@ -9,24 +9,39 @@
 }
 else if (State.Next is { } next)
 {
-    var exercise = State.Exercises[next.ExerciseId];
-    var sameExercise = State.ToLog?.ExerciseId == next.ExerciseId;
-    @if (State.Plan.Count > 0)
+    // Going on with what I just did reads "Start set 3" (or round); anything else, its name.
+    var goingOn = State.LastRound.Select(s => s.ExerciseId).SequenceEqual(next.ExerciseIds);
+    var names = State.Names(next.ExerciseIds);
+    @if (State.Plan.Count > 0 && next.IsRound)
+    {
+        @* A superset's round: each of its exercises can be changed on its own. *@
+        <div class="stack tight next-step">
+            <p class="label">Next · @WorkoutState.StepLabel(next)</p>
+            @foreach (var exerciseId in next.ExerciseIds)
+            {
+                <div class="spread">
+                    <p class="body">@State.Exercises[exerciseId].Name</p>
+                    <a class="btn-ghost" href="workout/change?exercise=@exerciseId" aria-label="Change @State.Exercises[exerciseId].Name">Change</a>
+                </div>
+            }
+        </div>
+    }
+    else if (State.Plan.Count > 0)
     {
         <div class="spread next-step">
             <div class="row-text">
                 <p class="label">Next</p>
-                <p class="body">@exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+                <p class="body">@names, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
             </div>
             <a class="btn-ghost" href="workout/change">Change</a>
         </div>
     }
     else
     {
-        <p class="note center">Next: @exercise.Name, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+        <p class="note center">Next: @names, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
     }
 
-    @* Other ways on sit above the big button, which stays in the same place on every screen. The warm-up has nothing to move on from. *@
+    @* Other ways on sit above the big button, which stays in the same place on every screen. *@
     @if (State.Plan.Count == 0)
     {
         <div class="grid-2">
@@ -34,19 +49,22 @@ else if (State.Next is { } next)
             <button type="button" class="btn tall" @onclick="FinishAsync">@FinishText</button>
         </div>
     }
-    else if (State is { CanMoveOn: true, WarmingUp: false, MoveOn: { } moveOn })
+    else if (State is { CanMoveOn: true, MoveOn: { } moveOn })
     {
-        var after = State.Exercises[moveOn.ExerciseId];
-        <button type="button" class="btn tall" @onclick="() => Start(after)">Move on to @after.Name</button>
+        <button type="button" class="btn tall" @onclick="() => Start(moveOn)">Move on to @State.Names(moveOn.ExerciseIds)</button>
     }
-    else if (State is { CanMoveOn: true, WarmingUp: false })
+    else if (State.CanMoveOn)
     {
         <div class="grid-2">
             <a class="btn tall" href="workout/add">Add more</a>
             <button type="button" class="btn tall" @onclick="FinishAsync">@FinishText</button>
         </div>
     }
-    <button type="button" class="btn-primary go" @onclick="() => Start(exercise)">@(sameExercise ? $"Start set {next.SetNumber}" : $"Start {exercise.Name}")</button>
+    else if (!goingOn && CanGoOn)
+    {
+        <button type="button" class="btn tall" @onclick="StartAnotherAsync">@(State.LastRound is [var only] ? $"Another set of {State.Exercises[only.ExerciseId].Name}" : "Another round")</button>
+    }
+    <button type="button" class="btn-primary go" @onclick="() => Start(next)">@(goingOn ? $"Start {(next.IsRound ? "round" : "set")} {next.SetNumber}" : $"Start {names}")</button>
 }
 else if (State.WarmingUp)
 {
@@ -54,8 +72,18 @@ else if (State.WarmingUp)
 }
 else
 {
-    <p class="note center">Every planned exercise is done.</p>
-    <a class="btn tall" href="workout/add">Add more</a>
+    <p class="note center">@(State.StillToDo().Count == 0 ? "Every planned exercise is done." : "That's the end of the plan.")</p>
+    @if (CanGoOn)
+    {
+        <div class="grid-2">
+            <button type="button" class="btn tall" @onclick="StartAnotherAsync">@(State.LastRound.Count > 1 ? "Another round" : "Another set")</button>
+            <a class="btn tall" href="workout/add">Add more</a>
+        </div>
+    }
+    else
+    {
+        <a class="btn tall" href="workout/add">Add more</a>
+    }
     <button type="button" class="btn-primary @(State.CoolDownNext ? "go" : "save")" @onclick="FinishAsync">@FinishText</button>
 }
 
@@ -69,9 +97,18 @@ else
 
     private string FinishText => State.CoolDownNext ? "Start cool-down" : "Finish workout";
 
-    private Task Start(Exercise exercise)
+    // More of what I just did, past its sets, while its exercises are still in today's plan.
+    private bool CanGoOn => State.LastRound is [_, ..] round && round.All(s => State.Plan.Any(e => e.ExerciseId == s.ExerciseId));
+
+    private Task Start(PlanStep step)
     {
-        Flow.StartSet(exercise);
+        Flow.StartSets(step.ExerciseIds);
+        return OnStarted.InvokeAsync();
+    }
+
+    private Task StartAnotherAsync()
+    {
+        Flow.StartAnother();
         return OnStarted.InvokeAsync();
     }
 

@@ -33,9 +33,31 @@ public static class PlanEdits
         return Build(blocks, (moving, rounds));
     }
 
+    /// <summary>
+    /// <see cref="DoFirst(IReadOnlyList{TemplateExercise}, long, long)"/> for a block already started, at this index in
+    /// <see cref="WorkoutPlan.Blocks"/>: what's done of it stays where it is, the other exercise (with its superset) goes right
+    /// after, and the rest of the block comes back after that with the sets still to do; with no count, as many as I like.
+    /// </summary>
+    public static List<TemplateExercise> DoFirst(IReadOnlyList<TemplateExercise> plan, long exerciseId, int block, int setsDone, int? setsLeft)
+    {
+        var blocks = WorkoutPlan.Blocks(plan);
+        var waiting = blocks[block];
+        var moving = blocks.Find(b => b != waiting && b.Any(e => e.ExerciseId == exerciseId));
+        if (moving is null) return Build(blocks);
+
+        var picked = moving.Find(e => e.ExerciseId == exerciseId)!;
+        var led = (List<TemplateExercise>)[picked, .. moving.Where(e => e != picked)];
+        blocks.Remove(moving);
+        var at = blocks.IndexOf(waiting);
+        blocks[at] = [.. waiting.Select((e, i) => With(e, e.ExerciseId, i == 0 ? setsDone : null))];
+        blocks.Insert(at + 1, [.. led.Select((e, i) => With(e, e.ExerciseId, i == 0 ? moving[0].PlannedSets : null))]);
+        blocks.Insert(at + 2, [.. waiting.Select((e, i) => With(e, e.ExerciseId, i == 0 ? setsLeft : null))]);
+        return Build(blocks);
+    }
+
     /// <summary>Puts another exercise in one's place: same spot, same sets, same superset.</summary>
     public static List<TemplateExercise> Swap(IReadOnlyList<TemplateExercise> plan, long exerciseId, long newExerciseId) =>
-        Build(WorkoutPlan.Blocks(plan).Select(b => b.Select(e => e.ExerciseId == exerciseId ? With(e, newExerciseId) : e).ToList()));
+        Build(WorkoutPlan.Blocks(plan).Select(b => b.Select(e => e.ExerciseId == exerciseId ? With(e, newExerciseId, e.PlannedSets) : e).ToList()));
 
     /// <summary>Leaves an exercise out. The rest of its superset keeps the rounds.</summary>
     public static List<TemplateExercise> Drop(IReadOnlyList<TemplateExercise> plan, long exerciseId)
@@ -47,6 +69,17 @@ public static class PlanEdits
         var rounds = block[0].PlannedSets;
         block.RemoveAll(e => e.ExerciseId == exerciseId);
         return Build(blocks, (block, rounds));
+    }
+
+    /// <summary>
+    /// Adds an exercise as its own entry right after the block at this index in <see cref="WorkoutPlan.Blocks"/> (an exercise, or a
+    /// whole superset), e.g. one picked from the list in that one's place; with no index, after everything else.
+    /// </summary>
+    public static List<TemplateExercise> InsertAfter(IReadOnlyList<TemplateExercise> plan, long exerciseId, int? block)
+    {
+        var blocks = WorkoutPlan.Blocks(plan);
+        blocks.Insert(block is int at ? at + 1 : blocks.Count, [new TemplateExercise { ExerciseId = exerciseId }]);
+        return Build(blocks);
     }
 
     /// <summary>Adds exercises after everything else, e.g. a whole other session. Its supersets stay their own.</summary>
@@ -71,6 +104,6 @@ public static class PlanEdits
         return plan;
     }
 
-    private static TemplateExercise With(TemplateExercise entry, long exerciseId) =>
-        new() { ExerciseId = exerciseId, Order = entry.Order, PlannedSets = entry.PlannedSets, SupersetGroup = entry.SupersetGroup };
+    private static TemplateExercise With(TemplateExercise entry, long exerciseId, int? plannedSets) =>
+        new() { ExerciseId = exerciseId, Order = entry.Order, PlannedSets = plannedSets, SupersetGroup = entry.SupersetGroup };
 }

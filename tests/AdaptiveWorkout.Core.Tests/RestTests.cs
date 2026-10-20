@@ -4,7 +4,7 @@ namespace AdaptiveWorkout.Core.Tests;
 
 public class RestTests
 {
-    private const long Rows = 1, Pulldown = 2;
+    private const long Rows = 1, Pulldown = 2, PullUps = 3, Dips = 4;
 
     private static readonly DateTimeOffset Start = new(2026, 10, 16, 18, 0, 0, TimeSpan.FromHours(-4));
 
@@ -36,6 +36,19 @@ public class RestTests
 
         Assert.Equal(TimeSpan.FromSeconds(60), Rest.Typical(sets, Rows));
         Assert.Equal(TimeSpan.FromSeconds(150), Rest.Typical(sets, Pulldown));
+    }
+
+    [Fact]
+    public void Typical_ASupersetRestsAfterEachRound_WhoseSetsStartAndStopTogether()
+    {
+        // Three rounds of a minute each, every 150 seconds: a 90-second rest after each, kept with the round's last exercise.
+        var sets = new List<WorkoutSet>();
+        for (var round = 0; round < 3; round++)
+        {
+            foreach (var exerciseId in new[] { PullUps, Dips }) sets.Add(new WorkoutSet { ExerciseId = exerciseId, Order = sets.Count + 1, StartedAt = Start.AddSeconds(round * 150), StoppedAt = Start.AddSeconds(round * 150 + 60) });
+        }
+
+        Assert.Equal(TimeSpan.FromSeconds(90), Rest.Typical(sets, Dips));
     }
 
     [Fact]

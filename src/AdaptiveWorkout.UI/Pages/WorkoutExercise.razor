@@ -40,13 +40,13 @@
     {
         state = Flow.Current ?? await Flow.LoadAsync();
         if (state is null) await Navigation.HomeAsync();
-        else if (state.Running is not null) await Navigation.ReturnToAsync("workout");
+        else if (state.Running.Count > 0) await Navigation.ReturnToAsync("workout");
     }
 
     // Back to the workout this was opened from, or, before the first set, on to it in this screen's place.
     private Task StartAsync(Exercise exercise)
     {
-        Flow.StartSet(exercise);
+        Flow.StartPicked(exercise);
         return Navigation.ReturnToAsync("workout");
     }
 

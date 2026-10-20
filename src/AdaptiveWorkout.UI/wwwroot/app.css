@@ -1201,6 +1201,42 @@ select.field {
     grid-column: 2 / -1;
 }
 
+/* A superset's exercises side by side, one round done back to back, with a hairline between them. */
+.split {
+    display: grid;
+    grid-template-columns: repeat(var(--parts), minmax(0, 1fr));
+}
+
+.split-part {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.split-part:not(:last-child) {
+    padding-right: 12px;
+}
+
+.split-part + .split-part {
+    padding-left: 12px;
+    border-left: 1px solid var(--rule);
+}
+
+/* Change under each name, its words in line with the name's. */
+.split-part > .btn-ghost {
+    margin-left: -8px;
+}
+
+.split-part > .ledger {
+    align-self: stretch;
+}
+
+.split-ledger > .row-text {
+    padding: 6px 0;
+}
+
 /* Up and down beside a change: a small triangle, never color. */
 .delta {
     display: inline-flex;
@@ -2156,6 +2192,17 @@ a.link {
 [data-theme="telemetry"] .past > .past-date {
     font-size: 13px;
     line-height: 18px;
+}
+
+/* A superset's names, smaller than one exercise's so both fit. */
+[data-theme="telemetry"] .split .title {
+    font-size: 24px;
+    line-height: 28px;
+}
+
+/* Its quiet links have no padding to make up for. */
+[data-theme="telemetry"] .split-part > .btn-ghost {
+    margin-left: 0;
 }
 
 [data-theme="telemetry"] .past > .past-at {

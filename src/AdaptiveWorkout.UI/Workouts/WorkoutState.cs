@@ -50,13 +50,20 @@ public sealed class WorkoutState
     /// <summary>A cool-down is planned and hasn't started, so finishing starts it instead.</summary>
     public bool CoolDownNext => Session is { CoolDown: true, CoolDownStartedAt: null };
 
-    public WorkoutSet? Running => Sets.Count > 0 && Sets[^1].StoppedAt is null ? Sets[^1] : null;
+    /// <summary>The sets running now, which stop together: one, or a superset's round. Empty between sets.</summary>
+    public List<WorkoutSet> Running => [.. Sets.Where(s => s.StoppedAt is null)];
 
     /// <summary>The set the break screen logs: the last one, once stopped.</summary>
     public WorkoutSet? ToLog => Sets.Count > 0 && Sets[^1].StoppedAt is not null ? Sets[^1] : null;
 
+    /// <summary>The last set and any started with it (a superset's round), once stopped. Empty before the first.</summary>
+    public List<WorkoutSet> LastRound => ToLog is { } last ? Sets[(Sets.FindLastIndex(s => s.StartedAt != last.StartedAt) + 1)..] : [];
+
     /// <summary>What the big button offers after the sets stopped so far.</summary>
     public PlanStep? Next { get; private set; }
+
+    /// <summary>Where <see cref="Next"/> is in the plan: its block's index in <see cref="WorkoutPlan.Blocks"/>; null when there's none.</summary>
+    public int? NextBlock { get; private set; }
 
     /// <summary>
     /// When the next step has no set count (nothing planned, nothing to go on from last time), I may be done with it:
@@ -64,15 +71,25 @@ public sealed class WorkoutState
     /// </summary>
     public PlanStep? MoveOn { get; private set; }
 
-    /// <summary>True when <see cref="Next"/> is open-ended and starts a new round, so the screen also offers to move on.</summary>
+    /// <summary>True when <see cref="Next"/> goes on with what I just did and has no count, so the screen also offers to move on.</summary>
     public bool CanMoveOn { get; private set; }
 
-    /// <summary>The exercise Change applies to: the running set's, else the next step's.</summary>
-    public long? ChangeTarget => Running?.ExerciseId ?? Next?.ExerciseId;
+    /// <summary>The exercise Change applies to when none is named: the running set's, else the next step's (a superset's first).</summary>
+    public long? ChangeTarget => Running.FirstOrDefault()?.ExerciseId ?? Next?.ExerciseId;
 
-    /// <summary>Exercises still to do in the plan, in order, supersets together.</summary>
+    /// <summary>Exercises still to do in the plan, in order, supersets together; ones I went past too.</summary>
     public List<long> StillToDo() =>
         [.. WorkoutPlan.Open(Plan, [.. Sets.Where(s => s.StoppedAt is not null)], setsLastTime, Skipped).SelectMany(o => o.Members).Select(e => e.ExerciseId)];
+
+    /// <summary>What starts this exercise now: its superset's round when it's in one still to do, else a set of it alone.</summary>
+    public IReadOnlyList<long> RoundOf(long exerciseId) =>
+        WorkoutPlan.Open(Plan, [.. Sets.Where(s => s.StoppedAt is not null)], setsLastTime, Skipped).Select(o => o.Step.ExerciseIds).FirstOrDefault(ids => ids.Contains(exerciseId)) ?? [exerciseId];
+
+    /// <summary>The sets each block of the plan counted, running ones too, in the order of <see cref="WorkoutPlan.Blocks"/>.</summary>
+    public List<List<WorkoutSet>> CountedSets() => WorkoutPlan.Counted(Plan, Sets, setsLastTime);
+
+    /// <summary>The exercises' names, joined: "Pull-ups + Dips".</summary>
+    public string Names(IEnumerable<long> exerciseIds) => string.Join(" + ", exerciseIds.Select(id => Exercises[id].Name));
 
     /// <summary>Recomputes what comes next. Called after every change.</summary>
     public void Refresh()
@@ -82,11 +99,11 @@ public sealed class WorkoutState
 
         var stopped = Sets.Where(s => s.StoppedAt is not null).ToList();
         Next = WorkoutPlan.Next(Plan, stopped, setsLastTime, Skipped);
-        CanMoveOn = Next is { TargetSets: null, AfterBreak: true };
-        if (!CanMoveOn || Plan.Count == 0) { MoveOn = null; return; }
+        NextBlock = WorkoutPlan.NextBlock(Plan, stopped, setsLastTime, Skipped);
+        CanMoveOn = Next is { TargetSets: null } next && LastRound.Any(s => next.ExerciseIds.Contains(s.ExerciseId));
+        if (!CanMoveOn || NextBlock is not int at) { MoveOn = null; return; }
 
-        var block = WorkoutPlan.Blocks(Plan).First(b => b.Any(e => e.ExerciseId == Next!.ExerciseId));
-        MoveOn = WorkoutPlan.Next(Plan, stopped, setsLastTime, [.. Skipped, .. block.Select(e => e.ExerciseId)]);
+        MoveOn = WorkoutPlan.Next(Plan, stopped, setsLastTime, [.. Skipped, .. WorkoutPlan.Blocks(Plan)[at].Select(e => e.ExerciseId)]);
     }
 
     /// <summary>The last 3 sessions that had this exercise, newest first.</summary>
@@ -96,16 +113,16 @@ public sealed class WorkoutState
         return history;
     }
 
-    /// <summary>Where a set sits in the plan ("set 2 of 3", "round 1 of 3"), counting only the sets before it.</summary>
+    /// <summary>Where a set sits in the plan ("set 2 of 3", "round 1 of 3"), counting only the sets before its round.</summary>
     public PlanStep Describe(WorkoutSet set)
     {
-        var before = Sets.TakeWhile(s => s.Order < set.Order).Where(s => s.StoppedAt is not null).ToList();
+        var before = Sets.Where(s => s.Order < set.Order && s.StartedAt != set.StartedAt && s.StoppedAt is not null).ToList();
         var planned = WorkoutPlan.Next(Plan, before, setsLastTime, Skipped);
-        if (planned?.ExerciseId == set.ExerciseId) return planned;
+        if (planned is not null && planned.ExerciseIds.Contains(set.ExerciseId)) return planned;
 
         var setNumber = before.Count(s => s.ExerciseId == set.ExerciseId) + 1;
         int? lastTime = setsLastTime.GetValueOrDefault(set.ExerciseId) is var count && count >= setNumber ? count : null;
-        return new PlanStep(set.ExerciseId, setNumber, lastTime, null, true);
+        return new PlanStep([set.ExerciseId], setNumber, lastTime);
     }
 
     /// <summary>The pre-filled values a set started with, to tell whether its weight went up for a hit goal.</summary>
@@ -119,6 +136,6 @@ public sealed class WorkoutState
     public static string StepLabel(PlanStep step)
     {
         var of = step.TargetSets is int target ? $" of {target}" : "";
-        return step.SupersetRound is int round ? $"Superset · round {round}{of}" : $"Set {step.SetNumber}{of}";
+        return step.IsRound ? $"Superset · round {step.SetNumber}{of}" : $"Set {step.SetNumber}{of}";
     }
 }

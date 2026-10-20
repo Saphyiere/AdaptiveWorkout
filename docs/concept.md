@@ -131,6 +131,8 @@ I can leave simple mode at any moment, like leaving full screen. **Advanced mode
      - `8, 9, 8 at 100`
      - `8 at 100 · 8 at 105 · 8 at 110`
    - the big **Stop** button
+
+   A superset's round runs both exercises at once, split side by side: each one's name with its own **Change**, one timer, and each one's last three times under it.
 2. **Stop** ends the set, and rest starts counting.
 3. **Break.** The rest timer, live heart rate, and an entry for each set since the last rest (one, or both halves of a superset round): weight, reps and **Hit goal**, pre-filled, each with its own **Save** (Enter works too). Time exercises need nothing: the stopwatch was the duration. Once every entry is saved, the break becomes a plain rest screen: **Today so far**, every exercise done in this workout in short form (`3 × 10 at 100`), with **Edit** to reopen the entries. One big button at the bottom names what's next: **Start set 3**, or **Start pull-ups**. It only starts the next set; anything not saved yet keeps what's in its fields.
 4. **Finish workout** is always reachable, in every state.
@@ -154,13 +156,15 @@ The app is suggestive, especially in simple mode:
 
 What the big button offers after each set:
 
-1. If the template entry has a set count, move on after that many sets.
-2. Else, if I've done this exercise before, move on after as many sets as last time.
-3. Else, offer another set, with a second button to **move on to the next exercise**, or to **finish the workout** when it's the last one. Such an exercise is done once a later one in the plan had a set after its last.
+1. It stays with the exercise I'm on. With a set count in the template entry, it moves on after that many sets.
+2. Else, if I've done this exercise before, it moves on after as many sets as last time.
+3. Else it offers another set, with a second button to **move on to the next exercise**, or to **finish the workout** when it's the last one. Such an exercise is done once a later one in the plan had a set after its last.
+4. Moving on means the next exercise in the plan after this one. Ones I went past (swapped out, dropped, skipped, or left for another exercise I picked) never come back on their own; they stay in the lists of what's still to do, so I can go back to one by picking it.
+5. Once it moves on, a second button offers **Another set of rows** (or **Another round**) for when I'm doing more than planned.
 
-In a superset, the next step alternates through its exercises (pull-ups, dips, pull-ups, dips…) and a round counts as one set of each.
+Each place in the plan counts its own sets: an exercise swapped into another one's place starts at set 1 there, even if I did it earlier in a superset.
 
-When nothing planned is left, the big button is **Finish workout**, with **Add more** under it. When just tracking, the break screen always offers **Different exercise** and **Finish workout** under the big button. With a cool-down, each of those reads **Start cool-down** instead.
+When nothing planned is left, the big button is **Finish workout**, with **Another set** and **Add more** above it. When just tracking, the break screen always offers **Different exercise** and **Finish workout** under the big button. With a cool-down, each of those reads **Start cool-down** instead.
 
 ### Warm-up and cool-down
 
@@ -177,11 +181,13 @@ Machines are taken all the time, so a workout never has to follow its session ex
 
 **Change** sits on the set screen and next to "Next:" on the break screen. It opens for that exercise:
 
-- **Do another one first:** any exercise still to do. The changed one waits and comes right after (the bench is taken, so incline first; the pulldown is taken, so skull crushers, then back to the pulldown). A superset moves as a whole, and at the start of a round either half can go first.
-- **Swap it for** any other exercise, today only, keeping its spot, sets and superset.
+- **Do another one first:** any exercise still to do. The changed one waits and comes right after (the bench is taken, so incline first; the pulldown is taken, so skull crushers, then back to the pulldown). A superset moves as a whole. Part way through an exercise, the sets still to do come right after the other one.
+- **Swap it for** any other exercise, today only, keeping its spot, sets and superset. The one swapped out is gone for today. One still to do later in the plan moves up instead; one already done today goes in afresh.
 - **Drop it today** (no dip station at this gym: the superset becomes just pull-ups, with the same rounds). There's no skip button anywhere else; changing the plan should take a deliberate step.
 
-From the set screen, the running set starts over as the new exercise. **Add more**, once everything planned is done, adds a whole other session (an ab session after the bike) or one exercise after everything else.
+In a superset, each exercise has its own **Change**. From the set screen, the running set (or round) starts over with the new exercise.
+
+**Different exercise** in advanced mode starts something in place of what's next: a planned one (with its superset), or one the plan doesn't have, which joins the plan right after what's next. Either way the plan carries on after it, and what it took the place of waits in the list of what's still to do. **Add more**, once everything planned is done, adds a whole other session (an ab session after the bike) or one exercise after everything else.
 
 ### Speed
 
@@ -191,7 +197,7 @@ Opening has to be quick, and stay quick as the log grows. Today reads only what 
 
 ### Supersets
 
-My back days are almost all supersets: a back exercise paired with a triceps exercise, like pull-ups and dips. Inside a superset there is no break and nothing to fill in: Stop on pull-ups shows **Start dips** and what dips were last time. The break comes after each round, and that's where both halves are entered. The sets are stored like any other, in the order I did them; only the template knows which exercises are grouped. The gap between the two halves is still measured.
+My back days are almost all supersets: a back exercise paired with a triceps exercise, like pull-ups and dips, or skull crushers straight into rows. I go from one to the other without stopping, so a round is one activity: **Start pull-ups + dips** starts both, the screen shows both side by side, and one **Stop** ends the round. The break comes after each round, and that's where both are entered. Each round stores a set of each exercise, in order, with the round's start and stop, so both get the same time and the same heart rate. Only the template knows which exercises are grouped. Swapping one of them part way keeps the round count: the new one joins the next round.
 
 **(later)** Other patterns, like many sets of one rep, are just many sets; nothing special is needed.
 

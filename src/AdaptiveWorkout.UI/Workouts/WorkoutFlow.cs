@@ -32,13 +32,12 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         {
             if (Current is not { } state) return null;
             if (state.Session.CoolDownStartedAt is { } coolingSince) return new WorkoutStatus(false, "Cool-down", coolingSince, null, null);
-            if (state.Running is { } running) return new WorkoutStatus(false, state.Exercises[running.ExerciseId].Name, running.StartedAt!.Value, null, null);
+            if (state.Running is [var first, ..] running) return new WorkoutStatus(false, state.Names(running.Select(s => s.ExerciseId)), first.StartedAt!.Value, null, null);
 
             // The warm-up waits for the first exercise like a rest, counting up, so the watch can start it too.
-            var next = state.Next is { } step ? state.Exercises[step.ExerciseId].Name : null;
+            var next = state.Next is { } step ? state.Names(step.ExerciseIds) : null;
             if (state.WarmingUp) return new WorkoutStatus(true, "Warm-up", state.Session.StartedAt, null, next);
             if (state.ToLog is not { } logged) return new WorkoutStatus(true, state.Name, state.Session.StartedAt, null, next);
-            if (state.Next is { AfterBreak: false }) return new WorkoutStatus(true, $"{state.Exercises[logged.ExerciseId].Name} done", logged.StoppedAt!.Value, null, next);
 
             DateTimeOffset? endsAt = RestCountdown ? logged.StoppedAt!.Value + RestTarget(logged.ExerciseId) : null;
             return new WorkoutStatus(true, "Rest", logged.StoppedAt!.Value, endsAt, next);
@@ -73,14 +72,17 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Save(store.SaveSessionPlanAsync(session, plan));
         Current = await CreateStateAsync(session, [], plan);
         watch.Open(session);
-        if (!session.WarmUp && Current.Next is { } first) StartSet(Current.Exercises[first.ExerciseId]);
+        if (!session.WarmUp && Current.Next is { } first) StartSets(first.ExerciseIds);
         else Announce();
     }
 
-    /// <summary>Saves the set being logged, then starts a set of the exercise with suggested values.</summary>
-    public void StartSet(Exercise exercise)
+    /// <summary>
+    /// Starts a set of each exercise, with suggested values: one, or a superset's round, whose sets start and stop together and
+    /// so share their time and the heart rate during it. Saves the entries of the rest it ends.
+    /// </summary>
+    public void StartSets(IReadOnlyList<long> exerciseIds)
     {
-        if (Current is not { } state) return;
+        if (Current is not { } state || exerciseIds.Count == 0) return;
 
         // The first exercise ends the warm-up as it starts. A set started during the cool-down puts the cool-down off until the end again.
         var now = DateTimeOffset.Now;
@@ -91,50 +93,79 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
             Save(store.SaveWarmUpAndCoolDownAsync(state.Session));
         }
 
-        if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
+        // Starting closes the rest's entries; anything not saved yet keeps what's in its fields.
+        foreach (var entry in state.ToConfirm) Save(store.UpdateSetAsync(entry));
+        state.LoggedThrough = state.Sets.Count;
+        state.Confirmed.Clear();
 
-        // Starting from a rest closes that rest's entries. The second half of a superset round doesn't, so the round is entered together.
-        var midRound = state.Next is { AfterBreak: false } next && next.ExerciseId == exercise.Id;
-        if (!midRound)
+        foreach (var exerciseId in exerciseIds)
         {
-            state.LoggedThrough = state.Sets.Count;
-            state.Confirmed.Clear();
+            var exercise = state.Exercises[exerciseId];
+            var thisSession = state.Sets.Where(s => s.ExerciseId == exerciseId).ToList();
+            var lastTime = state.History(exerciseId).FirstOrDefault()?.Sets ?? [];
+            var values = exercise.Measure == ExerciseMeasure.Weight ? SetSuggestion.For(thisSession, lastTime, settings.HitGoalStep) : null;
+            var set = new WorkoutSet
+            {
+                ExerciseId = exerciseId,
+                Order = state.Sets.Count + 1,
+                StartedAt = now,
+                Weight = values?.Weight,
+                WeightUnit = values?.Unit ?? settings.Unit,
+                Reps = values?.Reps,
+            };
+            state.Sets.Add(set);
+            Save(store.InsertSetAsync(state.Session, set));
         }
 
-        var thisSession = state.Sets.Where(s => s.ExerciseId == exercise.Id).ToList();
-        var lastTime = state.History(exercise.Id).FirstOrDefault()?.Sets ?? [];
-        var values = exercise.Measure == ExerciseMeasure.Weight ? SetSuggestion.For(thisSession, lastTime, settings.HitGoalStep) : null;
-        var set = new WorkoutSet
-        {
-            ExerciseId = exercise.Id,
-            Order = state.Sets.Count + 1,
-            StartedAt = now,
-            Weight = values?.Weight,
-            WeightUnit = values?.Unit ?? settings.Unit,
-            Reps = values?.Reps,
-        };
-        state.Exercises.TryAdd(exercise.Id, exercise);
-        state.Sets.Add(set);
         state.Refresh();
-        Save(store.InsertSetAsync(state.Session, set));
         Announce();
     }
 
     /// <summary>Starts whatever comes next, e.g. from the watch when a rest is up. Does nothing while a set runs.</summary>
     public void StartNext()
     {
-        if (Current is { Running: null, Next: { } next } state) StartSet(state.Exercises[next.ExerciseId]);
+        if (Current is { Running: [], Next: { } next }) StartSets(next.ExerciseIds);
     }
 
-    /// <summary>Stops the running set; for a time exercise the stopwatch becomes its duration.</summary>
+    /// <summary>Another set of what I just did (another round of a superset), e.g. past its planned sets.</summary>
+    public void StartAnother()
+    {
+        if (Current is { Running: [], LastRound: [_, ..] round }) StartSets([.. round.Select(s => s.ExerciseId)]);
+    }
+
+    /// <summary>
+    /// Starts an exercise picked from the list in place of what's next; one of a superset starts its round. One the plan doesn't
+    /// have joins it right after what's next, so the plan carries on after it and what it took the place of isn't offered again.
+    /// </summary>
+    public void StartPicked(Exercise exercise)
+    {
+        if (Current is not { } state) return;
+
+        state.Exercises.TryAdd(exercise.Id, exercise);
+        if (state.Plan.Count > 0 && state.Plan.All(e => e.ExerciseId != exercise.Id))
+        {
+            state.Plan = PlanEdits.InsertAfter(state.Plan, exercise.Id, state.NextBlock);
+            state.Refresh();
+            Save(store.SaveSessionPlanAsync(state.Session, state.Plan));
+        }
+
+        StartSets(state.RoundOf(exercise.Id));
+    }
+
+    /// <summary>Stops the running set, or a superset's round, all at once; for a time exercise the stopwatch becomes its duration.</summary>
     public void StopSet()
     {
-        if (Current?.Running is not { } running) return;
+        if (Current is not { Running: [_, ..] running } state) return;
 
-        running.StoppedAt = DateTimeOffset.Now;
-        if (Current.Exercises[running.ExerciseId].Measure == ExerciseMeasure.Time) running.DurationSeconds = (int)Math.Round((running.StoppedAt - running.StartedAt)?.TotalSeconds ?? 0);
-        Current.Refresh();
-        Save(store.UpdateSetAsync(running));
+        var now = DateTimeOffset.Now;
+        foreach (var set in running)
+        {
+            set.StoppedAt = now;
+            if (state.Exercises[set.ExerciseId].Measure == ExerciseMeasure.Time) set.DurationSeconds = (int)Math.Round((now - set.StartedAt!.Value).TotalSeconds);
+            Save(store.UpdateSetAsync(set));
+        }
+
+        state.Refresh();
         Announce();
     }
 
@@ -150,20 +181,21 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Save(store.UpdateSetAsync(set));
     }
 
-    /// <summary>Reopens this rest's entries. After a reopened workout, when nothing was entered at this rest, reopens the last set.</summary>
+    /// <summary>Reopens this rest's entries. After a reopened workout, when nothing was entered at this rest, reopens the last round.</summary>
     public void EditRound()
     {
         if (Current is not { } state) return;
 
-        if (state.Sets.All(s => s.Order <= state.LoggedThrough)) state.LoggedThrough = state.Sets.Count - 1;
+        if (state.Sets.All(s => s.Order <= state.LoggedThrough)) state.LoggedThrough = state.Sets.Count - state.LastRound.Count;
         state.Confirmed.Clear();
     }
 
-    public void Skip(long exerciseId)
+    /// <summary>Passes over an exercise (or a superset's) in today's plan.</summary>
+    public void Skip(IEnumerable<long> exerciseIds)
     {
         if (Current is null) return;
 
-        Current.Skipped.Add(exerciseId);
+        Current.Skipped.UnionWith(exerciseIds);
         Current.Refresh();
         Announce();
     }
@@ -171,9 +203,9 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
     /// <summary>After the last exercise: saves the set being logged and starts the cool-down, which runs until Finish.</summary>
     public void StartCoolDown()
     {
-        if (Current is not { Running: null, WarmingUp: false, CoolDownNext: true } state) return;
+        if (Current is not { Running: [], WarmingUp: false, CoolDownNext: true } state) return;
 
-        if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
+        foreach (var entry in state.ToConfirm) Save(store.UpdateSetAsync(entry));
         state.LoggedThrough = state.Sets.Count;
         state.Confirmed.Clear();
         state.Session.CoolDownStartedAt = DateTimeOffset.Now;
@@ -187,7 +219,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         if (Current is not { } state) return;
 
         StopSet();
-        if (state.ToLog is { } logged) Save(store.UpdateSetAsync(logged));
+        foreach (var entry in state.ToConfirm) Save(store.UpdateSetAsync(entry));
         state.Session.FinishedAt = DateTimeOffset.Now;
 
         // Finished during the warm-up: it was all warm-up.
@@ -245,28 +277,38 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Save(store.DeleteSessionAsync(session));
     }
 
-    /// <summary>Does another exercise first; the one Change was opened on waits until it's done. Today's plan only.</summary>
-    public void DoFirst(Exercise exercise)
+    /// <summary>
+    /// Does another exercise first; the one Change was opened on (the running or next step's) waits until it's done. Part way
+    /// through it, the sets still to do come right after the other one. Today's plan only.
+    /// </summary>
+    public void DoFirst(Exercise exercise, long target)
     {
-        if (Current is not { ChangeTarget: long target } state) return;
+        if (Current is not { } state) return;
 
-        ChangePlan(state, PlanEdits.DoFirst(state.Plan, exercise.Id, target), exercise);
+        var step = state.Running is [var first, ..] ? state.Describe(first) : state.Next;
+        var plan = step is { SetNumber: > 1 } && state.NextBlock is int block
+            ? PlanEdits.DoFirst(state.Plan, exercise.Id, block, step.SetNumber - 1, step.TargetSets - (step.SetNumber - 1))
+            : PlanEdits.DoFirst(state.Plan, exercise.Id, target);
+        ChangePlan(state, plan, exercise);
     }
 
-    /// <summary>Puts another exercise in place of the one Change was opened on, today only. One already further on in the plan moves up instead.</summary>
-    public void SwapFor(Exercise exercise)
+    /// <summary>
+    /// Puts another exercise in the place of the one Change was opened on, today only, with its sets. One further on in the plan,
+    /// not started yet, moves up instead; one already done today goes in afresh.
+    /// </summary>
+    public void SwapFor(Exercise exercise, long target)
     {
-        if (Current is not { ChangeTarget: long target } state) return;
+        if (Current is not { } state) return;
 
         state.Exercises.TryAdd(exercise.Id, exercise);
-        var inPlan = state.Plan.Any(e => e.ExerciseId == exercise.Id);
-        ChangePlan(state, inPlan ? PlanEdits.Drop(PlanEdits.DoFirst(state.Plan, exercise.Id, target), target) : PlanEdits.Swap(state.Plan, target, exercise.Id), exercise);
+        var moveUp = state.Plan.Any(e => e.ExerciseId == exercise.Id) && state.Sets.All(s => s.ExerciseId != exercise.Id);
+        ChangePlan(state, moveUp ? PlanEdits.Drop(PlanEdits.DoFirst(state.Plan, exercise.Id, target), target) : PlanEdits.Swap(state.Plan, target, exercise.Id), exercise);
     }
 
     /// <summary>Leaves the exercise Change was opened on out of today's workout.</summary>
-    public void Drop()
+    public void Drop(long target)
     {
-        if (Current is not { ChangeTarget: long target } state) return;
+        if (Current is not { } state) return;
 
         ChangePlan(state, PlanEdits.Drop(state.Plan, target), null);
     }
@@ -331,23 +373,23 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Announce();
     }
 
-    // Replaces today's plan and saves it. A running set belonged to the exercise that changed, so it's thrown away and
-    // `startNow` (or, after Drop, whatever comes next) starts in its place.
+    // Replaces today's plan and saves it. A running set (or round) belonged to what changed, so it's thrown away and `startNow`,
+    // with its superset, starts in its place; after Drop, whatever comes next.
     private void ChangePlan(WorkoutState state, List<TemplateExercise> plan, Exercise? startNow)
     {
         var running = state.Running;
-        if (running is not null)
+        foreach (var set in running)
         {
-            state.Sets.Remove(running);
-            Save(store.DeleteSetAsync(running));
+            state.Sets.Remove(set);
+            Save(store.DeleteSetAsync(set));
         }
 
         state.Plan = plan;
         state.Refresh();
         Save(store.SaveSessionPlanAsync(state.Session, plan));
 
-        var next = running is null ? null : startNow ?? (state.Next is { } step ? state.Exercises[step.ExerciseId] : null);
-        if (next is not null) StartSet(next);
+        var next = running.Count == 0 ? null : startNow is not null ? state.RoundOf(startNow.Id) : state.Next?.ExerciseIds;
+        if (next is not null) StartSets(next);
         else Announce();
     }
 
