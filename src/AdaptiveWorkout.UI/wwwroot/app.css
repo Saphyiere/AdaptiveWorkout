@@ -1346,13 +1346,49 @@ a.link {
     border-top: 1px solid var(--ink);
 }
 
-.set-grid > * {
-    padding: 6px 16px 6px 0;
-    border-bottom: 1px solid var(--rule);
+.set-grid.no-bpm {
+    grid-template-columns: auto 1fr auto;
 }
 
-.set-grid > :nth-child(4n) {
+/* A row of the ledger, its cells on the ledger's columns. A set's row is a button that opens it. */
+.set-line {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: baseline;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    background-color: transparent;
+    color: inherit;
+    text-align: left;
+}
+
+.set-line > * {
+    padding: 6px 16px 6px 0;
+}
+
+.set-line > :last-child {
     padding-right: 0;
+}
+
+button.set-line:active {
+    background-color: var(--surface-2);
+}
+
+.set-line.picked {
+    background-color: var(--wash);
+}
+
+/* An open set: its numbers to change, under its row. */
+.set-edit {
+    grid-column: 1 / -1;
+    padding: 12px 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-bottom: 1px solid var(--rule);
 }
 
 /* Gym: the improvement line. The SVG scales with the page; a row of invisible buttons over the plot picks a workout. */
@@ -1772,6 +1808,10 @@ a.link {
     width: 100%;
     margin: 0;
     background: var(--surface-2);
+}
+
+[data-theme="telemetry"] .set-line.picked {
+    background-color: var(--surface-2);
 }
 
 [data-theme="telemetry"] .week-plan,

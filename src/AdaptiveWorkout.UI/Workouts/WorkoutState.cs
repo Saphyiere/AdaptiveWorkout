@@ -30,6 +30,9 @@ public sealed class WorkoutState
     /// <summary>Sets up to this order were entered at an earlier rest, or before the workout was reopened.</summary>
     public int LoggedThrough { get; set; }
 
+    /// <summary>The last set's order; 0 before the first. Orders can skip numbers, after a set is deleted.</summary>
+    public int LastOrder => Sets.Count == 0 ? 0 : Sets[^1].Order;
+
     /// <summary>Sets saved on the current rest screen, by order.</summary>
     public HashSet<int> Confirmed { get; } = [];
 

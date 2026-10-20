@@ -1,0 +1,39 @@
+@page "/workout/sets"
+@implements IDisposable
+@inject WorkoutFlow Flow
+@inject AppNavigation Navigation
+
+<PageTitle>Today's sets</PageTitle>
+
+@if (state is not null)
+{
+    var done = state.Sets.Where(s => s.StoppedAt is not null).ToList();
+    <div class="screen">
+        <PageHeader Back="workout" BackText="@state.Name" Label="@state.Name" Title="Today's sets" Small="true" Live="true" />
+        @if (done.Count == 0)
+        {
+            <p class="note">Nothing done yet.</p>
+        }
+        else
+        {
+            @* Every finished set of this workout; tapping one changes or deletes it. *@
+            <SetList Sets="done" Exercises="state.Exercises" OnSave="Flow.SaveSet" OnDelete="Flow.DeleteSet" />
+        }
+    </div>
+}
+
+@code {
+    private WorkoutState? state;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Flow.Changed += OnFlowChanged;
+        state = Flow.Current ?? await Flow.LoadAsync();
+        if (state is null) await Navigation.HomeAsync();
+    }
+
+    // A change made elsewhere, e.g. a set started from the watch.
+    private void OnFlowChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Flow.Changed -= OnFlowChanged;
+}

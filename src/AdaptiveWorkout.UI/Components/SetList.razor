@@ -1,0 +1,160 @@
+@* A workout's sets by exercise: weight × reps (or the time), how long each set took, and the heart rate during it when there's
+   any. Tapping a set opens it to change its numbers or Hit goal, or to delete it, after asking once. *@
+
+@foreach (var exerciseSets in Sets.GroupBy(s => s.ExerciseId))
+{
+    var exercise = Exercises[exerciseSets.Key];
+    var list = exerciseSets.ToList();
+    var timed = exercise.Measure == ExerciseMeasure.Time;
+    <section class="block" aria-label="@exercise.Name">
+        <div class="spread">
+            <h2 class="name big">@exercise.Name</h2>
+            @if (list.Any(s => s.HitGoal))
+            {
+                <span class="inline">
+                    <Mark Kind="MarkKind.Tick" Size="22" />
+                    <span class="caption">Hit goal</span>
+                </span>
+            }
+        </div>
+        <div class="set-grid @(Samples is null ? "no-bpm" : "")">
+            <div class="set-line">
+                <span class="label">Set</span>
+                <span class="label">@(timed ? "Time" : $"{Unit(list[0].WeightUnit)} × reps")</span>
+                <span class="label">@(timed ? "" : "Time")</span>
+                @if (Samples is not null)
+                {
+                    <span class="label">Bpm</span>
+                }
+            </div>
+            @for (var i = 0; i < list.Count; i++)
+            {
+                var set = list[i];
+                var number = i + 1;
+                var open = editing == set;
+                <button type="button" class="set-line @(open ? "picked" : "")" aria-expanded="@(open ? "true" : "false")" @onclick="() => Open(set)">
+                    <span class="caption">@number</span>
+                    <span class="body">@(timed ? TimeText.Format(TimeSpan.FromSeconds(set.DurationSeconds ?? 0)) : $"{SetSummary.WeightText(set.Weight)} × {set.Reps ?? 0}")</span>
+                    <span class="caption">@(timed || set.StartedAt is null || set.StoppedAt is null ? "" : TimeText.Format(set.StoppedAt.Value - set.StartedAt.Value))</span>
+                    @if (Samples is not null)
+                    {
+                        <span class="caption">@(set is { StartedAt: { } start, StoppedAt: { } stop } && WorkoutStats.HeartRate(Samples, start, stop) is { } bpm ? bpm.Average.ToString(CultureInfo.CurrentCulture) : "")</span>
+                    }
+                </button>
+                @if (open)
+                {
+                    var id = $"edit-{set.Order}";
+                    <div class="set-edit appear">
+                        @if (confirming)
+                        {
+                            <p class="name">Delete set @number of @exercise.Name?</p>
+                            <div class="grid-2">
+                                <button type="button" class="btn tall" @onclick="() => confirming = false">Keep it</button>
+                                <button type="button" class="btn tall fill" @onclick="() => DeleteAsync(set)">Delete</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="entry-row">
+                                @if (timed)
+                                {
+                                    <div class="field-group entry-reps">
+                                        <label class="field-label" for="@id-minutes">Min</label>
+                                        <div class="writing">
+                                            <input id="@id-minutes" class="field number-field" type="number" inputmode="numeric" min="0" @bind="minutes" />
+                                        </div>
+                                    </div>
+                                    <div class="field-group entry-reps">
+                                        <label class="field-label" for="@id-seconds">Sec</label>
+                                        <div class="writing">
+                                            <input id="@id-seconds" class="field number-field" type="number" inputmode="numeric" min="0" max="59" @bind="seconds" />
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="field-group entry-weight">
+                                        <label class="field-label" for="@id-weight">Weight</label>
+                                        <div class="writing">
+                                            <input id="@id-weight" class="field number-field" type="number" inputmode="decimal" step="any" placeholder="Bodyweight" @bind="weight" />
+                                            <span class="unit">@Unit(set.WeightUnit)</span>
+                                        </div>
+                                    </div>
+                                    <div class="field-group entry-reps">
+                                        <label class="field-label" for="@id-reps">Reps</label>
+                                        <div class="writing">
+                                            <input id="@id-reps" class="field number-field" type="number" inputmode="numeric" min="0" @bind="reps" />
+                                        </div>
+                                    </div>
+                                    <label class="goal">
+                                        <input type="checkbox" @bind="hitGoal" />
+                                        <span>Hit goal</span>
+                                    </label>
+                                }
+                            </div>
+                            <div class="spread">
+                                <button type="button" class="btn-ghost" @onclick="() => confirming = true"><Icon Name="trash" Size="18" />Delete set</button>
+                                <div class="inline">
+                                    @if (!timed)
+                                    {
+                                        <button type="button" class="btn tall" aria-label="Switch between added and assisted weight" disabled="@(weight is null)" @onclick="() => weight = -weight">+/−</button>
+                                    }
+                                    <button type="button" class="btn tall adjust" @onclick="() => SaveAsync(set)">Save</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private WorkoutSet? editing;
+    private bool confirming;
+    private double? weight;
+    private int? reps;
+    private bool hitGoal;
+    private int? minutes;
+    private int? seconds;
+
+    /// <summary>Finished sets, in order.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<WorkoutSet> Sets { get; set; } = [];
+
+    [Parameter, EditorRequired] public IReadOnlyDictionary<long, Exercise> Exercises { get; set; } = default!;
+
+    /// <summary>Heart rate readings for the Bpm column; without them there's no such column.</summary>
+    [Parameter] public IReadOnlyList<HeartRateSample>? Samples { get; set; }
+
+    /// <summary>Called with a set whose numbers or Hit goal changed, already changed.</summary>
+    [Parameter] public EventCallback<WorkoutSet> OnSave { get; set; }
+
+    /// <summary>Called with a set to delete, once deleting it was confirmed.</summary>
+    [Parameter] public EventCallback<WorkoutSet> OnDelete { get; set; }
+
+    private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";
+
+    // Opens a set's numbers to change, or closes it when it's the one open.
+    private void Open(WorkoutSet set)
+    {
+        editing = editing == set ? null : set;
+        confirming = false;
+        (weight, reps, hitGoal) = (set.Weight, set.Reps, set.HitGoal);
+        (minutes, seconds) = (set.DurationSeconds / 60, set.DurationSeconds % 60);
+    }
+
+    private Task SaveAsync(WorkoutSet set)
+    {
+        if (Exercises[set.ExerciseId].Measure == ExerciseMeasure.Time) set.DurationSeconds = Math.Max(0, (minutes ?? 0) * 60 + (seconds ?? 0));
+        else (set.Weight, set.Reps, set.HitGoal) = (weight, reps, hitGoal);
+        editing = null;
+        return OnSave.InvokeAsync(set);
+    }
+
+    private Task DeleteAsync(WorkoutSet set)
+    {
+        editing = null;
+        return OnDelete.InvokeAsync(set);
+    }
+}

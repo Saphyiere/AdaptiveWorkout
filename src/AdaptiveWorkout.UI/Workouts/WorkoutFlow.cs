@@ -95,7 +95,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
 
         // Starting closes the rest's entries; anything not saved yet keeps what's in its fields.
         foreach (var entry in state.ToConfirm) Save(store.UpdateSetAsync(entry));
-        state.LoggedThrough = state.Sets.Count;
+        state.LoggedThrough = state.LastOrder;
         state.Confirmed.Clear();
 
         foreach (var exerciseId in exerciseIds)
@@ -107,7 +107,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
             var set = new WorkoutSet
             {
                 ExerciseId = exerciseId,
-                Order = state.Sets.Count + 1,
+                Order = state.LastOrder + 1,
                 StartedAt = now,
                 Weight = values?.Weight,
                 WeightUnit = values?.Unit ?? settings.Unit,
@@ -172,6 +172,36 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
     /// <summary>Saves edits to a set (weight, reps, hit goal).</summary>
     public void SaveSet(WorkoutSet set) => Save(store.UpdateSetAsync(set));
 
+    /// <summary>Deletes a finished set of the open workout, e.g. one done by mistake. What's next follows from the sets left.</summary>
+    public void DeleteSet(WorkoutSet set)
+    {
+        if (Current is not { } state || set.StoppedAt is null || !state.Sets.Remove(set)) return;
+
+        state.Confirmed.Remove(set.Order);
+        state.Refresh();
+        Save(store.DeleteSetAsync(set));
+        Announce();
+    }
+
+    /// <summary>Saves a change to a set of a finished workout, then works out again how it and every later one compared.</summary>
+    public async Task SavePastSetAsync(WorkoutSet set)
+    {
+        await LoadAsync();
+        var at = pastSets.FindIndex(s => s.Id == set.Id);
+        if (at >= 0) pastSets[at] = set;
+        Save(store.UpdateSetAsync(set));
+        await RescoreFromAsync(set.SessionId);
+    }
+
+    /// <summary>Deletes a set of a finished workout, then works out again how it and every later one compared.</summary>
+    public async Task DeletePastSetAsync(WorkoutSet set)
+    {
+        await LoadAsync();
+        pastSets.RemoveAll(s => s.Id == set.Id);
+        Save(store.DeleteSetAsync(set));
+        await RescoreFromAsync(set.SessionId);
+    }
+
     /// <summary>Saves a set entered on the rest screen; once every set there is saved, the rest screen shows today's summary.</summary>
     public void ConfirmSet(WorkoutSet set)
     {
@@ -179,15 +209,6 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
 
         state.Confirmed.Add(set.Order);
         Save(store.UpdateSetAsync(set));
-    }
-
-    /// <summary>Reopens this rest's entries. After a reopened workout, when nothing was entered at this rest, reopens the last round.</summary>
-    public void EditRound()
-    {
-        if (Current is not { } state) return;
-
-        if (state.Sets.All(s => s.Order <= state.LoggedThrough)) state.LoggedThrough = state.Sets.Count - state.LastRound.Count;
-        state.Confirmed.Clear();
     }
 
     /// <summary>Passes over an exercise (or a superset's) in today's plan.</summary>
@@ -206,7 +227,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         if (Current is not { Running: [], WarmingUp: false, CoolDownNext: true } state) return;
 
         foreach (var entry in state.ToConfirm) Save(store.UpdateSetAsync(entry));
-        state.LoggedThrough = state.Sets.Count;
+        state.LoggedThrough = state.LastOrder;
         state.Confirmed.Clear();
         state.Session.CoolDownStartedAt = DateTimeOffset.Now;
         Save(store.SaveWarmUpAndCoolDownAsync(state.Session));
@@ -393,6 +414,15 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         else Announce();
     }
 
+    // A finished workout's sets changed: it, and every one after it, compared against them, so each is worked out again.
+    private async Task RescoreFromAsync(long sessionId)
+    {
+        if (pastSessions.Find(s => s.Id == sessionId) is not { } changed) return;
+
+        foreach (var session in pastSessions.Where(s => s.StartedAt >= changed.StartedAt)) (session.Improvement, session.ExercisesCompared) = (null, null);
+        await ScoreSessionsAsync();
+    }
+
     private async Task<WorkoutState> CreateStateAsync(WorkoutSession session, List<WorkoutSet> sets, List<TemplateExercise> plan)
     {
         var template = session.TemplateId is long templateId ? await store.GetTemplateAsync(templateId) : null;
@@ -406,7 +436,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
             PastSessions = pastSessions,
             PastSets = pastSets,
             HitGoalStep = settings.HitGoalStep,
-            LoggedThrough = sets.Count,
+            LoggedThrough = sets.Count == 0 ? 0 : sets[^1].Order,
         };
         state.Refresh();
         return state;

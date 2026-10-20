@@ -51,38 +51,8 @@
             @Phase("Warm-up", session.StartedAt, warmedUpAt)
         }
 
-        @foreach (var exerciseSets in sets.GroupBy(s => s.ExerciseId))
-        {
-            var exercise = exercises[exerciseSets.Key];
-            var list = exerciseSets.ToList();
-            <section class="block" aria-label="@exercise.Name">
-                <div class="spread">
-                    <h2 class="name big">@exercise.Name</h2>
-                    @if (list.Any(s => s.HitGoal))
-                    {
-                        <span class="inline">
-                            <Mark Kind="MarkKind.Tick" Size="22" />
-                            <span class="caption">Hit goal</span>
-                        </span>
-                    }
-                </div>
-                <div class="set-grid">
-                    <span class="label">Set</span>
-                    <span class="label">@(exercise.Measure == ExerciseMeasure.Time ? "Time" : $"{Unit(list[0].WeightUnit)} × reps")</span>
-                    <span class="label">@(exercise.Measure == ExerciseMeasure.Time ? "" : "Time")</span>
-                    <span class="label">Bpm</span>
-                    @for (var i = 0; i < list.Count; i++)
-                    {
-                        var set = list[i];
-                        var during = set is { StartedAt: { } start, StoppedAt: { } stop } ? WorkoutStats.HeartRate(samples, start, stop) : null;
-                        <span class="caption">@(i + 1)</span>
-                        <span class="body">@(exercise.Measure == ExerciseMeasure.Time ? TimeText.Format(TimeSpan.FromSeconds(set.DurationSeconds ?? 0)) : $"{SetSummary.WeightText(set.Weight)} × {set.Reps ?? 0}")</span>
-                        <span class="caption">@(exercise.Measure == ExerciseMeasure.Time || set.StartedAt is null || set.StoppedAt is null ? "" : TimeText.Format(set.StoppedAt.Value - set.StartedAt.Value))</span>
-                        <span class="caption">@(during?.Average.ToString(CultureInfo.CurrentCulture) ?? "")</span>
-                    }
-                </div>
-            </section>
-        }
+        @* Every set by exercise; tapping one changes or deletes it. *@
+        <SetList Sets="sets" Exercises="exercises" Samples="samples" OnSave="SaveSetAsync" OnDelete="DeleteSetAsync" />
 
         @if (session.CoolDownStartedAt is { } cooledFrom)
         {
@@ -148,6 +118,15 @@
                 <p class="caption">@bpm.Average bpm avg · @bpm.Max max</p>
             }
         </section>;
+
+    // A changed or deleted set changes how this workout, and every later one, compared with the last time.
+    private Task SaveSetAsync(WorkoutSet set) => Flow.SavePastSetAsync(set);
+
+    private Task DeleteSetAsync(WorkoutSet set)
+    {
+        sets.Remove(set);
+        return Flow.DeletePastSetAsync(set);
+    }
 
     private async Task DeleteAsync()
     {
