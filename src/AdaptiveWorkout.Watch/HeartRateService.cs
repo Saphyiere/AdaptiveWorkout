@@ -5,6 +5,8 @@ using Android.Gms.Wearable;
 using Android.Hardware;
 using Android.OS;
 using Android.Util;
+using AndroidX.Core.App;
+using AndroidX.Wear.Ongoing;
 
 namespace AdaptiveWorkout.Watch;
 
@@ -74,14 +76,23 @@ public sealed class HeartRateService : Service, ISensorEventListener
 
         var notifications = (NotificationManager)GetSystemService(NotificationService)!;
         notifications.CreateNotificationChannel(new NotificationChannel(Channel, GetString(Resource.String.workout_channel), NotificationImportance.Low));
-        var open = PendingIntent.GetActivity(this, 0, new Intent(this, typeof(MainActivity)), PendingIntentFlags.Immutable);
-        var notification = new Notification.Builder(this, Channel)
-            .SetSmallIcon(Resource.Drawable.appicon_foreground)
-            .SetContentTitle(GetString(Resource.String.app_name))
-            .SetContentText(GetString(Resource.String.workout_notification))
-            .SetContentIntent(open)
-            .SetOngoing(true)
-            .Build();
+        var open = PendingIntent.GetActivity(this, 0, new Intent(this, typeof(MainActivity)).AddFlags(ActivityFlags.SingleTop), PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
+        var builder = new NotificationCompat.Builder(this, Channel);
+        builder.SetSmallIcon(Resource.Drawable.appicon_foreground);
+        builder.SetContentTitle(GetString(Resource.String.app_name));
+        builder.SetContentText(GetString(Resource.String.workout_notification));
+        builder.SetCategory(NotificationCompat.CategoryWorkout);
+        builder.SetVisibility(NotificationCompat.VisibilityPublic);
+        builder.SetContentIntent(open);
+        builder.SetOngoing(true);
+
+        // An ongoing activity keeps the heart rate screen up for the whole workout: without one, Wear OS goes back to the watch face
+        // a while after the screen dims. If I go to the watch face myself, its icon there taps straight back in.
+        var ongoing = new OngoingActivity.Builder(ApplicationContext!, NotificationId, builder);
+        ongoing.SetStaticIcon(Resource.Drawable.appicon_foreground);
+        ongoing.SetTouchIntent(open);
+        ongoing.Build()!.Apply(ApplicationContext!);
+        var notification = builder.Build()!;
         if (OperatingSystem.IsAndroidVersionAtLeast(34)) StartForeground(NotificationId, notification, ForegroundService.TypeHealth);
         else StartForeground(NotificationId, notification);
 
@@ -146,12 +157,15 @@ public sealed class HeartRateService : Service, ISensorEventListener
         else Changed?.Invoke();
     });
 
-    /// <summary>Asks the phone to start whatever comes next; the phone answers with the new status. Any thread.</summary>
-    public static void StartNext() => running?.handler.Post(async () =>
+    /// <summary>
+    /// Asks the phone to do what its big button does now: <see cref="WatchMessages.StopSet"/> or <see cref="WatchMessages.Next"/>.
+    /// The phone answers with the new status. Any thread.
+    /// </summary>
+    public static void Ask(string path) => running?.handler.Post(async () =>
     {
         if (running is not { } service) return;
 
-        PhoneReachable = await service.TellPhoneAsync(WatchMessages.Next, []);
+        PhoneReachable = await service.TellPhoneAsync(path, []);
         Changed?.Invoke();
     });
 

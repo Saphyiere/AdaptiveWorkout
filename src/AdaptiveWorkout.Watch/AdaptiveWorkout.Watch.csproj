@@ -16,7 +16,9 @@
     <UseInterpreter>false</UseInterpreter>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Xamarin.AndroidX.Wear" Version="1.3.0.10" />
+    <PackageReference Include="Xamarin.AndroidX.Wear" Version="1.4.0.2" />
+    <!-- Keeps the heart rate screen up during a workout instead of going back to the watch face, with a way back on the watch face. -->
+    <PackageReference Include="Xamarin.AndroidX.Wear.Ongoing" Version="1.1.0.3" />
     <!-- Same version as the phone app. -->
     <PackageReference Include="Xamarin.GooglePlayServices.Wearable" Version="119.0.0.4" />
   </ItemGroup>

@@ -6,7 +6,10 @@ using Android.Gms.Wearable;
 
 namespace AdaptiveWorkout.Watch;
 
-/// <summary>Hears the phone when a workout starts, changes (a set or a rest), or finishes, whether or not this app is running.</summary>
+/// <summary>
+/// Hears the phone when a workout starts, changes (a set or a rest), or finishes, and when its theme changes, whether or not
+/// this app is running.
+/// </summary>
 [Service(Exported = true)]
 [IntentFilter(["com.google.android.gms.wearable.MESSAGE_RECEIVED"], DataScheme = "wear", DataHost = "*", DataPathPrefix = "/workout")]
 public sealed class PhoneListenerService : WearableListenerService
@@ -17,6 +20,7 @@ public sealed class PhoneListenerService : WearableListenerService
     public override void OnMessageReceived(IMessageEvent message)
     {
         if (message.Path == WatchMessages.Status) HeartRateService.Show(WatchMessages.DecodeStatus(message.GetData()!));
+        if (message.Path == WatchMessages.Theme) WatchTheme.Save(this, Encoding.UTF8.GetString(message.GetData()!));
         if (message.Path == WatchMessages.Stop) StopService(new Intent(this, typeof(HeartRateService)));
         if (message.Path != WatchMessages.Start || MainActivity.IsVisible) return;
 

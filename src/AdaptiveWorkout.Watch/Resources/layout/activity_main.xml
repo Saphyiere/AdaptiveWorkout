@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The heart rate screen: the time up top, then what the workout is doing (a set and its time, or the rest and how long is
-    left), heart rate in the middle, and how long the workout has run. While resting, a button that starts the next set on the
-    phone takes the workout time's place.
+    left), heart rate in the middle, and how long the workout has run. The phone's big button takes the workout time's place:
+    Stop while a set runs, Start what's next between sets. Colors and fonts follow the phone's theme (WatchTheme).
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/black"
     android:gravity="center_horizontal"
     android:orientation="vertical"
     android:paddingTop="@dimen/edge_margin"
@@ -21,8 +21,7 @@
         android:layout_height="wrap_content"
         android:format12Hour="h:mm"
         android:format24Hour="HH:mm"
-        android:textColor="@color/ink_muted"
-        android:textSize="14sp" />
+        android:textSize="13sp" />
 
     <Space
         android:layout_width="0dp"
@@ -42,21 +41,18 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxWidth="96dp"
+            android:letterSpacing="0.06"
+            android:maxWidth="104dp"
             android:maxLines="1"
-            android:textColor="@color/ink_muted"
-            android:textSize="14sp" />
+            android:textSize="12sp" />
 
         <Chronometer
             android:id="@+id/phase_time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
-            android:fontFamily="@font/archivo_expanded"
             android:fontFeatureSettings="tnum"
-            android:fontVariationSettings="'wght' 600"
             android:includeFontPadding="false"
-            android:textColor="@color/ink"
             android:textSize="18sp" />
     </LinearLayout>
 
@@ -71,20 +67,17 @@
             android:id="@+id/bpm"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/archivo_expanded"
             android:fontFeatureSettings="tnum"
-            android:fontVariationSettings="'wght' 700"
             android:includeFontPadding="false"
             android:text="@string/no_reading"
-            android:textColor="@color/accent"
-            android:textSize="56sp" />
+            android:textSize="54sp" />
 
         <TextView
+            android:id="@+id/bpm_unit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:text="@string/bpm"
-            android:textColor="@color/ink_muted"
             android:textSize="14sp" />
     </LinearLayout>
 
@@ -93,21 +86,17 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:fontFamily="@font/archivo_expanded"
         android:fontFeatureSettings="tnum"
-        android:fontVariationSettings="'wght' 600"
         android:includeFontPadding="false"
-        android:textColor="@color/ink"
         android:textSize="18sp" />
 
     <Button
         android:id="@+id/start"
         android:layout_width="wrap_content"
-        android:layout_height="34dp"
+        android:layout_height="36dp"
         android:layout_marginTop="4dp"
-        android:background="@drawable/start_button"
         android:ellipsize="end"
-        android:maxWidth="124dp"
+        android:maxWidth="132dp"
         android:maxLines="1"
         android:minWidth="96dp"
         android:minHeight="0dp"
@@ -117,9 +106,7 @@
         android:paddingBottom="0dp"
         android:stateListAnimator="@null"
         android:textAllCaps="false"
-        android:textColor="@color/on_accent"
         android:textSize="14sp"
-        android:textStyle="bold"
         android:visibility="gone" />
 
     <Space
@@ -133,7 +120,6 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:maxWidth="160dp"
-        android:textColor="@color/ink_muted"
         android:textSize="12sp"
         android:visibility="gone" />
 </LinearLayout>

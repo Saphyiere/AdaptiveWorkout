@@ -7,7 +7,10 @@ using Android.Gms.Wearable;
 
 namespace AdaptiveWorkout.Phone;
 
-/// <summary>Hears the watch, whether the app is on screen, in the background, or not running: heart rate, and "start the next set".</summary>
+/// <summary>
+/// Hears the watch, whether the app is on screen, in the background, or not running: heart rate, and its button, which stops the
+/// running set or starts the next one.
+/// </summary>
 [Service(Exported = true)]
 [IntentFilter(["com.google.android.gms.wearable.MESSAGE_RECEIVED"], DataScheme = "wear", DataHost = "*", DataPathPrefix = WatchMessages.HeartRate)]
 [IntentFilter(["com.google.android.gms.wearable.MESSAGE_RECEIVED"], DataScheme = "wear", DataHost = "*", DataPathPrefix = "/workout")]
@@ -18,7 +21,7 @@ public sealed class WatchListenerService : WearableListenerService
         var services = IPlatformApplication.Current!.Services;
         var watch = services.GetRequiredService<WatchLink>();
         var path = message.Path;
-        if (path is WatchMessages.Next or WatchMessages.Hello)
+        if (path is WatchMessages.Next or WatchMessages.StopSet or WatchMessages.Hello)
         {
             // On the main thread, like the screens, since the open workout isn't shared across threads.
             var workout = services.GetRequiredService<WorkoutFlow>();
@@ -26,6 +29,8 @@ public sealed class WatchListenerService : WearableListenerService
             {
                 await workout.LoadAsync();
                 if (path == WatchMessages.Next) workout.StartNext();
+                if (path == WatchMessages.StopSet) workout.StopSet();
+                if (path == WatchMessages.Hello && watch is PhoneWatchLink phone) phone.ShowTheme();
 
                 // Answers every message, also a Next with nothing to start, so the watch's Start button never waits on it.
                 if (workout.Status is { } status) watch.Show(status);

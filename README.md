@@ -77,7 +77,8 @@ The phone opens the watch app when a workout starts, and the watch sends heart r
 2. Turn Bluetooth back on on the phone after deploying to the watch: the watch and phone talk over that link.
 3. Open **AdaptiveWorkout** on the watch once by hand and allow heart rate and notifications. It shows your heart rate right away. Swipe it away when done.
 4. Start a workout on the phone (allow its notifications, for the rest timer on the lock screen). The watch wakes up on the heart rate screen, and within a few seconds the phone shows the bpm under the timer. **Finish** closes the watch app.
-5. On a break, tap the rest time for a countdown. At zero the watch buzzes; with the phone's screen elsewhere, the watch comes up with **Start <next>**, which starts that set on the phone.
+5. On a break, tap the rest time for a countdown. At zero the watch buzzes; with the phone's screen elsewhere, the watch comes up with **Start <next>**, which starts that set on the phone. While a set runs, the watch's button is **Stop**.
+6. The watch screen stays up for the whole workout, dimmed between glances, instead of going back to the watch face: the workout is an ongoing activity, and its icon on the watch face taps back in.
 
 If the watch doesn't open, it should at least show a "Workout started" notification; tap it. Then check the phone's log with `adb logcat -s AdaptiveWorkout`: `Opening the watch app: done` or `failed (n)` says what the watch's companion app answered. **Open on watch** on the phone tries again.
 
@@ -106,7 +107,7 @@ To add a theme: add it to `Theme.All`, give it a token block (and any shapes) in
 
 Fonts are in `src/AdaptiveWorkout.UI/wwwroot/fonts`, each under the SIL Open Font License (`OFL-*.txt`): Newsreader and Schibsted Grotesk for Logbook, Martian Mono and Atkinson Hyperlegible Next for Telemetry. The app icon and splash are SVGs in `src/AdaptiveWorkout.Phone/Resources`.
 
-The watch keeps its black screen with the pink accent: a dark screen suits the watch, and vermilion on black is too dim to read. Its colors are in `src/AdaptiveWorkout.Watch/Resources/values/colors.xml`, its icon in `Resources/drawable`, and its font is Archivo Expanded (SIL Open Font License, `src/AdaptiveWorkout.Watch/OFL-ArchivoExpanded.txt`).
+The watch wears the phone's theme too. The phone sends its theme's id with each workout, when the watch says hello, and when it changes; the watch keeps the last one. `src/AdaptiveWorkout.Watch/WatchTheme.cs` has each theme's colors (from the `app.css` tokens) and fonts: the same four, cut down to Latin as TTFs in `Resources/font` (Newsreader at a fixed optical size), with their licenses in `src/AdaptiveWorkout.Watch/OFL-*.txt`. Dimmed, the watch goes to light print on black, whatever the theme, to spare the screen. To add a theme there, add its `WatchTheme` and the fonts it needs.
 
 ## Tests
 

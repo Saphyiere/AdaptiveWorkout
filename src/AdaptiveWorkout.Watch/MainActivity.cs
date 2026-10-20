@@ -2,6 +2,9 @@ using System.Globalization;
 using AdaptiveWorkout.Core;
 using Android.Content;
 using Android.Content.PM;
+using Android.Content.Res;
+using Android.Graphics;
+using Android.Graphics.Drawables;
 using Android.OS;
 using Android.Views;
 using AndroidX.Activity;
@@ -10,14 +13,18 @@ using AndroidX.Wear.Ambient;
 namespace AdaptiveWorkout.Watch;
 
 /// <summary>
-/// The heart rate screen. The phone opens it when a workout starts and closes it at Finish, and it comes up when a rest countdown is up.
-/// When the watch screen times out it stays up, dimmed, instead of going back to the watch face.
+/// The heart rate screen, in the phone's theme. The phone opens it when a workout starts and closes it at Finish, and it comes up
+/// when a rest countdown is up. When the watch screen times out it stays up, dimmed, instead of going back to the watch face.
+/// Its button is the phone's big button: Stop while a set runs, Start what's next between sets.
 /// </summary>
 [Activity(Label = "@string/app_name", MainLauncher = true, Exported = true, LaunchMode = LaunchMode.SingleTask)]
 [IntentFilter([Intent.ActionView], Categories = [Intent.CategoryDefault, Intent.CategoryBrowsable], DataScheme = "adaptiveworkout", DataHost = "workout")]
 public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientLifecycleCallback
 {
+    private View root = null!;
+    private TextView clock = null!;
     private TextView bpm = null!;
+    private TextView bpmUnit = null!;
     private TextView status = null!;
     private Chronometer elapsed = null!;
     private View phase = null!;
@@ -26,9 +33,10 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
     private Button start = null!;
     private long workoutStartedAt;
     private bool ambient;
+    private WatchTheme theme = WatchTheme.Logbook;
 
-    // The status Start was tapped on. The button says "Starting…" until the phone answers with a new one.
-    private WorkoutStatus? startTappedOn;
+    // The status the button was tapped on. It says "Starting…" or "Stopping…" until the phone answers with a new one.
+    private WorkoutStatus? tappedOn;
 
     /// <summary>True while the screen is showing, so the phone's start message doesn't also post a notification.</summary>
     public static bool IsVisible { get; private set; }
@@ -42,7 +50,10 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
         SetContentView(Resource.Layout.activity_main);
         SetShowWhenLocked(true);
         SetTurnScreenOn(true);
+        root = FindViewById(Resource.Id.root)!;
+        clock = FindViewById<TextView>(Resource.Id.clock)!;
         bpm = FindViewById<TextView>(Resource.Id.bpm)!;
+        bpmUnit = FindViewById<TextView>(Resource.Id.bpm_unit)!;
         status = FindViewById<TextView>(Resource.Id.status)!;
         elapsed = FindViewById<Chronometer>(Resource.Id.elapsed)!;
         phase = FindViewById(Resource.Id.phase)!;
@@ -51,8 +62,8 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
         start = FindViewById<Button>(Resource.Id.start)!;
         start.Click += (_, _) =>
         {
-            startTappedOn = HeartRateService.Status;
-            HeartRateService.StartNext();
+            tappedOn = HeartRateService.Status;
+            HeartRateService.Ask(tappedOn is { Resting: false } ? WatchMessages.StopSet : WatchMessages.Next);
             Show();
         };
         Lifecycle.AddObserver(AmbientLifecycleObserverKt.AmbientLifecycleObserver(this, this));
@@ -69,6 +80,8 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
     {
         base.OnStart();
         HeartRateService.Changed += OnChanged;
+        WatchTheme.Changed += OnThemeChanged;
+        Dress();
         Show();
     }
 
@@ -90,6 +103,7 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
     protected override void OnStop()
     {
         HeartRateService.Changed -= OnChanged;
+        WatchTheme.Changed -= OnThemeChanged;
         base.OnStop();
     }
 
@@ -116,12 +130,14 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
     public void OnEnterAmbient(AmbientLifecycleObserverAmbientDetails ambientDetails)
     {
         ambient = true;
+        Dress();
         Show();
     }
 
     public void OnExitAmbient()
     {
         ambient = false;
+        Dress();
         Show();
     }
 
@@ -146,11 +162,44 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
         else Show();
     }
 
+    private void OnThemeChanged()
+    {
+        Dress();
+        Show();
+    }
+
+    // The phone's theme: its ground, print and fonts, and its big button. Dimmed, light print on black and no color, to spare the screen.
+    private void Dress()
+    {
+        theme = WatchTheme.Current(this);
+        var (ink, muted) = ambient ? (WatchTheme.DimInk, WatchTheme.DimMuted) : (theme.Ink, theme.Muted);
+        root.SetBackgroundColor(ambient ? Color.Black : theme.Ground);
+        Style(clock, theme.Labels, muted);
+        Style(phaseTitle, theme.Labels, muted);
+        Style(phaseTime, theme.Numbers, ink);
+        Style(bpm, theme.Numbers, ambient ? ink : theme.Heart);
+        Style(bpmUnit, theme.Unit, muted);
+        Style(elapsed, theme.Numbers, ink);
+        Style(status, theme.Unit, muted);
+        Style(start, theme.Control, theme.OnSlab);
+        var slab = new GradientDrawable();
+        slab.SetColor(theme.Slab);
+        slab.SetCornerRadius(theme.SlabRadius * Resources!.DisplayMetrics!.Density);
+        start.Background = new RippleDrawable(ColorStateList.ValueOf(Color.Argb(51, theme.OnSlab.R, theme.OnSlab.G, theme.OnSlab.B)), slab, null);
+    }
+
+    private void Style(TextView view, WatchFont font, Color color)
+    {
+        view.Typeface = Resources!.GetFont(font.Font);
+        view.SetFontVariationSettings(font.Axes.Length == 0 ? null : font.Axes);
+        view.SetAllCaps(font.Caps);
+        view.SetTextColor(color);
+    }
+
     private void Show()
     {
-        // Dimmed, the pink and the button go, to spare the screen.
+        // Dimmed, the color and the button go, to spare the screen.
         bpm.Text = HeartRateService.Bpm?.ToString(CultureInfo.InvariantCulture) ?? GetString(Resource.String.no_reading);
-        bpm.SetTextColor(GetColorStateList(ambient ? Resource.Color.ink : Resource.Color.accent));
         status.Text = HeartRateService.PhoneReachable ? "" : GetString(Resource.String.phone_unreachable);
         status.Visibility = HeartRateService.PhoneReachable ? ViewStates.Gone : ViewStates.Visible;
 
@@ -159,11 +208,13 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
         elapsed.Start();
 
         // What the phone says the workout is doing: a set and its time, or a rest counting down to the next set (then how far over).
+        // The button is the phone's big button: Stop while a set (or a superset's round) runs, Start what's next between them.
         var workout = HeartRateService.Status;
-        var canStart = workout is { Resting: true, Next: not null } && HeartRateService.PhoneReachable && !ambient;
+        var stops = workout is { Resting: false };
+        var button = (stops || workout is { Resting: true, Next: not null }) && HeartRateService.PhoneReachable && !ambient;
         phase.Visibility = workout is null ? ViewStates.Gone : ViewStates.Visible;
-        start.Visibility = canStart ? ViewStates.Visible : ViewStates.Gone;
-        elapsed.Visibility = canStart ? ViewStates.Gone : ViewStates.Visible;
+        start.Visibility = button ? ViewStates.Visible : ViewStates.Gone;
+        elapsed.Visibility = button ? ViewStates.Gone : ViewStates.Visible;
         if (workout is null) return;
 
         var over = HeartRateService.RestOver;
@@ -171,16 +222,22 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
         phaseTitle.Text = over ? GetString(Resource.String.rest_over) : workout.Title;
         phaseTime.CountDown = countdown;
         phaseTime.Format = over ? "+%s" : null;
-        phaseTime.SetTextColor(GetColorStateList(over && !ambient ? Resource.Color.accent : Resource.Color.ink));
+        phaseTime.SetTextColor(over && !ambient ? theme.Mark : ambient ? WatchTheme.DimInk : theme.Ink);
         phaseTime.Base = SystemClock.ElapsedRealtime() - (long)(DateTimeOffset.Now - (countdown || over ? workout.RestEndsAt!.Value : workout.Since)).TotalMilliseconds;
         phaseTime.Start();
 
         // Out of the phone's reach, the button goes until it's back, then can be tapped again.
-        if (!HeartRateService.PhoneReachable) startTappedOn = null;
-        if (workout.Next is not { } next) return;
+        if (!HeartRateService.PhoneReachable) tappedOn = null;
+        if (!button) return;
 
-        var starting = ReferenceEquals(startTappedOn, workout);
-        start.Enabled = !starting;
-        start.Text = starting ? GetString(Resource.String.starting) : GetString(Resource.String.start_next, new Java.Lang.String(next));
+        var waiting = ReferenceEquals(tappedOn, workout);
+        start.Enabled = !waiting;
+        start.Text = (stops, waiting) switch
+        {
+            (true, true) => GetString(Resource.String.stopping),
+            (true, false) => GetString(Resource.String.stop),
+            (false, true) => GetString(Resource.String.starting),
+            _ => GetString(Resource.String.start_next, new Java.Lang.String(workout.Next!)),
+        };
     }
 }

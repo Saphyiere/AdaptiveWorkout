@@ -15,8 +15,17 @@ public static class WatchMessages
     /// <summary>Phone to watch: what the workout is doing now, as <see cref="EncodeStatus"/> writes it. Sent on every change.</summary>
     public const string Status = "/workout/status";
 
+    /// <summary>
+    /// Phone to watch: the theme the phone wears, by its id ("logbook" or "telemetry"), so the watch wears it too. Sent with a new
+    /// workout, when the watch says hello, and when it changes.
+    /// </summary>
+    public const string Theme = "/workout/theme";
+
     /// <summary>Watch to phone: start whatever comes next, e.g. when the rest countdown is up.</summary>
     public const string Next = "/workout/next";
+
+    /// <summary>Watch to phone: stop the running set, or a superset's round. The watch's Stop button.</summary>
+    public const string StopSet = "/workout/stop-set";
 
     /// <summary>Watch to phone: the watch app just started reading, so send the status again.</summary>
     public const string Hello = "/workout/hello";

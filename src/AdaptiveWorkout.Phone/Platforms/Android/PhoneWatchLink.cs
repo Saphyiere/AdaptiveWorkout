@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using AdaptiveWorkout.Core;
 using AdaptiveWorkout.UI.Storage;
+using AdaptiveWorkout.UI.Themes;
 using AdaptiveWorkout.UI.Watch;
 using Android.Content;
 using Android.Gms.Extensions;
@@ -13,13 +14,21 @@ using Application = Android.App.Application;
 
 namespace AdaptiveWorkout.Phone;
 
-/// <summary>Reaches the watch app over the Wear OS Data Layer.</summary>
-public sealed class PhoneWatchLink(WorkoutStore store) : WatchLink(store)
+/// <summary>Reaches the watch app over the Wear OS Data Layer. The watch wears the phone's theme, so it hears of every change.</summary>
+public sealed class PhoneWatchLink : WatchLink
 {
     // What androidx.wear.remote.interactions.RemoteActivityHelper sends, which has no .NET binding: the watch's companion app
     // on the phone (Galaxy Wearable's plugin for a Galaxy Watch) passes the intent to the watch, and the watch opens it.
     private const string RemoteIntent = "com.google.android.wearable.intent.action.REMOTE_INTENT";
     private const string DefaultCompanion = "com.google.android.wearable.app";
+
+    private readonly ThemeSetting themes;
+
+    public PhoneWatchLink(WorkoutStore store, ThemeSetting themes) : base(store)
+    {
+        this.themes = themes;
+        themes.Changed += ShowTheme;
+    }
 
     public override void Open(WorkoutSession session) => _ = ToEachWatchAsync(async (context, watch) =>
     {
@@ -42,8 +51,13 @@ public sealed class PhoneWatchLink(WorkoutStore store) : WatchLink(store)
 
         // Backup: the watch app shows a "workout started" notification if its screen didn't open.
         var startedAt = Encoding.UTF8.GetBytes(session.StartedAt.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture));
+        await WearableClass.GetMessageClient(context).SendMessageAsync(watch.Id, WatchMessages.Theme, Encoding.UTF8.GetBytes(themes.Current.Id));
         await WearableClass.GetMessageClient(context).SendMessageAsync(watch.Id, WatchMessages.Start, startedAt);
     });
+
+    /// <summary>Tells the watch which theme the phone wears, so its screen wears it too.</summary>
+    public void ShowTheme() =>
+        _ = ToEachWatchAsync((context, watch) => WearableClass.GetMessageClient(context).SendMessageAsync(watch.Id, WatchMessages.Theme, Encoding.UTF8.GetBytes(themes.Current.Id)));
 
     public override void Close() => _ = ToEachWatchAsync((context, watch) => WearableClass.GetMessageClient(context).SendMessageAsync(watch.Id, WatchMessages.Stop, []));
 

@@ -31,11 +31,12 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         get
         {
             if (Current is not { } state) return null;
-            if (state.Session.CoolDownStartedAt is { } coolingSince) return new WorkoutStatus(false, "Cool-down", coolingSince, null, null);
+            if (state.Session.CoolDownStartedAt is { } coolingSince) return new WorkoutStatus(true, "Cool-down", coolingSince, null, null);
             if (state.Running is [var first, ..] running) return new WorkoutStatus(false, state.Names(running.Select(s => s.ExerciseId)), first.StartedAt!.Value, null, null);
 
-            // The warm-up waits for the first exercise like a rest, counting up, so the watch can start it too.
-            var next = state.Next is { } step ? state.Names(step.ExerciseIds) : null;
+            // The warm-up waits for the first exercise like a rest, counting up, so the watch can start it too. After the last
+            // exercise, a planned cool-down is what's next.
+            var next = state.Next is { } step ? state.Names(step.ExerciseIds) : state is { WarmingUp: false, CoolDownNext: true } ? "cool-down" : null;
             if (state.WarmingUp) return new WorkoutStatus(true, "Warm-up", state.Session.StartedAt, null, next);
             if (state.ToLog is not { } logged) return new WorkoutStatus(true, state.Name, state.Session.StartedAt, null, next);
 
@@ -121,10 +122,11 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         Announce();
     }
 
-    /// <summary>Starts whatever comes next, e.g. from the watch when a rest is up. Does nothing while a set runs.</summary>
+    /// <summary>Starts whatever comes next, e.g. from the watch: the next set or round, else a planned cool-down. Does nothing while a set runs.</summary>
     public void StartNext()
     {
         if (Current is { Running: [], Next: { } next }) StartSets(next.ExerciseIds);
+        else StartCoolDown();
     }
 
     /// <summary>Another set of what I just did (another round of a superset), e.g. past its planned sets.</summary>
