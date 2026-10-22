@@ -27,6 +27,13 @@ public static class WatchMessages
     /// <summary>Watch to phone: stop the running set, or a superset's round. The watch's Stop button.</summary>
     public const string StopSet = "/workout/stop-set";
 
+    /// <summary>
+    /// Watch to phone: the rest countdown ran out, so start the next set, as the countdown on the phone's rest screen would. The
+    /// watch keeps time even with the phone in a pocket and its app asleep. The payload is when that countdown ended, as
+    /// <see cref="EncodeTime"/> writes it, so one that changed since starts nothing.
+    /// </summary>
+    public const string RestOver = "/workout/rest-over";
+
     /// <summary>Watch to phone: the watch app just started reading, so send the status again.</summary>
     public const string Hello = "/workout/hello";
 
@@ -35,6 +42,12 @@ public static class WatchMessages
 
     /// <summary>Opens the watch app's heart rate screen for a workout.</summary>
     public static string WorkoutUri(DateTimeOffset startedAt) => $"adaptiveworkout://workout?started={startedAt.ToUnixTimeMilliseconds()}";
+
+    /// <summary>A moment, as Unix milliseconds in text.</summary>
+    public static byte[] EncodeTime(DateTimeOffset at) => Encoding.UTF8.GetBytes(at.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture));
+
+    public static DateTimeOffset DecodeTime(byte[] payload) =>
+        DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(Encoding.UTF8.GetString(payload), CultureInfo.InvariantCulture)).ToLocalTime();
 
     /// <summary>A line with the phone workout's start (0 when the watch app was opened on its own), then a line per reading: Unix milliseconds and bpm.</summary>
     public static byte[] EncodeReadings(DateTimeOffset? workoutStartedAt, IEnumerable<HeartRateSample> readings)

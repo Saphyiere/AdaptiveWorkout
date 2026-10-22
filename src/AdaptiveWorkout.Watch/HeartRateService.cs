@@ -13,7 +13,8 @@ namespace AdaptiveWorkout.Watch;
 /// <summary>
 /// Reads heart rate during a workout, screen on or off, and sends it to the phone.
 /// Readings wait here until the phone takes them, so a short disconnect loses nothing.
-/// It also keeps the phone's word on what the workout is doing, and buzzes when a rest countdown is up.
+/// It also keeps the phone's word on what the workout is doing, and when a rest countdown is up, buzzes and starts the next set:
+/// it keeps time while the phone's app may be asleep in a pocket.
 /// </summary>
 [Service(ForegroundServiceType = ForegroundService.TypeHealth, Exported = false)]
 public sealed class HeartRateService : Service, ISensorEventListener
@@ -55,6 +56,9 @@ public sealed class HeartRateService : Service, ISensorEventListener
 
     /// <summary>What the phone says the workout is doing; empty until it says.</summary>
     public static WorkoutStatus? Status { get; private set; }
+
+    /// <summary>The status the watch last asked the phone to move on from. Until the phone answers with a new one, the button says so.</summary>
+    public static WorkoutStatus? AskedOn { get; private set; }
 
     /// <summary>True once the rest countdown is up and the next set hasn't started.</summary>
     public static bool RestOver => Status is { Resting: true, RestEndsAt: { } end } && DateTimeOffset.Now >= end;
@@ -135,7 +139,7 @@ public sealed class HeartRateService : Service, ISensorEventListener
         restAlarm.RemoveCallbacksAndMessages(null);
         ((NotificationManager)GetSystemService(NotificationService)!).Cancel(RestOverNotificationId);
         running = null;
-        (StartedAt, FromPhone, Bpm, PhoneReachable, Status) = (null, false, null, true, null);
+        (StartedAt, FromPhone, Bpm, PhoneReachable, Status, AskedOn) = (null, false, null, true, null, null);
         Changed?.Invoke();
         base.OnDestroy();
     }
@@ -145,7 +149,7 @@ public sealed class HeartRateService : Service, ISensorEventListener
     {
         if (running is not { } service) return;
 
-        // With its screen on the rest, the phone starts the next set at zero itself, which can land just before this buzz. Buzz anyway.
+        // With its rest screen open, the phone starts the next set at zero itself, which can land just before this buzz. Buzz anyway.
         var now = DateTimeOffset.Now;
         var startedAtZero = !status.Resting && service.buzzAt - now < TimeSpan.FromSeconds(1);
         Status = status;
@@ -158,24 +162,29 @@ public sealed class HeartRateService : Service, ISensorEventListener
     });
 
     /// <summary>
-    /// Asks the phone to do what its big button does now: <see cref="WatchMessages.StopSet"/> or <see cref="WatchMessages.Next"/>.
-    /// The phone answers with the new status. Any thread.
+    /// Asks the phone to move the workout on: what its big button does (<see cref="WatchMessages.StopSet"/> or
+    /// <see cref="WatchMessages.Next"/>), or <see cref="WatchMessages.RestOver"/>. The phone answers with the new status. Any thread.
     /// </summary>
-    public static void Ask(string path) => running?.handler.Post(async () =>
+    public static void Ask(string path, byte[]? payload = null) => running?.handler.Post(async () =>
     {
         if (running is not { } service) return;
 
-        PhoneReachable = await service.TellPhoneAsync(path, []);
+        AskedOn = Status;
+        Changed?.Invoke();
+        PhoneReachable = await service.TellPhoneAsync(path, payload ?? []);
+        if (!PhoneReachable) AskedOn = null;
         Changed?.Invoke();
     });
 
-    // The rest countdown is up: buzz, and if the heart rate screen isn't showing, bring it up with "Start <next>"
-    // (or the set itself, when the phone started it at zero).
+    // The rest countdown is up: buzz, start the next set on the phone (from here, since the phone's app may be asleep in a pocket;
+    // if its rest screen is open it may have started it already, which is fine), and if the heart rate screen isn't showing, bring
+    // it up. Out of the phone's reach, the screen shows "Rest is up" and Start for when it's back.
     private void RestIsOver()
     {
         buzzAt = null;
         var vibrator = OperatingSystem.IsAndroidVersionAtLeast(31) ? ((VibratorManager)GetSystemService(VibratorManagerService)!).DefaultVibrator : (Vibrator)GetSystemService(VibratorService)!;
         vibrator.Vibrate(VibrationEffect.CreateWaveform([0, 400, 200, 400, 200, 400], -1));
+        if (Status is { Resting: true, RestEndsAt: { } end, Next: not null }) Ask(WatchMessages.RestOver, WatchMessages.EncodeTime(end));
         Changed?.Invoke();
         if (MainActivity.IsVisible) return;
 
@@ -189,7 +198,7 @@ public sealed class HeartRateService : Service, ISensorEventListener
         notifications.Notify(RestOverNotificationId, new Notification.Builder(this, RestOverChannel)
             .SetSmallIcon(Resource.Drawable.appicon_foreground)
             .SetContentTitle(GetString(Resource.String.rest_over))
-            .SetContentText(Status is { Resting: true, Next: { } next } ? GetString(Resource.String.start_next, new Java.Lang.String(next)) : Status?.Title)
+            .SetContentText(Status is { Resting: true, Next: { } next } ? next : Status?.Title)
             .SetContentIntent(open)
             .SetFullScreenIntent(open, true)
             .SetAutoCancel(true)

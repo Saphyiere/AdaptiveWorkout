@@ -129,6 +129,18 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         else StartCoolDown();
     }
 
+    /// <summary>
+    /// The rest countdown ran out: starts the next set or round, from the rest screen's countdown or the watch's. A cool-down waits
+    /// for a tap. The watch says when its countdown ended (<paramref name="endsAt"/>); when that's no longer this rest's (another
+    /// set started meanwhile, or the countdown changed), nothing starts.
+    /// </summary>
+    public void RestIsUp(DateTimeOffset? endsAt = null)
+    {
+        if (endsAt is { } heard && (Status?.RestEndsAt is not { } end || (end - heard).Duration() > TimeSpan.FromSeconds(2))) return;
+
+        if (Current is { Running: [], Next: { } next }) StartSets(next.ExerciseIds);
+    }
+
     /// <summary>Another set of what I just did (another round of a superset), e.g. past its planned sets.</summary>
     public void StartAnother()
     {

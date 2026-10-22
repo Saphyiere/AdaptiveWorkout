@@ -166,7 +166,7 @@
             var toConfirm = state.ToConfirm;
             <div class="step" @key="@($"break-{logged.Order}")">
                 <section class="block bare" aria-label="Rest">
-                    <RestTimer Since="logged.StoppedAt!.Value" ExerciseId="logged.ExerciseId" NextName="@(state.Next is { } upNext ? state.Names(upNext.ExerciseIds) : null)" OnZero="StartNext" />
+                    <RestTimer Since="logged.StoppedAt!.Value" ExerciseId="logged.ExerciseId" NextName="@(state.Next is { } upNext ? state.Names(upNext.ExerciseIds) : null)" OnZero="() => Flow.RestIsUp()" />
                 </section>
 
                 <section class="block" aria-label="Heart rate">
@@ -235,12 +235,6 @@
     }
 
     private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";
-
-    // The rest countdown reached zero: on to the next set. A cool-down waits for a tap.
-    private void StartNext()
-    {
-        if (state?.Next is not null) Flow.StartNext();
-    }
 
     // A change made elsewhere, e.g. a set started from the watch.
     private void OnFlowChanged() => _ = InvokeAsync(StateHasChanged);

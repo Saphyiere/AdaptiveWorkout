@@ -35,9 +35,6 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
     private bool ambient;
     private WatchTheme theme = WatchTheme.Logbook;
 
-    // The status the button was tapped on. It says "Starting…" or "Stopping…" until the phone answers with a new one.
-    private WorkoutStatus? tappedOn;
-
     /// <summary>True while the screen is showing, so the phone's start message doesn't also post a notification.</summary>
     public static bool IsVisible { get; private set; }
 
@@ -60,12 +57,7 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
         phaseTitle = FindViewById<TextView>(Resource.Id.phase_title)!;
         phaseTime = FindViewById<Chronometer>(Resource.Id.phase_time)!;
         start = FindViewById<Button>(Resource.Id.start)!;
-        start.Click += (_, _) =>
-        {
-            tappedOn = HeartRateService.Status;
-            HeartRateService.Ask(tappedOn is { Resting: false } ? WatchMessages.StopSet : WatchMessages.Next);
-            Show();
-        };
+        start.Click += (_, _) => HeartRateService.Ask(HeartRateService.Status is { Resting: false } ? WatchMessages.StopSet : WatchMessages.Next);
         Lifecycle.AddObserver(AmbientLifecycleObserverKt.AmbientLifecycleObserver(this, this));
         StartReading(Intent);
     }
@@ -226,11 +218,10 @@ public class MainActivity : ComponentActivity, IAmbientLifecycleObserverAmbientL
         phaseTime.Base = SystemClock.ElapsedRealtime() - (long)(DateTimeOffset.Now - (countdown || over ? workout.RestEndsAt!.Value : workout.Since)).TotalMilliseconds;
         phaseTime.Start();
 
-        // Out of the phone's reach, the button goes until it's back, then can be tapped again.
-        if (!HeartRateService.PhoneReachable) tappedOn = null;
+        // Asked, the button says so until the phone answers. Out of the phone's reach, it goes until it's back, then can be tapped again.
         if (!button) return;
 
-        var waiting = ReferenceEquals(tappedOn, workout);
+        var waiting = ReferenceEquals(HeartRateService.AskedOn, workout);
         start.Enabled = !waiting;
         start.Text = (stops, waiting) switch
         {

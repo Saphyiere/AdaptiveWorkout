@@ -15,6 +15,14 @@ public class WatchMessagesTests
     }
 
     [Fact]
+    public void Time_ComesBackTheSame_ToTheMillisecond()
+    {
+        var restEndsAt = Stopped.AddSeconds(90).AddMilliseconds(250);
+
+        Assert.Equal(restEndsAt, WatchMessages.DecodeTime(WatchMessages.EncodeTime(restEndsAt)));
+    }
+
+    [Fact]
     public void Status_ComesBackTheSame_WithoutACountdownOrANextSet()
     {
         var set = new WorkoutStatus(false, "Bench press", Stopped, null, null);
