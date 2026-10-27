@@ -43,7 +43,7 @@ Build the foundation first, then add on.
 The home screen answers the three questions at a glance. **(proposed)**
 
 - **Gym today:** done, not yet, or **rest day**, plus this week's gym days (e.g. Mon, Wed, Thu) with the routine's rest days marked, and the streak. Tapping it opens **Gym**.
-- **Calories:** eaten today against 1,800, with a quick add. **Edit** lists today's entries, each deletable.
+- **Calories:** eaten today against my goal (1,800) and maintenance, with a quick add. **Edit** lists today's entries, each deletable. Tapping its heading opens **Calories**.
 - **Body weight:** the latest weigh-in and its trend, with a quick add. **Edit** lists the last 10 weigh-ins, each deletable.
 - The big button: **Start Back day** (today's session in the routine). On a rest day, or once today is done, it reads **Start a workout** and opens the session picker. On a rest day, **Edit routine** sits under it.
 - At the top right: **Stats** (a little line chart), then **Settings**.
@@ -74,14 +74,24 @@ How has my flat chest press been going? **An exercise** shows its line across ev
 
 Tapping a point on any line picks that workout in the list below, and tapping a workout opens it.
 
+### Calories
+
+How have I been eating, and why am I (not) losing weight? Opened from Today's calorie heading, or from the top of Stats:
+
+- **Eaten:** a bar for each day of the last five weeks, or with **Weeks**, each week of the last six months as its average day. Each bar is solid up to the goal and hatched past it, with the goal across in ink and maintenance dashed (it steps as my weight changes). A day with nothing logged is a dash on the baseline; today's bar, still filling, is fainter. Tapping a bar shows its day (or week): eaten, and how far over or under the goal and maintenance.
+- **This week**, its days that are over: the average day against my goal, how many days I logged, how far under maintenance, and what that should do to my weight so far.
+- **Last 4 weeks:** the weight my logs add up to, against the scale's (the line through my weigh-ins). When the scale lost less, it says so: some of what I eat may not be logged, or my maintenance is lower than the formula's.
+- **Every week** since I started logging, by month: its average day, the days logged, and the weight it should come to.
+
 ### Settings
 
-The icon at the top right of Today, after Stats. For now it holds the look:
+The icon at the top right of Today, after Stats:
 
-- **Logbook:** a printed training log, warm paper and a red pen.
-- **Telemetry:** a dark instrument panel, with every number on a ruler.
+- **Look:** **Logbook**, a printed training log, warm paper and a red pen; or **Telemetry**, a dark instrument panel, with every number on a ruler. Choosing one switches the whole app at once.
+- **Calories:** my goal a day (1,800 to start), and maintenance, worked out from my body and latest weigh-in (see *Calories* below).
+- **Body:** sex, age, height, and how active I am in a usual week, training included: from sitting most of the day to hard training and a physical job.
 
-Choosing one switches the whole app at once, and it's remembered.
+Everything is remembered.
 
 ### Getting around
 
@@ -298,10 +308,11 @@ How it runs:
 ## Calories
 
 - Just what I ate. Not tied to sessions.
-- Enter one total before bed, or add amounts through the day; both are entries summed per day.
-- Goal 1,800 a day; maintenance 2,200.
-- A simple chart: eaten per day against the goal and maintenance lines.
-- A day with no entries counts as over: maintenance + 200 (2,400). **(proposed)** The +200 is a setting.
+- Enter one total before bed, or add amounts through the day; both are entries summed per day, by the day on the clock when I ate. Every entry is kept, so every day is there to look back on; a day counts once it's over.
+- Goal 1,800 a day, changed in Settings.
+- **Maintenance** is what would keep my weight where it is: resting calories by the Mifflin-St Jeor formula (10 × kg + 6.25 × cm − 5 × age, then +5 for a man or −161 for a woman), times how active I am (1.2 sitting most of the day, 1.375 lightly active, 1.55 moderately, 1.725 very, 1.9 hard training and a physical job). Each day takes the weigh-in nearest before it ended, so maintenance follows my weight down. Until my sex, age, height and a weigh-in are in, Today takes it as 2,200.
+- **A day with nothing logged** is a day I didn't log, not a day I didn't eat: it's left out of the averages and shown as a gap, with how many days I did log. What my logs should do to my weight counts every day as an average one: the average deficit × the days ÷ 3,500 a pound (7,700 a kilogram).
+- **The scale's change** is read off the straight line through the weigh-ins in that time, so one heavy morning doesn't swing it. It needs two weigh-ins a week apart.
 
 ## Body weight
 
@@ -313,7 +324,7 @@ A weigh-in whenever I step on the scale, charted over time.
 Routine            Id, Name
 RoutineDay         RoutineId, Day (Monday 0 to Sunday 6), TemplateId (empty = rest day)
 SessionTemplate    Id, Name, Order, WarmUp, CoolDown
-Setting            Key, Value                    (the routine in use, the theme, rest countdowns)
+Setting            Key, Value                    (the routine in use, the theme, rest countdowns, the calorie goal, sex, birth year, height, activity)
 TemplateExercise   TemplateId, ExerciseId, Order, PlannedSets (optional), SupersetGroup (optional)
 SessionExercise    SessionId, ExerciseId, Order, PlannedSets, SupersetGroup   (the workout's own copy, changed as it goes)
 Session            Id, TemplateId (empty = just tracking), StartedAt, FinishedAt, LoggedAfterward
@@ -328,7 +339,7 @@ Set                Id, SessionId, ExerciseId, Order,
 HeartRateSample    At, Bpm                      (matched to sessions, sets and rests by time)
 FoodEntry          Id, At, Calories
 BodyWeightEntry    Id, At, Weight, WeightUnit
-Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Unit lb
+Settings           CalorieGoal 1800, Sex, BirthYear, HeightCm, Activity (Moderate), Unit lb; maintenance 2200 until it can be worked out
 ```
 
 **(proposed)** Stored locally on the phone (SQLite). Backup or Google sync later.

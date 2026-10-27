@@ -1,16 +1,31 @@
 @page "/stats"
 @inject WorkoutStore Store
 @inject WorkoutFlow Flow
+@inject AppSettings Settings
 
 <PageTitle>Stats</PageTitle>
 
-@* How am I doing at each routine, session and exercise? Each one's change since its first time, and a tap opens its own trend. *@
+@* How am I doing at each routine, session and exercise? Each one's change since its first time, and a tap opens its own trend.
+   Calories, first, open what I've eaten day by day. *@
 @if (loaded)
 {
     var key = ExerciseNames.Key(query);
     var found = exerciseRows.Where(r => ExerciseNames.Key(r.Exercise.Name).Contains(key)).ToList();
     <div class="screen">
         <PageHeader Back="" BackText="Today" Label="@WorkoutsText(workouts)" Title="Stats" />
+
+        <section class="stack" aria-labelledby="calories-heading">
+            <h2 id="calories-heading" class="label">Calories</h2>
+            <div class="ledger">
+                <a class="row" href="calories">
+                    <span class="row-text">
+                        <span class="name">Calories eaten</span>
+                        <span class="caption">@caloriesText</span>
+                    </span>
+                    <Icon Name="forward" Size="16" />
+                </a>
+            </div>
+        </section>
 
         @if (workouts == 0)
         {
@@ -100,6 +115,7 @@
     private bool loaded;
     private int workouts;
     private string query = "";
+    private string caloriesText = "";
     private readonly List<(Routine Routine, bool InUse, int GymDays, int Workouts, double? Total)> routineRows = [];
     private readonly List<(SessionTemplate Template, string Days, int Workouts, double? Total)> sessionRows = [];
     private readonly List<(Exercise Exercise, int Workouts, DateTimeOffset Last, double? Total)> exerciseRows = [];
@@ -113,6 +129,15 @@
         var bodyWeights = await Store.GetBodyWeightsAsync();
         var setsBySession = sets.ToLookup(s => s.SessionId);
         workouts = sessions.Count;
+
+        // This week's days that are over, for the Calories row.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var monday = Consistency.WeekStart(today);
+        var food = await Store.GetFoodSinceAsync(new DateTimeOffset(monday.ToDateTime(TimeOnly.MinValue)));
+        var thisWeek = Calories.Span(Calories.Days(food, [], Settings, monday, today.AddDays(-1)));
+        var logged = $"{thisWeek.Logged} of {thisWeek.Days} {(thisWeek.Days == 1 ? "day" : "days")} logged";
+        caloriesText = thisWeek.Days == 0 ? "Day by day, against your goal and maintenance"
+            : thisWeek.AverageEaten is double eaten ? $"This week: {eaten:N0} a day · {logged}" : "Nothing logged this week";
 
         // How much better some workouts' exercises are than their first time among them, by the last of them; empty until there's a change.
         double? Total(IReadOnlyList<WorkoutSession> some, IEnumerable<WorkoutSet> theirSets) =>

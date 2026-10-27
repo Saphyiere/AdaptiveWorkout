@@ -3,9 +3,12 @@
 @implements IAsyncDisposable
 @inject AppLaunch Launch
 @inject ThemeSetting ThemeSetting
+@inject AppSettings Settings
+@inject WorkoutStore Store
 @inject IJSRuntime JS
 
-@* Pages wait for the saved theme, so the components that draw per theme don't start in the wrong one. *@
+@* Pages wait for the saved theme, so the components that draw per theme don't start in the wrong one, and for the saved calorie
+   goal and body details. *@
 @if (themeLoaded)
 {
     <CascadingValue Value="ThemeSetting.Current">
@@ -25,7 +28,7 @@
         // The opening's timing (AppLaunch): Blazor is running, then the saved settings are read.
         Launch.Step("Blazor");
         ThemeSetting.Changed += OnThemeChanged;
-        await ThemeSetting.LoadAsync();
+        await Task.WhenAll(ThemeSetting.LoadAsync(), Store.LoadAsync(Settings));
         Launch.Step("settings");
         themeLoaded = true;
     }

@@ -252,6 +252,12 @@ h1:focus {
     gap: 8px;
 }
 
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
 .center {
     text-align: center;
     align-self: center;
@@ -974,6 +980,18 @@ select.field {
     color: var(--ground);
 }
 
+/* A small switch beside a section's heading, like the calorie chart's Days and Weeks. */
+.segmented.compact {
+    grid-template-columns: repeat(2, auto);
+    gap: 6px;
+}
+
+.segmented.compact button {
+    height: 36px;
+    padding: 0 12px;
+    font-size: 14px;
+}
+
 /* The "Done" status: a stamp in the pen's color, set down slightly crooked. */
 .stamp {
     height: 24px;
@@ -1462,6 +1480,81 @@ button.set-line:active {
     padding: 0;
     border: 0;
     background: none;
+}
+
+/* Calories: a bar a day (or a week), ink up to the goal and hatched past it like Today's meter, with the goal across in ink and
+   maintenance dashed. A day with nothing logged is a dash on the baseline; today's bar, still filling, is fainter. */
+.calorie-chart {
+    position: relative;
+}
+
+.calorie-chart svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.calorie-chart .bar {
+    fill: var(--ink);
+}
+
+.calorie-chart .over {
+    fill: url(#calorie-over);
+}
+
+.calorie-chart .hatch {
+    fill: var(--ink);
+}
+
+.calorie-chart .so-far {
+    opacity: 0.45;
+}
+
+.calorie-chart .none {
+    stroke: var(--ink-muted);
+    stroke-width: 1.5;
+}
+
+.calorie-chart .base {
+    stroke: var(--rule);
+    stroke-width: 1;
+}
+
+.calorie-chart .picked {
+    fill: var(--wash);
+}
+
+.calorie-chart .tick {
+    fill: var(--ink-muted);
+    font-family: var(--font-label);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.calorie-chart .goal-line, .legend .goal-line {
+    stroke: var(--ink);
+    stroke-width: 1.5;
+}
+
+.calorie-chart .maint-line, .legend .maint-line {
+    fill: none;
+    stroke: var(--ink-muted);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
+}
+
+/* What the lines are, under the chart. */
+.legend {
+    gap: 16px;
+    font-family: var(--font-label);
+    font-size: 13px;
+    line-height: 16px;
+    color: var(--ink-muted);
+}
+
+.legend .inline {
+    gap: 6px;
 }
 
 /* Settings: a theme's own paper, ink, figures and pen, whichever theme the page is in (the sample carries its data-theme). */
@@ -2302,6 +2395,23 @@ button.set-line:active {
 
 [data-theme="telemetry"] .history-row.picked > :nth-child(2) {
     padding-left: 8px;
+}
+
+/* The calorie chart: amber bars in the fuel channel, and the bar picked on a raised panel. */
+[data-theme="telemetry"] .calorie-chart .bar,
+[data-theme="telemetry"] .calorie-chart .hatch {
+    fill: var(--fuel);
+}
+
+[data-theme="telemetry"] .calorie-chart .picked {
+    fill: var(--surface-2);
+}
+
+[data-theme="telemetry"] .calorie-chart .tick,
+[data-theme="telemetry"] .legend {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 /* The improvement chart: a lime line with square markers, and a crosshair on the workout picked. */

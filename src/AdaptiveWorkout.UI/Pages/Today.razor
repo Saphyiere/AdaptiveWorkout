@@ -104,7 +104,10 @@
             @if (telemetry)
             {
                 <div class="spread">
-                    <h2 id="calories-heading" class="label tag channel-fuel">Kcal</h2>
+                    <a class="inline" href="calories">
+                        <h2 id="calories-heading" class="label tag channel-fuel">Kcal</h2>
+                        <Icon Name="forward" Size="16" />
+                    </a>
                     @if (todayFood.Count > 0)
                     {
                         <button type="button" class="btn-ghost" @onclick="() => editingFood = !editingFood">@(editingFood ? "Done" : "Edit")</button>
@@ -122,9 +125,9 @@
                 </div>
                 // The day on a ruler of 100-calorie ticks from 0 to a little past maintenance: the goal and maintenance marked
                 // and labelled, and the bar hatched past the goal.
-                var top = (Math.Max(Settings.Maintenance, eaten) + 99) / 100 * 100 + 200;
+                var top = (Math.Max(maintenance, eaten) + 99) / 100 * 100 + 200;
                 double X(int calories) => 0.5 + calories * 325.0 / top;
-                <svg class="ruler channel-fuel" viewBox="0 0 326 36" role="img" aria-label="@($"{eaten:N0} calories on a scale to {top:N0}, goal {Settings.CalorieGoal:N0}, maintenance {Settings.Maintenance:N0}")">
+                <svg class="ruler channel-fuel" viewBox="0 0 326 36" role="img" aria-label="@($"{eaten:N0} calories on a scale to {top:N0}, goal {Settings.CalorieGoal:N0}, maintenance {maintenance:N0}")">
                     <defs>
                         <pattern id="over-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                             <rect class="value" width="1.5" height="4"></rect>
@@ -138,29 +141,32 @@
                     }
                     <rect class="value" x="@N(Math.Max(0, X(eaten) - 1))" y="16" width="2" height="20"></rect>
                     <rect class="goal-mark" x="@N(X(Settings.CalorieGoal) - 1)" y="12" width="2" height="24"></rect>
-                    <rect class="maint-mark" x="@N(X(Settings.Maintenance) - 1)" y="12" width="2" height="24"></rect>
+                    <rect class="maint-mark" x="@N(X(maintenance) - 1)" y="12" width="2" height="24"></rect>
                     <g>
                         <text class="goal-label" x="@N(X(Settings.CalorieGoal))" y="9" text-anchor="middle">GOAL</text>
-                        <text class="maint-label" x="@N(X(Settings.Maintenance))" y="9" text-anchor="middle">MAINT</text>
+                        <text class="maint-label" x="@N(X(maintenance))" y="9" text-anchor="middle">MAINT</text>
                     </g>
                 </svg>
-                <p class="note"><span class="ink strong">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span> · maintenance @Settings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)</p>
+                <p class="note"><span class="ink strong">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span> · maintenance @maintenance.ToString("N0", CultureInfo.CurrentCulture)</p>
             }
             else
             {
-                <div class="spread">
+                <a class="spread" href="calories">
                     <h2 id="calories-heading" class="label">Calories eaten</h2>
-                    <span class="note">of @Settings.CalorieGoal.ToString("N0", CultureInfo.CurrentCulture) goal</span>
-                </div>
+                    <span class="inline">
+                        <span class="note">of @Settings.CalorieGoal.ToString("N0", CultureInfo.CurrentCulture) goal</span>
+                        <Icon Name="forward" Size="16" />
+                    </span>
+                </a>
                 <div class="spread end">
                     <span class="row-text">
                         <span class="name big tabular">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span>
-                        <span class="caption">maintenance @Settings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)</span>
+                        <span class="caption">maintenance @maintenance.ToString("N0", CultureInfo.CurrentCulture)</span>
                     </span>
                     <span class="number md">@eaten.ToString("N0", CultureInfo.CurrentCulture)</span>
                 </div>
                 // The meter runs to maintenance (or past it): ink up to the goal, hatching beyond it.
-                var scale = Math.Max(Settings.Maintenance, eaten);
+                var scale = Math.Max(maintenance, eaten);
                 var goalAt = Settings.CalorieGoal * 100.0 / scale;
                 <div class="meter" role="meter" aria-label="@($"Calories eaten, {eaten:N0} of {Settings.CalorieGoal:N0} goal")" aria-valuemin="0" aria-valuemax="@scale" aria-valuenow="@eaten">
                     <span class="meter-fill" style="width: @Percent(Math.Min(eaten, Settings.CalorieGoal) * 100.0 / scale)"></span>
@@ -370,6 +376,7 @@
     private WorkoutSession? openSession;
     private int eaten;
     private int left;
+    private int maintenance;
     private BodyWeightEntry? latestWeight;
     private (string Points, string LastY)? sparkline;
     private (string Points, string LastX, string LastY)? weightTrace;
@@ -438,9 +445,10 @@
         eaten = todayFood.Sum(f => f.Calories);
         left = Settings.CalorieGoal - eaten;
 
-        // The weigh-ins Today shows: the last 30 days, and the latest few for the list.
+        // The weigh-ins Today shows: the last 30 days, and the latest few for the list. The latest also works out maintenance.
         weights = await Store.GetBodyWeightsSinceAsync(now.AddDays(-30), 10);
         latestWeight = weights.MaxBy(w => w.At);
+        maintenance = Calories.Maintenance(Settings, latestWeight, today) ?? Settings.Maintenance;
         var change = BodyWeight.Change(weights, now, 30);
         weightChange = change is null or 0 ? null : $"{(change < 0 ? "−" : "+")}{Math.Abs(change.Value).ToString("0.#", CultureInfo.CurrentCulture)} {UnitText}";
         weightChangeText = change switch

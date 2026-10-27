@@ -60,6 +60,7 @@ public sealed class WorkoutStore(string databasePath)
         """;
 
     private const string ActiveRoutineKey = "ActiveRoutineId";
+    private const string CalorieGoalKey = "CalorieGoal", SexKey = "Sex", BirthYearKey = "BirthYear", HeightKey = "HeightCm", ActivityKey = "Activity";
 
     private readonly string connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString();
     private readonly Lock laneGate = new();
@@ -91,6 +92,26 @@ public sealed class WorkoutStore(string databasePath)
     public Task SetSettingAsync(string key, string? value) => RunAsync(c => value is null
         ? c.ExecuteAsync("DELETE FROM Setting WHERE Key = @key", new { key })
         : c.ExecuteAsync("INSERT INTO Setting (Key, Value) VALUES (@key, @value) ON CONFLICT (Key) DO UPDATE SET Value = excluded.Value", new { key, value }));
+
+    /// <summary>Reads the saved calorie goal and body details into <paramref name="settings"/>; any not saved are the defaults.</summary>
+    public async Task LoadAsync(AppSettings settings)
+    {
+        var saved = await GetSettingsAsync();
+        var defaults = new AppSettings();
+        settings.CalorieGoal = int.TryParse(saved.GetValueOrDefault(CalorieGoalKey), CultureInfo.InvariantCulture, out var goal) ? goal : defaults.CalorieGoal;
+        settings.Sex = Enum.TryParse<Sex>(saved.GetValueOrDefault(SexKey), out var sex) ? sex : null;
+        settings.BirthYear = int.TryParse(saved.GetValueOrDefault(BirthYearKey), CultureInfo.InvariantCulture, out var born) ? born : null;
+        settings.HeightCm = double.TryParse(saved.GetValueOrDefault(HeightKey), CultureInfo.InvariantCulture, out var height) ? height : null;
+        settings.Activity = Enum.TryParse<ActivityLevel>(saved.GetValueOrDefault(ActivityKey), out var activity) ? activity : defaults.Activity;
+    }
+
+    /// <summary>Saves the calorie goal and body details; an empty one is removed.</summary>
+    public Task SaveAsync(AppSettings settings) => Task.WhenAll(
+        SetSettingAsync(CalorieGoalKey, settings.CalorieGoal.ToString(CultureInfo.InvariantCulture)),
+        SetSettingAsync(SexKey, settings.Sex?.ToString()),
+        SetSettingAsync(BirthYearKey, settings.BirthYear?.ToString(CultureInfo.InvariantCulture)),
+        SetSettingAsync(HeightKey, settings.HeightCm?.ToString(CultureInfo.InvariantCulture)),
+        SetSettingAsync(ActivityKey, settings.Activity.ToString()));
 
     /// <summary>A routine's week, Monday first: each day's session, or null for a rest day.</summary>
     public Task<long?[]> GetRoutineWeekAsync(long routineId) => RunAsync(async c =>
@@ -217,6 +238,9 @@ public sealed class WorkoutStore(string databasePath)
         c.ExecuteAsync("UPDATE WorkoutSet SET StoppedAt = @StoppedAt, Weight = @Weight, WeightUnit = @WeightUnit, Reps = @Reps, DurationSeconds = @DurationSeconds, HitGoal = @HitGoal WHERE Id = @Id", set));
 
     public Task AddFoodAsync(int calories, DateTimeOffset at) => RunAsync(c => c.ExecuteAsync("INSERT INTO FoodEntry (At, Calories) VALUES (@at, @calories)", new { at, calories }));
+
+    /// <summary>Everything I've logged eating, oldest first.</summary>
+    public Task<List<FoodEntry>> GetFoodAsync() => RunAsync(async c => (await c.QueryAsync<FoodEntry>("SELECT Id, At, Calories FROM FoodEntry ORDER BY Id")).AsList());
 
     /// <summary>Food eaten since a time. Times are text with an offset, so SQL narrows with a day of slack and the exact range is checked in memory.</summary>
     public Task<List<FoodEntry>> GetFoodSinceAsync(DateTimeOffset since) => RunAsync(async c =>

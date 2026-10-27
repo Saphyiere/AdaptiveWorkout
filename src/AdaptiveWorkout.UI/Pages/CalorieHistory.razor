@@ -1,0 +1,340 @@
+@page "/calories"
+@inject WorkoutStore Store
+@inject AppSettings Settings
+
+<PageTitle>Calories</PageTitle>
+
+@* What I've eaten, day by day and week by week, against my goal and maintenance, and what that should do to my weight. A day counts
+   once it's over; today shows what's in so far. A day with nothing logged is a day I didn't log, not a day I didn't eat. *@
+@if (loaded)
+{
+    var telemetry = Theme == Theme.Telemetry;
+    var monday = Consistency.WeekStart(today);
+    var goal = Settings.CalorieGoal;
+    var maintenance = days[^1].Maintenance;
+    var unitText = unit == WeightUnit.Kilograms ? "kg" : "lb";
+
+    // The bars: the last five weeks' days, or the last 26 weeks, each the average of its days that are over.
+    var bars = new List<(DateOnly From, DateOnly To, CalorieSpan Span, double? Maintenance, bool SoFar)>();
+    var (oldest, newest, stride) = byWeek ? (monday.AddDays(-7 * 25), monday, 7) : (monday.AddDays(-28), monday.AddDays(6), 1);
+    for (var start = oldest; start <= newest; start = start.AddDays(stride))
+    {
+        var end = start.AddDays(stride - 1);
+        var counted = Range(start, byWeek && end >= today ? today.AddDays(-1) : end);
+        var maintenances = counted.Select(d => d.Maintenance).OfType<int>().ToList();
+        double? level = maintenances.Count == 0 ? maintenance : maintenances.Average();
+        bars.Add((start, end, Calories.Span(counted), level, start <= today && today <= end));
+    }
+
+    var shown = picked ?? (bars.FindLastIndex(b => b.Span.Logged > 0) is var latest && latest >= 0 ? latest : bars.FindIndex(b => b.SoFar));
+    var high = Math.Max(goal, Math.Max(bars.Max(b => b.Span.AverageEaten ?? 0), bars.Max(b => b.Maintenance ?? 0)));
+    var top = Math.Ceiling(high * 1.1 / 250) * 250;
+    var slot = ChartWidth / bars.Count;
+    var barWidth = slot * 0.64;
+    double Y(double calories) => PlotBottom - calories / top * (PlotBottom - PlotTop);
+
+    // Maintenance in steps, as it moves with each weigh-in.
+    var steps = new List<string>();
+    for (var i = 0; i < bars.Count; i++)
+    {
+        if (bars[i].Maintenance is not double level) continue;
+
+        steps.Add(i == 0 || bars[i - 1].Maintenance is null ? $"M{N(i * slot)} {N(Y(level))}" : $"V{N(Y(level))}");
+        steps.Add($"H{N((i + 1) * slot)}");
+    }
+
+    <div class="screen">
+        <PageHeader Back="" BackText="Today" Label="@($"Goal {goal.ToString("N0", CultureInfo.CurrentCulture)} a day")" Title="Calories" />
+
+        <section class="block" aria-labelledby="chart-heading">
+            <div class="spread">
+                <h2 id="chart-heading" class="label @(telemetry ? "tag channel-fuel" : "")">Eaten</h2>
+                <div class="segmented compact" role="group" aria-label="Show">
+                    <button type="button" aria-pressed="@(byWeek ? "false" : "true")" @onclick="() => (byWeek, picked) = (false, null)">Days</button>
+                    <button type="button" aria-pressed="@(byWeek ? "true" : "false")" @onclick="() => (byWeek, picked) = (true, null)">Weeks</button>
+                </div>
+            </div>
+            <div class="calorie-chart">
+                <svg viewBox="0 0 @N(ChartWidth) @N(ChartHeight)" role="img" aria-label="@($"Calories eaten {(byWeek ? "a day, by week, over 26 weeks" : "each day over five weeks")}, against a goal of {goal:N0}{(maintenance is int m ? $" and maintenance of {m:N0}" : "")}")">
+                    <defs>
+                        <pattern id="calorie-over" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                            <rect class="hatch" width="1.5" height="4"></rect>
+                        </pattern>
+                    </defs>
+                    <rect class="picked" x="@N(shown * slot)" y="0" width="@N(slot)" height="@N(PlotBottom)"></rect>
+                    <line class="base" x1="0" x2="@N(ChartWidth)" y1="@N(PlotBottom + 0.5)" y2="@N(PlotBottom + 0.5)"></line>
+                    @for (var i = 0; i < bars.Count; i++)
+                    {
+                        var (first, _, span, _, soFar) = bars[i];
+                        var x = i * slot + (slot - barWidth) / 2;
+                        if (span.AverageEaten is double eaten)
+                        {
+                            // Up to the goal in ink (or the fuel channel's amber), past it hatched, like Today's meter.
+                            var solid = Math.Min(eaten, goal);
+                            <rect class="bar @(soFar ? "so-far" : "")" x="@N(x)" y="@N(Y(solid))" width="@N(barWidth)" height="@N(PlotBottom - Y(solid))"></rect>
+                            @if (eaten > goal)
+                            {
+                                <rect class="over @(soFar ? "so-far" : "")" x="@N(x)" y="@N(Y(eaten))" width="@N(barWidth)" height="@N(Y(goal) - Y(eaten))"></rect>
+                            }
+                        }
+                        else if (span.Days > 0 && !soFar && bars[i].To >= firstLogged)
+                        {
+                            // Nothing logged, since I started logging: a dash on the baseline.
+                            <line class="none" x1="@N(x)" x2="@N(x + barWidth)" y1="@N(PlotBottom - 2)" y2="@N(PlotBottom - 2)"></line>
+                        }
+
+                        // A date under each week (by day), or under each month's first week.
+                        if (byWeek ? i == 0 || first.Month != bars[i - 1].From.Month : first.DayOfWeek == DayOfWeek.Monday)
+                        {
+                            <g>
+                                <text class="tick" x="@N(i * slot)" y="@N(ChartHeight - 4)">@first.ToString(byWeek ? "MMM" : "MMM d", CultureInfo.CurrentCulture)</text>
+                            </g>
+                        }
+                    }
+                    <line class="goal-line" x1="0" x2="@N(ChartWidth)" y1="@N(Y(goal))" y2="@N(Y(goal))"></line>
+                    @if (steps.Count > 0)
+                    {
+                        <path class="maint-line" d="@string.Concat(steps)"></path>
+                    }
+                </svg>
+
+                @* Each bar's slice of the chart picks it. *@
+                <div class="trend-picks" style="left: 0; width: 100%; height: @N(PlotBottom / ChartHeight * 100)%">
+                    @for (var i = 0; i < bars.Count; i++)
+                    {
+                        var index = i;
+                        <button type="button" disabled="@(bars[i].Span.Days == 0)" aria-pressed="@(i == shown ? "true" : "false")" aria-label="@BarName(bars[i].From, bars[i].To)"
+                                @onclick="() => picked = index" @onfocus="() => picked = index"></button>
+                    }
+                </div>
+            </div>
+            <div class="inline legend">
+                <span class="inline"><svg width="20" height="8" aria-hidden="true"><line class="goal-line" x1="0" x2="20" y1="4" y2="4"></line></svg>@(telemetry ? "Goal" : "goal") @goal.ToString("N0", CultureInfo.CurrentCulture)</span>
+                @if (maintenance is int maintains)
+                {
+                    <span class="inline"><svg width="20" height="8" aria-hidden="true"><line class="maint-line" x1="0" x2="20" y1="4" y2="4"></line></svg>@(telemetry ? "Maint" : "maintenance") @maintains.ToString("N0", CultureInfo.CurrentCulture)</span>
+                }
+            </div>
+            @if (shown >= 0)
+            {
+                var bar = bars[shown];
+                var name = bar.SoFar ? (byWeek ? "This week" : "Today, so far") : BarName(bar.From, bar.To);
+                <div class="spread baseline">
+                    <p class="@(telemetry ? "label ink" : "body strong")">@name</p>
+                    @if (bar.Span.AverageEaten is double eaten)
+                    {
+                        <p class="inline baseline">
+                            <span class="number xs">@CaloriesText(eaten)</span>
+                            <span class="@(telemetry ? "label" : "note")">@(byWeek ? "a day" : "eaten")</span>
+                        </p>
+                    }
+                </div>
+                <p class="@(telemetry ? "label" : "note")">
+                    @if (bar.Span.AverageEaten is not double average)
+                    {
+                        @(bar.Span.Days == 0 ? "Counts once today is over." : bar.To < firstLogged ? "Before you started logging." : "Nothing logged.")
+                    }
+                    else
+                    {
+                        var against = new List<string> { Against(average, goal, "goal") };
+                        if (bar.Maintenance is double level) against.Add(Against(average, level, "maintenance"));
+                        if (byWeek) against.Add(LoggedText(bar.Span));
+                        @string.Join(" · ", against)
+                    }
+                </p>
+            }
+        </section>
+
+        @* This week, its days that are over: how I ate against my goal and maintenance, and what that should do to my weight. *@
+        @{
+            var week = Calories.Span(Range(monday, today.AddDays(-1)));
+        }
+        <section class="block" aria-labelledby="week-heading">
+            <h2 id="week-heading" class="label">This week</h2>
+            @if (week.Days == 0)
+            {
+                <p class="note">Its days add up here once they're over. @(days[^1].Eaten is int sofar ? $"So far today: {sofar:N0}." : "")</p>
+            }
+            else
+            {
+                <div class="grid-2">
+                    <div class="row-text">
+                        <span class="label">A day</span>
+                        <span class="number sm">@(week.AverageEaten is double average ? CaloriesText(average) : "–")</span>
+                        <span class="caption">@(week.AverageEaten is double eaten ? Against(eaten, goal, "your goal") : "Nothing logged")</span>
+                    </div>
+                    <div class="row-text">
+                        <span class="label">Logged</span>
+                        <span class="number sm">@week.Logged</span>
+                        <span class="caption">of @week.Days @(week.Days == 1 ? "day" : "days")</span>
+                    </div>
+                    @if (week.AverageDeficit is double deficit)
+                    {
+                        <div class="row-text">
+                            <span class="label">@(deficit >= 0 ? "Under maintenance" : "Over maintenance")</span>
+                            <span class="number sm">@CaloriesText(Math.Abs(deficit))</span>
+                            <span class="caption">a day</span>
+                        </div>
+                        <div class="row-text">
+                            <span class="label">Weight, by your logs</span>
+                            <span class="inline baseline">
+                                <span class="number sm">@WeightText(week.WeightChange(unit)!.Value)</span>
+                                <span class="unit">@unitText</span>
+                            </span>
+                            <span class="caption">this week so far</span>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        @* The last four weeks: the weight my logs add up to against the scale's. If the scale lost less, food is going unlogged, or
+           maintenance is lower than the formula's. *@
+        @{
+            var fourWeeks = Calories.Span(Range(today.AddDays(-28), today.AddDays(-1)));
+            var byLogs = fourWeeks.WeightChange(unit);
+            var byScale = BodyWeight.Trend(weighIns, Start(today.AddDays(-28)), Start(today), unit);
+        }
+        <section class="block" aria-labelledby="month-heading">
+            <h2 id="month-heading" class="label">Last 4 weeks</h2>
+            @if (fourWeeks.Logged == 0)
+            {
+                <p class="note">Nothing logged in the last four weeks.</p>
+            }
+            else if (maintenance is null)
+            {
+                <p class="note">@CaloriesText(fourWeeks.AverageEaten!.Value) a day on the @fourWeeks.Logged days logged. Add your sex, age and height in <a class="link" href="settings">Settings</a> to see what that means for your weight.</p>
+            }
+            else
+            {
+                <div class="grid-2">
+                    <div class="row-text">
+                        <span class="label">By your logs</span>
+                        <span class="inline baseline">
+                            <span class="number sm">@WeightText(byLogs!.Value)</span>
+                            <span class="unit">@unitText</span>
+                        </span>
+                        <span class="caption">@CaloriesText(fourWeeks.AverageEaten!.Value) a day, @fourWeeks.Logged of 28 days logged</span>
+                    </div>
+                    <div class="row-text">
+                        <span class="label">By the scale</span>
+                        @if (byScale is double change)
+                        {
+                            <span class="inline baseline">
+                                <span class="number sm">@WeightText(change)</span>
+                                <span class="unit">@unitText</span>
+                            </span>
+                            <span class="caption">the line through your weigh-ins</span>
+                        }
+                        else
+                        {
+                            <span class="number sm">–</span>
+                            <span class="caption">Weigh in a week apart to see it</span>
+                        }
+                    </div>
+                </div>
+                @if (byScale is double scale && scale - byLogs!.Value >= (unit == WeightUnit.Kilograms ? 0.5 : 1))
+                {
+                    <p class="note">The scale lost less than your logs add up to. Some of what you eat may not be logged, or your maintenance may be lower than the formula's.</p>
+                }
+            }
+        </section>
+
+        @* Every week since the first one logged, newest first, by month. *@
+        @foreach (var month in weeks.GroupBy(w => w.Monday.ToString("MMMM yyyy", CultureInfo.CurrentCulture)))
+        {
+            <section class="stack tight" aria-label="@month.Key">
+                <h2 class="month">@month.Key</h2>
+                <div class="ledger">
+                    @foreach (var (start, span) in month)
+                    {
+                        <div class="row">
+                            <span class="row-text">
+                                <span class="name">@(start == monday ? "This week" : BarName(start, start.AddDays(6)))</span>
+                                <span class="caption">@(span.AverageEaten is double eaten ? $"{CaloriesText(eaten)} a day · {LoggedText(span)}" : "Nothing logged")</span>
+                            </span>
+                            @if (span.WeightChange(unit) is double change)
+                            {
+                                <span class="name tabular">@WeightText(change) @unitText</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    // The chart's drawing space, which the SVG scales to the page: the bars, then dates under them.
+    private const double ChartWidth = 350, ChartHeight = 172, PlotTop = 6, PlotBottom = 150;
+
+    private bool loaded;
+    private DateOnly today;
+    private DateOnly from;
+    private DateOnly firstLogged;
+    private List<CalorieDay> days = [];
+    private List<BodyWeightEntry> weighIns = [];
+    private WeightUnit unit;
+    private List<(DateOnly Monday, CalorieSpan Span)> weeks = [];
+    private bool byWeek;
+    private int? picked;
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = DateOnly.FromDateTime(DateTime.Now);
+        var food = await Store.GetFoodAsync();
+        weighIns = await Store.GetBodyWeightsAsync();
+        unit = weighIns.MaxBy(w => w.At)?.WeightUnit ?? Settings.Unit;
+
+        // Every day since the week of the first one logged, or 26 weeks back for the chart, through today.
+        var monday = Consistency.WeekStart(today);
+        firstLogged = food.Count == 0 ? today : DateOnly.FromDateTime(food.MinBy(f => f.At)!.At.DateTime);
+        from = Consistency.WeekStart(firstLogged < monday.AddDays(-7 * 25) ? firstLogged : monday.AddDays(-7 * 25));
+        days = Calories.Days(food, weighIns, Settings, from, today);
+
+        // The weeks, each its days that are over: this week's only once one is.
+        var firstWeek = Consistency.WeekStart(firstLogged);
+        for (var start = monday; start >= firstWeek && food.Count > 0; start = start.AddDays(-7))
+        {
+            var counted = Range(start, start == monday ? today.AddDays(-1) : start.AddDays(6));
+            if (counted.Count > 0) weeks.Add((start, Calories.Span(counted)));
+        }
+
+        loaded = true;
+    }
+
+    // The days from first through last, within the ones there are.
+    private List<CalorieDay> Range(DateOnly first, DateOnly last)
+    {
+        var start = Math.Max(first.DayNumber, from.DayNumber) - from.DayNumber;
+        var end = Math.Min(last.DayNumber, today.DayNumber) - from.DayNumber;
+        return end < start ? [] : days.GetRange(start, end - start + 1);
+    }
+
+    // "Oct 19 – 25", "Sep 28 – Oct 4", or one day: "Tue, Oct 20".
+    private string BarName(DateOnly first, DateOnly last) => first == last ? first.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)
+        : $"{first.ToString("MMM d", CultureInfo.CurrentCulture)} – {last.ToString(last.Month == first.Month ? "%d" : "MMM d", CultureInfo.CurrentCulture)}";
+
+    private static string CaloriesText(double calories) => Math.Round(calories).ToString("N0", CultureInfo.CurrentCulture);
+
+    // "150 over goal", "60 under maintenance".
+    private static string Against(double eaten, double mark, string what) => $"{CaloriesText(Math.Abs(eaten - mark))} {(eaten > mark ? "over" : "under")} {what}";
+
+    private static string LoggedText(CalorieSpan span) => $"{span.Logged} of {span.Days} {(span.Days == 1 ? "day" : "days")} logged";
+
+    // A change in weight: "−1.4", "+0.3", "0.0".
+    private static string WeightText(double change)
+    {
+        var rounded = Math.Round(change, 1);
+        return $"{(rounded < 0 ? "−" : rounded > 0 ? "+" : "")}{Math.Abs(rounded).ToString("0.0", CultureInfo.CurrentCulture)}";
+    }
+
+    // The start of a day, in the phone's time zone.
+    private static DateTimeOffset Start(DateOnly day) => new(day.ToDateTime(TimeOnly.MinValue));
+
+    // SVG numbers, which take a point whatever the phone's language.
+    private static string N(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+}

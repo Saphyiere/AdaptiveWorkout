@@ -138,12 +138,42 @@ public sealed class HeartRateSample
     public int Bpm { get; set; }
 }
 
+/// <summary>The formula for resting calories has a version for each.</summary>
+public enum Sex
+{
+    Male = 0,
+    Female = 1,
+}
+
+/// <summary>How much I move in a usual week, training included. It takes resting calories up to maintenance.</summary>
+public enum ActivityLevel
+{
+    Sedentary = 0,
+    Light = 1,
+    Moderate = 2,
+    Very = 3,
+    Extra = 4,
+}
+
 public sealed class AppSettings
 {
+    /// <summary>Calories to eat in a day.</summary>
     public int CalorieGoal { get; set; } = 1800;
+
+    /// <summary>Maintenance until it can be worked out from my body details and a weigh-in (see <see cref="Calories.Maintenance"/>).</summary>
     public int Maintenance { get; set; } = 2200;
+
     public WeightUnit Unit { get; set; } = WeightUnit.Pounds;
 
     /// <summary>How much heavier the suggestion gets after a hit goal, in the set's own unit.</summary>
     public double HitGoalStep { get; set; } = 5;
+
+    /// <summary>For maintenance, with the year I was born and my height; each empty until I've said.</summary>
+    public Sex? Sex { get; set; }
+
+    public int? BirthYear { get; set; }
+
+    public double? HeightCm { get; set; }
+
+    public ActivityLevel Activity { get; set; } = ActivityLevel.Moderate;
 }

@@ -1,8 +1,15 @@
 @page "/settings"
 @inject ThemeSetting ThemeSetting
+@inject AppSettings AppSettings
+@inject WorkoutStore Store
 
 <PageTitle>Settings</PageTitle>
 
+@{
+    var thisYear = DateTime.Now.Year;
+    var maintenance = Calories.Maintenance(AppSettings, latestWeight, DateOnly.FromDateTime(DateTime.Now));
+    var metric = (latestWeight?.WeightUnit ?? AppSettings.Unit) == WeightUnit.Kilograms;
+}
 <div class="screen">
     <PageHeader Back="" BackText="Today" Title="Settings" />
 
@@ -29,4 +36,125 @@
             }
         </div>
     </section>
+
+    @* What I aim to eat in a day, and maintenance: what would keep my weight where it is, from my body below and my latest weigh-in. *@
+    <section class="stack" aria-labelledby="calories-heading">
+        <h2 id="calories-heading" class="label">Calories</h2>
+        <div class="grid-2">
+            <div class="field-group">
+                <label class="field-label" for="calorie-goal">Goal a day</label>
+                <input id="calorie-goal" class="field" type="number" inputmode="numeric" min="0" step="50" @bind="goal"
+                       @bind:after="() => SaveAsync(() => AppSettings.CalorieGoal = (goal = goal is > 0 ? goal : new AppSettings().CalorieGoal).Value)" />
+            </div>
+            <div class="row-text">
+                <span class="label">Maintenance</span>
+                <span class="name big tabular">@(maintenance is int calories ? calories.ToString("N0", CultureInfo.CurrentCulture) : "Not yet")</span>
+            </div>
+        </div>
+        <p class="note">
+            @if (maintenance is not null)
+            {
+                @($"What would keep your weight where it is: resting calories for your weight ({latestWeight!.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {(metric ? "kg" : "lb")}), height, age and sex by the Mifflin-St Jeor formula, × {Calories.Factor(AppSettings.Activity).ToString("0.###", CultureInfo.CurrentCulture)} for how active you are.")
+            }
+            else
+            {
+                @($"Worked out from your body below and your latest weigh-in{(latestWeight is null ? ", once you've weighed in on Today" : "")}. Until then, Today takes it as {AppSettings.Maintenance.ToString("N0", CultureInfo.CurrentCulture)}.")
+            }
+        </p>
+    </section>
+
+    <section class="stack" aria-labelledby="body-heading">
+        <h2 id="body-heading" class="label">Body</h2>
+        <div class="segmented" role="group" aria-label="Sex">
+            @foreach (var sex in Enum.GetValues<Sex>())
+            {
+                <button type="button" aria-pressed="@(AppSettings.Sex == sex ? "true" : "false")" @onclick="() => SaveAsync(() => AppSettings.Sex = sex)">@sex</button>
+            }
+        </div>
+        <div class="@(metric ? "grid-2" : "grid-3")">
+            <div class="field-group">
+                <label class="field-label" for="age">Age</label>
+                <input id="age" class="field" type="number" inputmode="numeric" min="1" max="120" @bind="age" @bind:after="() => SaveAsync(() => AppSettings.BirthYear = age is > 0 and < 120 ? thisYear - age : null)" />
+            </div>
+            @if (metric)
+            {
+                <div class="field-group">
+                    <label class="field-label" for="height-cm">Height, cm</label>
+                    <input id="height-cm" class="field" type="number" inputmode="decimal" min="0" step="any" @bind="centimeters" @bind:after="() => SaveAsync(() => AppSettings.HeightCm = centimeters is > 0 ? centimeters : null)" />
+                </div>
+            }
+            else
+            {
+                <div class="field-group">
+                    <label class="field-label" for="height-feet">Height, ft</label>
+                    <input id="height-feet" class="field" type="number" inputmode="numeric" min="0" @bind="feet" @bind:after="SaveFeetAndInchesAsync" />
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="height-inches">in</label>
+                    <input id="height-inches" class="field" type="number" inputmode="decimal" min="0" max="11.9" step="any" @bind="inches" @bind:after="SaveFeetAndInchesAsync" />
+                </div>
+            }
+        </div>
+        <div class="ledger" role="group" aria-label="How active you are">
+            @foreach (var (level, name, description) in Levels)
+            {
+                var chosen = AppSettings.Activity == level;
+                <button type="button" class="row" aria-pressed="@(chosen ? "true" : "false")" @onclick="() => SaveAsync(() => AppSettings.Activity = level)">
+                    <span class="status">
+                        @if (chosen)
+                        {
+                            <Mark Kind="MarkKind.Tick" Size="28" />
+                        }
+                    </span>
+                    <span class="row-text">
+                        <span class="name">@name</span>
+                        <span class="note">@description</span>
+                    </span>
+                    <span class="caption tabular">× @Calories.Factor(level).ToString("0.###", CultureInfo.CurrentCulture)</span>
+                </button>
+            }
+        </div>
+    </section>
 </div>
+
+@code {
+    // How active I am in a usual week, training included: the usual levels.
+    private static readonly (ActivityLevel Level, string Name, string Description)[] Levels =
+    [
+        (ActivityLevel.Sedentary, "Sitting most of the day", "Little or no exercise"),
+        (ActivityLevel.Light, "Lightly active", "Exercise 1 to 3 days a week"),
+        (ActivityLevel.Moderate, "Moderately active", "Exercise 3 to 5 days a week"),
+        (ActivityLevel.Very, "Very active", "Hard exercise 6 or 7 days a week"),
+        (ActivityLevel.Extra, "Extra active", "Hard training and a physical job"),
+    ];
+
+    private BodyWeightEntry? latestWeight;
+    private int? goal;
+    private int? age;
+    private double? centimeters;
+    private int? feet;
+    private double? inches;
+
+    protected override async Task OnInitializedAsync()
+    {
+        goal = AppSettings.CalorieGoal;
+        age = DateTime.Now.Year - AppSettings.BirthYear;
+        if (AppSettings.HeightCm is double height)
+        {
+            var totalInches = height / 2.54;
+            (centimeters, feet, inches) = (Math.Round(height, 1), (int)(totalInches / 12), Math.Round(totalInches % 12, 1));
+        }
+
+        // The latest weigh-in, as Today finds it.
+        latestWeight = (await Store.GetBodyWeightsSinceAsync(DateTimeOffset.Now.AddDays(-30), 10)).MaxBy(w => w.At);
+    }
+
+    // Changes a setting, then saves them all.
+    private Task SaveAsync(Action change)
+    {
+        change();
+        return Store.SaveAsync(AppSettings);
+    }
+
+    private Task SaveFeetAndInchesAsync() => SaveAsync(() => AppSettings.HeightCm = feet is > 0 ? Math.Round(((feet ?? 0) * 12 + (inches ?? 0)) * 2.54, 1) : null);
+}

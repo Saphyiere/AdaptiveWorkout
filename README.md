@@ -11,7 +11,7 @@ build/
                             Put local-dev files here.
 docs/                       The app concept and data model (concept.md).
 src/
-  AdaptiveWorkout.Core/     Business logic (plain .NET 10): next step, plan changes, suggestions, history, schedule, consistency, improvement.
+  AdaptiveWorkout.Core/     Business logic (plain .NET 10): next step, plan changes, suggestions, history, schedule, consistency, improvement, calories and maintenance.
   AdaptiveWorkout.UI/       The app's screens (Razor) and storage (SQLite via Dapper). Any host can show them.
   AdaptiveWorkout.Phone/    Phone app: .NET MAUI Blazor Hybrid host for the UI, Android only.
   AdaptiveWorkout.Watch/    Watch app: .NET for Android targeting Wear OS. Shows heart rate and sends it to the phone.
@@ -100,7 +100,7 @@ Design links:
 
 - **Colors, fonts and line weights** are tokens in `src/AdaptiveWorkout.UI/wwwroot/app.css`, one block per theme under its `[data-theme]`. Fonts go by role: words, figures, labels, controls.
 - **Shapes** that differ are rules under the theme's own `[data-theme]` (Telemetry's tiles, boxed fields, chips, filled tick boxes), so neither theme's rules touch the other's.
-- **Pieces that draw differently** branch on the cascading theme inside their own component: the pen marks against Telemetry's checks (`Mark`), its rulers (`RulerTicks`, `SecondsRuler`, the rest and calorie rulers), the heart rate line, the workout header, Today's tiles, and the improvement chart (`TrendChart`, on Gym and Stats).
+- **Pieces that draw differently** branch on the cascading theme inside their own component: the pen marks against Telemetry's checks (`Mark`), its rulers (`RulerTicks`, `SecondsRuler`, the rest and calorie rulers), the heart rate line, the workout header, Today's tiles, the improvement chart (`TrendChart`, on Gym and Stats), and the calorie chart.
 - **The phone around the page** follows too (`PhoneThemeSetting`): the status and navigation bar icons go light on a dark theme, and the background behind the page while it loads matches. Both start in the last theme, kept in the phone's preferences. The splash and app icon stay Logbook's (vermilion on paper), since Android draws them before the app can choose.
 
 To add a theme: add it to `Theme.All`, give it a token block (and any shapes) in `app.css`, add its fonts to `wwwroot/fonts`, and branch the components above where it should draw differently.
