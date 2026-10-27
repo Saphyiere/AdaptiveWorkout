@@ -69,6 +69,26 @@ public class ProgressTests
     }
 
     [Fact]
+    public void Improvement_LiftsTheWeighInNearestBeforeTheWorkout_ElseTheFirstOneAfter()
+    {
+        var first = Workout(0, (PullUps, -50, 10));
+        var beforeAny = Workout(1, (PullUps, -40, 10));
+        Workout(3, (PullUps, -50, 10));
+        var later = Workout(4, (PullUps, -40, 10));
+        Workout(5, (PullUps, -50, 10));
+        var last = Workout(6, (PullUps, -40, 10));
+        BodyWeightEntry WeighIn(int days, double pounds) => new() { At = Monday.AddDays(days), Weight = pounds, WeightUnit = WeightUnit.Pounds };
+        BodyWeightEntry[] weighIns = [WeighIn(40, 300), WeighIn(10, 250), WeighIn(27, 200), WeighIn(29, 210)];
+
+        // Before any weigh-in, the first one after: 210 lb lifted instead of 200. The fourth week's workout lifts the 200 lb from
+        // the day before, not the 250 or the later ones: 160 instead of 150. The sixth week's, the 300 lb from two days before.
+        Assert.Equal(210 / 200.0 - 1, Improvement(beforeAny, weighIns).Change!.Value, 10);
+        Assert.Equal(160 / 150.0 - 1, Improvement(later, weighIns).Change!.Value, 10);
+        Assert.Equal(260 / 250.0 - 1, Improvement(last, weighIns).Change!.Value, 10);
+        Assert.Equal(160 / 150.0 - 1, Assert.Single(Progress.Trend([first, later], sets, Exercises, weighIns)).Change, 10);
+    }
+
+    [Fact]
     public void Improvement_ComparesTimeByAverageSet_AndKilogramsWithPounds()
     {
         Workout(0, (Plank, null, 60), (Plank, null, 60), (Bench, 45.359, 10));
@@ -120,5 +140,38 @@ public class ProgressTests
         Assert.Equal(0.10, trend[0].Total, 10);
         Assert.Equal(0.10, trend[1].Total, 10);
         Assert.Equal(Math.Sqrt(1.1) - 1, trend[2].Total, 10);
+    }
+
+    [Fact]
+    public void Trend_OfSomeWorkouts_ComparesThemOnlyWithEachOther()
+    {
+        var monday = Workout(0, (Bench, 100, 10), (Curls, 30, 10));
+        Workout(1, (Bench, 120, 10));
+        var nextMonday = Workout(2, (Bench, 105, 10), (Curls, 30, 10));
+        var open = new WorkoutSession { Id = 99, StartedAt = Monday.AddDays(30) };
+        sets.Add(new WorkoutSet { SessionId = open.Id, ExerciseId = Bench, Order = 99, Weight = 200, Reps = 10 });
+
+        var trend = Progress.Trend([monday, nextMonday, open], sets, Exercises, []);
+
+        // Bench against last Monday's 100, not the 120 in between; curls the same. The open workout isn't done yet.
+        Assert.Equal(Math.Sqrt(105 / 120.0) - 1, Improvement(nextMonday).Change!.Value, 10);
+        var point = Assert.Single(trend);
+        Assert.Equal(nextMonday, point.Session);
+        Assert.Equal(Math.Sqrt(1.05) - 1, point.Change, 10);
+        Assert.Equal(Math.Sqrt(1.05) - 1, point.Total, 10);
+    }
+
+    [Fact]
+    public void Trend_OfOneExercisesSets_IsItsChangeSinceTheFirstTime()
+    {
+        Workout(0, (Bench, 100, 10), (Curls, 30, 10));
+        var up = Workout(1, (Bench, 110, 10), (Curls, 20, 10));
+        var down = Workout(2, (Bench, 99, 10));
+
+        var trend = Progress.Trend(sessions, [.. sets.Where(s => s.ExerciseId == Bench)], Exercises, []);
+
+        Assert.Equal([up, down], trend.Select(p => p.Session));
+        Assert.Equal([0.1, -0.1], trend.Select(p => Math.Round(p.Change, 10)));
+        Assert.Equal([0.1, -0.01], trend.Select(p => Math.Round(p.Total, 10)));
     }
 }

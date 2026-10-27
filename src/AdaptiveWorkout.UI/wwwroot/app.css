@@ -1316,6 +1316,11 @@ select.field {
     background: var(--wash);
 }
 
+/* Stats: finding an exercise heads its list, so the field's line is the list's top rule. */
+.find + .ledger {
+    border-top: 0;
+}
+
 /* A link inside text. */
 a.link {
     text-decoration: underline;

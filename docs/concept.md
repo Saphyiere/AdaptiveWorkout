@@ -46,6 +46,7 @@ The home screen answers the three questions at a glance. **(proposed)**
 - **Calories:** eaten today against 1,800, with a quick add. **Edit** lists today's entries, each deletable.
 - **Body weight:** the latest weigh-in and its trend, with a quick add. **Edit** lists the last 10 weigh-ins, each deletable.
 - The big button: **Start Back day** (today's session in the routine). On a rest day, or once today is done, it reads **Start a workout** and opens the session picker. On a rest day, **Edit routine** sits under it.
+- At the top right: **Stats** (a little line chart), then **Settings**.
 
 Every delete asks once (Keep or Delete) before anything is gone.
 
@@ -57,9 +58,25 @@ Am I getting better, and everything I've done:
 - **Edit routine** opens the routines, to edit one or switch.
 - **History:** every finished workout, newest first and grouped by month: its name, date, length, set count and improvement, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. Tapping a set opens it to change its weight and reps (or time) and Hit goal, or to delete just that set after asking once; that workout's improvement, and every later one's, is worked out again. A warm-up comes before the exercises and a cool-down after them, each with how long it took and its average and highest heart rate. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
 
+### Stats
+
+How am I doing at each routine, session and exercise? Each one is listed with its change since its first time, and tapping it opens its own improvement line:
+
+- **Routines**, the one in use first.
+- **Sessions**, in the order of the week in use, each with its days (Mon, Fri), so Monday's is easy to find.
+- **Exercises**, the latest done first, with **Find** to type a name.
+
+How have my Monday workouts gone? **A session** shows its improvement line, worked out among its own workouts only, so Monday's compares with last Monday's even when Thursday's had the same exercises in between. Under it are its exercises, each with its last sets there and its change in this session, then its workouts, each with its change against the one before.
+
+How has my flat chest press been going? **An exercise** shows its line across every workout that had it, its heaviest set (the most reps for bodyweight, the longest for a time exercise), how many workouts since when, then every workout's sets with its change against the time before.
+
+**A routine** shows its sessions' workouts on one line, whichever routine was in use then, and its week: each day's session and how it's going.
+
+Tapping a point on any line picks that workout in the list below, and tapping a workout opens it.
+
 ### Settings
 
-The icon at the top right of Today. For now it holds the look:
+The icon at the top right of Today, after Stats. For now it holds the look:
 
 - **Logbook:** a printed training log, warm paper and a red pen.
 - **Telemetry:** a dark instrument panel, with every number on a ruler.
@@ -193,7 +210,7 @@ In a superset, each exercise has its own **Change**. From the set screen, the ru
 
 Every tap has to feel instant. The open workout lives in memory: Stop, Start and the break screen change on the spot, and saving happens in the background, one write at a time and in order. Buttons react the moment they're pressed, and each step slides in, already mostly visible so the slide never reads as waiting. Debug builds run compiled code too (the Android interpreter is off), so testing feels like the real thing.
 
-Opening has to be quick, and stay quick as the log grows. Today reads only what it shows: the list of workouts for the week and the streak, today's food, and the last 30 days of weigh-ins (plus the latest few for the list). The workout history behind suggestions and the last three times, every set ever logged, loads once Today is up, so it never holds Today up and is usually ready before Start or Resume needs it. The history screens read only what they show too: a past workout reads its own sets and the heart rate during it, and Gym reads how many sets each workout had of each exercise rather than every set.
+Opening has to be quick, and stay quick as the log grows. Today reads only what it shows: the list of workouts for the week and the streak, today's food, and the last 30 days of weigh-ins (plus the latest few for the list). The workout history behind suggestions and the last three times, every set ever logged, loads once Today is up, so it never holds Today up and is usually ready before Start or Resume needs it. The history screens read only what they show too: a past workout reads its own sets and the heart rate during it, and Gym reads how many sets each workout had of each exercise rather than every set. Stats works from the history already in memory and draws each line from the sets as it opens: a few milliseconds a line, even over years of workouts.
 
 ### Supersets
 
@@ -242,6 +259,7 @@ Until I choose a lead signal, one number stands for "better", so the Gym trend h
 - **Each exercise** counts as its sets' average estimated one-rep max, weight × (1 + reps ÷ 30), so heavier and more reps both count, however the sets were split (10, 10, 8 → 10, 10, 10 at 100 is +1.7%; 100 → 105 is +5%). Bodyweight and assisted sets lift my body too, at my last weigh-in before the workout, the same for both workouts (−50 → −40 assist at 200 lb is +6.7%); with no weigh-in, plain bodyweight compares by reps alone. Time exercises count their average set length.
 - **A workout's improvement** is how its exercises did against the last time I did each, averaged (the geometric mean, so +10% and the same ratio down even out). Exercises done for the first time are left out; with none to compare, a workout has no improvement. It's worked out once after Finish and stored; workouts finished before this existed get theirs the first time Gym opens.
 - **The trend** is each exercise's change since its first time, averaged over every exercise compared so far. More workouts in a week don't inflate it: bench +10% and curls +10% is +10%.
+- **A trend of some workouts** (a routine's, a session's or an exercise's, on Stats) compares each of them only with the last of them that had each exercise, the other workouts left out. It's worked out from their sets when Stats opens, not stored.
 
 ## Consistency
 
@@ -321,7 +339,7 @@ Settings           CalorieGoal 1800, Maintenance 2200, UntrackedDayOver 200, Uni
 2. **Sessions in simple mode:** routines, templates, the set loop, the last three times, supersets, Hit goal. *Built.*
 3. **Live heart rate** from the watch during sessions, with the rest timer on the watch and in the notification. *Built; needs its first run on the real watch.*
 4. **Advanced mode** and logging after the fact. *Advanced view built (add a set, different exercise, skip); reordering mid-workout and logging after the fact not yet.*
-5. **Adaptive comparisons** and charts. *The improvement trend on Gym is built; choosing the lead signal and per-exercise charts not yet.*
+5. **Adaptive comparisons** and charts. *The improvement trend is built, on Gym for every workout and on Stats for each routine, session and exercise; choosing the lead signal not yet.*
 
 ## Later
 

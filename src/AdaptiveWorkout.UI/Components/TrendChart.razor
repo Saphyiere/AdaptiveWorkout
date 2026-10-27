@@ -1,0 +1,153 @@
+@* Am I getting better? The latest total, big, then the line of every workout's total, oldest first. Tapping the line picks the
+   nearest workout, to show how it compared with the time before. Gym's line is every workout; Stats draws one routine's, session's
+   or exercise's. *@
+
+<section class="block" aria-labelledby="trend-heading">
+    @if (Theme == Theme.Telemetry && Points.Count > 0)
+    {
+        <div class="spread">
+            <h2 id="trend-heading" class="label tag channel-train">Improvement</h2>
+            <p class="label">Over @Points.Count @(Points.Count == 1 ? "workout" : "workouts")</p>
+        </div>
+    }
+    else
+    {
+        <h2 id="trend-heading" class="label">Improvement</h2>
+    }
+    @if (Points.Count == 0)
+    {
+        <p class="note">@Empty</p>
+    }
+    else
+    {
+        var index = Enumerable.Range(0, Points.Count).FirstOrDefault(i => Points[i].Session == Picked, Points.Count - 1);
+        var shown = Points[index];
+        var telemetry = Theme == Theme.Telemetry;
+
+        // A y-axis of round steps, with 0% always on it and at most five lines.
+        var low = Math.Min(0, Points.Min(p => p.Total));
+        var high = Math.Max(0, Points.Max(p => p.Total));
+        var step = Steps.FirstOrDefault(s => Math.Ceiling(high / s) - Math.Floor(low / s) <= 4, Math.Ceiling(high - low));
+        var bottom = Math.Floor(low / step) * step;
+        var top = Math.Max(Math.Ceiling(high / step) * step, bottom + step);
+        var ticks = Enumerable.Range(0, (int)Math.Round((top - bottom) / step) + 1).Select(i => bottom + i * step).ToList();
+        double X(int i) => PlotLeft + (i + 0.5) * (ChartWidth - PlotLeft) / Points.Count;
+        double Y(double total) => PlotBottom - (total - bottom) / (top - bottom) * (PlotBottom - PlotTop);
+        var line = string.Join(' ', Points.Select((p, i) => $"{N(X(i))},{N(Y(p.Total))}"));
+
+        // A note at the low point, when it's a dip along the way rather than an end.
+        var lowest = Points.Select((p, i) => (p.Total, i)).Min().i;
+        var noteDip = lowest > 0 && lowest < Points.Count - 1 && lowest != index;
+
+        <p class="number hero">@PercentText.Format(Points[^1].Total)</p>
+        <p class="note">@Note</p>
+        <div class="trend-chart">
+            <svg viewBox="0 0 @N(ChartWidth) @N(ChartHeight)" role="img" aria-label="@($"Improvement over {Points.Count} workouts: {PercentText.Format(Points[^1].Total)}")">
+                @* In a group, since Razor reads a <text> that starts a code block's markup as its own text tag. *@
+                @foreach (var tick in ticks)
+                {
+                    <g>
+                        <line class="grid" x1="@N(PlotLeft)" x2="@N(ChartWidth)" y1="@N(Y(tick) + 0.5)" y2="@N(Y(tick) + 0.5)" />
+                        <text class="tick" x="@N(PlotLeft - 8)" y="@N(Y(tick) + 4.5)" text-anchor="end">@(tick == 0 ? "0" : TickText(tick))</text>
+                    </g>
+                }
+                @if (telemetry)
+                {
+                    @* A square marker on every workout, a tick under each, and a crosshair through the one picked. *@
+                    <path class="axis" d="@string.Concat(Points.Select((_, i) => $"M{N(X(i) + 0.5)} {N(PlotBottom)}V{N(PlotBottom + 6)}"))" />
+                    <path class="crosshair" d="@($"M{N(X(index) + 0.5)} 0V{N(PlotBottom + 6)}M{N(PlotLeft)} {N(Y(shown.Total) + 0.5)}H{N(ChartWidth)}")" />
+                    <polyline class="trend-line" points="@line" />
+                    @foreach (var i in Enumerable.Range(0, Points.Count).Where(i => i != index))
+                    {
+                        <rect class="marker" x="@N(X(i) - 2.5)" y="@N(Y(Points[i].Total) - 2.5)" width="5" height="5" />
+                    }
+                    <rect class="picked-frame" x="@N(X(index) - 6.5)" y="@N(Y(shown.Total) - 6.5)" width="13" height="13" />
+                    <rect class="marker" x="@N(X(index) - 4.5)" y="@N(Y(shown.Total) - 4.5)" width="9" height="9" />
+                }
+                else
+                {
+                    @if (noteDip)
+                    {
+                        <g>
+                            <line class="leader" x1="@N(X(lowest) + 0.5)" x2="@N(X(lowest) + 0.5)" y1="@N(Y(Points[lowest].Total) + 6)" y2="@N(Y(Points[lowest].Total) + 18)" />
+                            <text class="aside" x="@N(X(lowest))" y="@N(Y(Points[lowest].Total) + 30)" text-anchor="middle">@DateText(Points[lowest].Session)</text>
+                        </g>
+                    }
+                    <line class="picked-line" x1="@N(X(index) + 0.5)" x2="@N(X(index) + 0.5)" y1="@N(Y(shown.Total) + 10)" y2="@N(PlotBottom)" />
+                    <polyline class="trend-line" points="@line" />
+                    <circle class="dot" cx="@N(X(index))" cy="@N(Y(shown.Total))" r="4" />
+                    <path class="pen" stroke-width="2.5" transform="@($"translate({N(X(index) - 15.6)} {N(Y(shown.Total) - 12.7)}) scale(0.8)")" d="M33 8C27 2.5 9 2.5 4.5 11C0.5 19 9 28.5 21 27.5C32 26.5 38 18.5 34.5 10.5L31 6.5" />
+                }
+                <text class="tick" x="@N(X(0))" y="@N(ChartHeight - 4)" text-anchor="@(Points.Count == 1 ? "middle" : "start")">@DateText(Points[0].Session)</text>
+                @if (Points.Count > 1)
+                {
+                    <g>
+                        <text class="tick" x="@N(ChartWidth)" y="@N(ChartHeight - 4)" text-anchor="end">@DateText(Points[^1].Session)</text>
+                    </g>
+                }
+            </svg>
+
+            @* Each workout's slice of the plot picks it, so a tap anywhere lands on the nearest one. *@
+            <div class="trend-picks" style="left: @N(PlotLeft / ChartWidth * 100)%; width: @N((ChartWidth - PlotLeft) / ChartWidth * 100)%; height: @N(PlotBottom / ChartHeight * 100)%">
+                @foreach (var point in Points)
+                {
+                    <button type="button" aria-pressed="@(point == shown ? "true" : "false")" aria-label="@($"{NameOf(point.Session)}, {DateText(point.Session)}: {PercentText.Format(point.Change)}")"
+                            @onclick="() => PickedChanged.InvokeAsync(point.Session)" @onfocus="() => PickedChanged.InvokeAsync(point.Session)"></button>
+                }
+            </div>
+        </div>
+        @if (telemetry)
+        {
+            <div class="spread">
+                <p class="label ink">@NameOf(shown.Session) · @shown.Session.StartedAt.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</p>
+                <p class="inline">
+                    <Delta Change="shown.Change" />
+                    <span class="label">vs last</span>
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="spread baseline">
+                <p class="body strong">@NameOf(shown.Session), @shown.Session.StartedAt.ToString("ddd, MMM d", CultureInfo.CurrentCulture)</p>
+                <p class="inline baseline">
+                    <Delta Change="shown.Change" />
+                    <span class="note">vs last time</span>
+                </p>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    // The chart's drawing space, which the SVG scales to the page: tick labels at the left, the plot, dates under it.
+    private const double ChartWidth = 350, ChartHeight = 168, PlotLeft = 32, PlotTop = 8, PlotBottom = 140;
+    private static readonly double[] Steps = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
+    /// <summary>The workouts on the line, oldest first.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<TrendPoint> Points { get; set; } = [];
+
+    /// <summary>The workout picked on the line; the latest until one is.</summary>
+    [Parameter] public WorkoutSession? Picked { get; set; }
+
+    [Parameter] public EventCallback<WorkoutSession> PickedChanged { get; set; }
+
+    /// <summary>A workout's name, e.g. its session's.</summary>
+    [Parameter, EditorRequired] public Func<WorkoutSession, string> NameOf { get; set; } = default!;
+
+    /// <summary>What the big number is, under it.</summary>
+    [Parameter, EditorRequired] public string Note { get; set; } = "";
+
+    /// <summary>Instead of the line, until it has a workout: when it starts.</summary>
+    [Parameter, EditorRequired] public string Empty { get; set; } = "";
+
+    private static string DateText(WorkoutSession session) => session.StartedAt.ToString("MMM d", CultureInfo.CurrentCulture);
+
+    // The y-axis: 5%, 10%, −5%.
+    private static string TickText(double tick) => $"{(tick < 0 ? "−" : "")}{Math.Abs(Math.Round(tick * 100, 1)).ToString("0.#", CultureInfo.CurrentCulture)}%";
+
+    // SVG numbers, which take a point whatever the phone's language.
+    private static string N(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+}

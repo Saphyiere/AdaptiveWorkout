@@ -1,0 +1,153 @@
+@page "/stats"
+@inject WorkoutStore Store
+@inject WorkoutFlow Flow
+
+<PageTitle>Stats</PageTitle>
+
+@* How am I doing at each routine, session and exercise? Each one's change since its first time, and a tap opens its own trend. *@
+@if (loaded)
+{
+    var key = ExerciseNames.Key(query);
+    var found = exerciseRows.Where(r => ExerciseNames.Key(r.Exercise.Name).Contains(key)).ToList();
+    <div class="screen">
+        <PageHeader Back="" BackText="Today" Label="@WorkoutsText(workouts)" Title="Stats" />
+
+        @if (workouts == 0)
+        {
+            <p class="note">No finished workouts yet. Each one counts here after Finish workout.</p>
+        }
+
+        @if (routineRows.Count > 0)
+        {
+            <section class="stack" aria-labelledby="routines-heading">
+                <h2 id="routines-heading" class="label">Routines</h2>
+                <div class="ledger">
+                    @foreach (var (routine, inUse, gymDays, count, total) in routineRows)
+                    {
+                        <a class="row" href="stats/routines/@routine.Id">
+                            <span class="row-text">
+                                <span class="name">@routine.Name</span>
+                                <span class="caption">@(inUse ? "In use · " : "")@gymDays gym days · @WorkoutsText(count)</span>
+                            </span>
+                            @if (total is { } change)
+                            {
+                                <Delta Change="change" />
+                            }
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+
+        @if (sessionRows.Count > 0)
+        {
+            <section class="stack" aria-labelledby="sessions-heading">
+                <h2 id="sessions-heading" class="label">Sessions</h2>
+                <div class="ledger">
+                    @foreach (var (template, days, count, total) in sessionRows)
+                    {
+                        <a class="row" href="stats/sessions/@template.Id">
+                            <span class="row-text">
+                                <span class="name">@template.Name</span>
+                                <span class="caption">@(days.Length == 0 ? "" : $"{days} · ")@(count == 0 ? "Not done yet" : WorkoutsText(count))</span>
+                            </span>
+                            @if (total is { } change)
+                            {
+                                <Delta Change="change" />
+                            }
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+
+        @if (exerciseRows.Count > 0)
+        {
+            <section class="stack" aria-labelledby="exercises-heading">
+                <h2 id="exercises-heading" class="label">Exercises</h2>
+                <div class="field-group find">
+                    <label class="field-label" for="find-exercise">Find</label>
+                    <input id="find-exercise" class="field" placeholder="Type a name" autocomplete="off" @bind="query" @bind:event="oninput" />
+                </div>
+                @if (found.Count == 0)
+                {
+                    <p class="note">No exercise by that name.</p>
+                }
+                else
+                {
+                    <div class="ledger">
+                        @foreach (var (exercise, count, last, total) in found)
+                        {
+                            <a class="row" href="stats/exercises/@exercise.Id">
+                                <span class="row-text">
+                                    <span class="name">@exercise.Name</span>
+                                    <span class="caption">@WorkoutsText(count) · last @last.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</span>
+                                </span>
+                                @if (total is { } change)
+                                {
+                                    <Delta Change="change" />
+                                }
+                            </a>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private bool loaded;
+    private int workouts;
+    private string query = "";
+    private readonly List<(Routine Routine, bool InUse, int GymDays, int Workouts, double? Total)> routineRows = [];
+    private readonly List<(SessionTemplate Template, string Days, int Workouts, double? Total)> sessionRows = [];
+    private readonly List<(Exercise Exercise, int Workouts, DateTimeOffset Last, double? Total)> exerciseRows = [];
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var (sessions, sets) = await Flow.LoadFinishedAsync();
+        var exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
+        var bodyWeights = await Store.GetBodyWeightsAsync();
+        var setsBySession = sets.ToLookup(s => s.SessionId);
+        workouts = sessions.Count;
+
+        // How much better some workouts' exercises are than their first time among them, by the last of them; empty until there's a change.
+        double? Total(IReadOnlyList<WorkoutSession> some, IEnumerable<WorkoutSet> theirSets) =>
+            Progress.Trend(some, [.. theirSets], exercises, bodyWeights) is [.., var last] ? last.Total : null;
+
+        // The routine in use first. A routine's workouts are its sessions', whichever routine was in use then.
+        var activeId = (await Store.GetActiveRoutineAsync())?.Id;
+        var activeWeek = activeId is long id ? await Store.GetRoutineWeekAsync(id) : new long?[7];
+        foreach (var routine in (await Store.GetRoutinesAsync()).OrderBy(r => r.Id != activeId))
+        {
+            var week = await Store.GetRoutineWeekAsync(routine.Id);
+            var theirs = sessions.Where(s => s.TemplateId is long templateId && week.Contains(templateId)).ToList();
+            routineRows.Add((routine, routine.Id == activeId, week.Count(d => d is not null), theirs.Count, Total(theirs, theirs.SelectMany(s => setsBySession[s.Id]))));
+        }
+
+        // Sessions in the order of the week in use, with their days, then the rest.
+        foreach (var template in (await Store.GetTemplatesAsync()).OrderBy(t => Array.IndexOf(activeWeek, t.Id) is var day and >= 0 ? day : 7).ThenBy(t => t.Order))
+        {
+            var theirs = sessions.Where(s => s.TemplateId == template.Id).ToList();
+            var days = string.Join(", ", Enumerable.Range(0, 7).Where(i => activeWeek[i] == template.Id).Select(Schedule.ShortName));
+            sessionRows.Add((template, days, theirs.Count, Total(theirs, theirs.SelectMany(s => setsBySession[s.Id]))));
+        }
+
+        // Exercises, the latest done first, each against its own first time.
+        var startedAt = sessions.ToDictionary(s => s.Id, s => s.StartedAt);
+        foreach (var exerciseSets in sets.GroupBy(s => s.ExerciseId).OrderByDescending(g => g.Max(s => startedAt[s.SessionId])))
+        {
+            if (!exercises.TryGetValue(exerciseSets.Key, out var exercise)) continue;
+
+            var count = exerciseSets.Select(s => s.SessionId).Distinct().Count();
+            exerciseRows.Add((exercise, count, exerciseSets.Max(s => startedAt[s.SessionId]), Total(sessions, exerciseSets)));
+        }
+
+        loaded = true;
+    }
+
+    private static string WorkoutsText(int count) => $"{count} {(count == 1 ? "workout" : "workouts")}";
+}

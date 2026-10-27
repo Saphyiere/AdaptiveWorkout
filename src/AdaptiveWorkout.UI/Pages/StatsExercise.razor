@@ -1,0 +1,112 @@
+@page "/stats/exercises/{Id:long}"
+@inject WorkoutStore Store
+@inject WorkoutFlow Flow
+@inject AppNavigation Navigation
+
+<PageTitle>@(exercise?.Name ?? "Exercise")</PageTitle>
+
+@* How has this exercise been going? Every workout that had it, against the time before, and its heaviest (or longest) set. *@
+@if (exercise is not null)
+{
+    var telemetry = Theme == Theme.Telemetry;
+    var timed = exercise.Measure == ExerciseMeasure.Time;
+    var shown = trend.Find(p => p.Session == picked)?.Session ?? (trend.Count > 0 ? trend[^1].Session : null);
+    var over = $"over {trend.Count} {(trend.Count == 1 ? "workout" : "workouts")}";
+    var note = telemetry ? "Better than your first time"
+        : timed ? $"How much longer your sets are than the first time, {over}." : $"How much better your sets are than the first time, {over}, with weight and reps together.";
+    <div class="screen">
+        <PageHeader Back="stats" BackText="Stats" Label="Exercise" Title="@exercise.Name" />
+
+        <TrendChart Points="trend" @bind-Picked="picked" NameOf="NameOf" Note="@note" Empty="Its trend starts the second time you do it." />
+
+        @if (best is not null)
+        {
+            // Bodyweight sets all weigh the same, so the best of them has the most reps.
+            var bodyweight = !timed && done.All(d => d.Sets.All(s => s.Weight is null));
+            var (label, value, unit) = timed ? ("Longest", TimeText.Format(TimeSpan.FromSeconds(best.DurationSeconds ?? 0)), "")
+                : bodyweight ? ("Most reps", $"{best.Reps ?? 0}", "reps")
+                : ("Heaviest", SetSummary.WeightText(best.Weight), $"{(best.WeightUnit == WeightUnit.Kilograms ? "kg" : "lb")} × {best.Reps ?? 0}");
+            <section class="block" aria-label="Summary">
+                <div class="grid-2">
+                    <div class="row-text">
+                        <span class="label">@label</span>
+                        <span class="inline baseline">
+                            <span class="number sm">@value</span>
+                            <span class="unit">@unit</span>
+                        </span>
+                        <span class="caption">@bestOn.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</span>
+                    </div>
+                    <div class="row-text">
+                        <span class="label">Workouts</span>
+                        <span class="number sm">@done.Count</span>
+                        <span class="caption">since @done[^1].Session.StartedAt.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</span>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <section class="stack" aria-labelledby="workouts-heading">
+            <h2 id="workouts-heading" class="label">Workouts</h2>
+            @if (done.Count == 0)
+            {
+                <p class="note">Not done yet.</p>
+            }
+            else
+            {
+                <div class="ledger">
+                    @foreach (var (session, sets) in done)
+                    {
+                        <a class="row @(session == shown ? "picked" : "")" href="history/@session.Id">
+                            <span class="row-text">
+                                <span class="caption">@session.StartedAt.ToString(Theme.DayFormat, CultureInfo.CurrentCulture) · @NameOf(session)</span>
+                                <span class="name tabular">@SetSummary.Format(sets, exercise.Measure)</span>
+                            </span>
+                            @if (trend.Find(p => p.Session == session) is { } point)
+                            {
+                                <Delta Change="point.Change" />
+                            }
+                        </a>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    private Exercise? exercise;
+    private Dictionary<long, string> templateNames = [];
+    private List<TrendPoint> trend = [];
+    private WorkoutSession? picked;
+    private List<PastSession> done = [];
+    private WorkoutSet? best;
+    private DateTimeOffset bestOn;
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
+    [Parameter] public long Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
+        exercise = exercises.GetValueOrDefault(Id);
+        if (exercise is null)
+        {
+            await Navigation.BackAsync("stats");
+            return;
+        }
+
+        var (sessions, sets) = await Flow.LoadFinishedAsync();
+        var exerciseSets = sets.Where(s => s.ExerciseId == Id).ToList();
+        templateNames = (await Store.GetTemplatesAsync()).ToDictionary(t => t.Id, t => t.Name);
+        trend = Progress.Trend(sessions, exerciseSets, exercises, await Store.GetBodyWeightsAsync());
+        done = [.. ExerciseHistory.Recent(Id, sessions, exerciseSets, 0, sessions.Count)];
+
+        // The heaviest set, in pounds whatever each set's unit, with the most reps at that weight; or the longest.
+        best = exercise.Measure == ExerciseMeasure.Time ? exerciseSets.MaxBy(s => s.DurationSeconds ?? 0)
+            : exerciseSets.MaxBy(s => (WorkoutStats.Pounds(s.Weight ?? 0, s.WeightUnit), s.Reps ?? 0));
+        bestOn = sessions.Find(s => s.Id == best?.SessionId)?.StartedAt ?? default;
+    }
+
+    private string NameOf(WorkoutSession session) => session.TemplateId is long id && templateNames.TryGetValue(id, out var name) ? name : "Workout";
+}

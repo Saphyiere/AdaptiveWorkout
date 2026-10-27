@@ -1,0 +1,121 @@
+@page "/stats/sessions/{Id:long}"
+@inject WorkoutStore Store
+@inject WorkoutFlow Flow
+@inject AppNavigation Navigation
+
+<PageTitle>@(template?.Name ?? "Session")</PageTitle>
+
+@* How have I been doing at this session, e.g. Monday's? Its workouts against each other, and each of its exercises in them. *@
+@if (template is not null)
+{
+    var name = template.Name;
+    var telemetry = Theme == Theme.Telemetry;
+    var shown = trend.Find(p => p.Session == picked)?.Session ?? (trend.Count > 0 ? trend[^1].Session : null);
+    var note = telemetry ? "Better than its first time, on average"
+        : $"How much better this session's exercises are than its first time, on average, over {trend.Count} {(trend.Count == 1 ? "workout" : "workouts")}.";
+    <div class="screen">
+        <PageHeader Back="stats" BackText="Stats" Label="@(days.Length == 0 ? "Session" : $"Session · {days}")" Title="@template.Name" />
+
+        <TrendChart Points="trend" @bind-Picked="picked" NameOf="@(_ => name)" Note="@note" Empty="Its trend starts the second time you do it." />
+
+        @if (exerciseRows.Count > 0)
+        {
+            <section class="stack" aria-labelledby="exercises-heading">
+                <h2 id="exercises-heading" class="label">Exercises</h2>
+                <div class="ledger">
+                    @foreach (var (exercise, lastTime, total) in exerciseRows)
+                    {
+                        <a class="row" href="stats/exercises/@exercise.Id">
+                            <span class="row-text">
+                                <span class="name">@exercise.Name</span>
+                                <span class="caption">@(lastTime.Count == 0 ? "Not done yet" : SetSummary.Format(lastTime, exercise.Measure))</span>
+                            </span>
+                            @if (total is { } change)
+                            {
+                                <Delta Change="change" />
+                            }
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+
+        <section class="stack" aria-labelledby="workouts-heading">
+            <h2 id="workouts-heading" class="label">Workouts</h2>
+            @if (workouts.Count == 0)
+            {
+                <p class="note">Not done yet.</p>
+            }
+            else
+            {
+                <div class="ledger">
+                    @foreach (var workout in workouts)
+                    {
+                        var setCount = setsBySession[workout.Id].Count();
+                        <a class="row @(workout == shown ? "picked" : "")" href="history/@workout.Id">
+                            <span class="row-text">
+                                <span class="name">@workout.StartedAt.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</span>
+                                <span class="caption">@TimeText.Format(workout.FinishedAt!.Value - workout.StartedAt) · @setCount @(setCount == 1 ? "set" : "sets")</span>
+                            </span>
+                            @if (trend.Find(p => p.Session == workout) is { } point)
+                            {
+                                <Delta Change="point.Change" />
+                            }
+                        </a>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    private SessionTemplate? template;
+    private string days = "";
+    private List<TrendPoint> trend = [];
+    private WorkoutSession? picked;
+    private List<WorkoutSession> workouts = [];
+    private ILookup<long, WorkoutSet> setsBySession = Enumerable.Empty<WorkoutSet>().ToLookup(s => s.SessionId);
+    private readonly List<(Exercise Exercise, List<WorkoutSet> LastTime, double? Total)> exerciseRows = [];
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
+    [Parameter] public long Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        template = await Store.GetTemplateAsync(Id);
+        if (template is null)
+        {
+            await Navigation.BackAsync("stats");
+            return;
+        }
+
+        var (sessions, sets) = await Flow.LoadFinishedAsync();
+        var exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
+        var bodyWeights = await Store.GetBodyWeightsAsync();
+        var theirs = sessions.Where(s => s.TemplateId == Id).ToList();
+        var ids = theirs.Select(s => s.Id).ToHashSet();
+        var theirSets = sets.Where(s => ids.Contains(s.SessionId)).ToList();
+        setsBySession = theirSets.ToLookup(s => s.SessionId);
+        workouts = [.. Enumerable.Reverse(theirs)];
+        trend = Progress.Trend(theirs, theirSets, exercises, bodyWeights);
+
+        var activeId = (await Store.GetActiveRoutineAsync())?.Id;
+        var week = activeId is long routineId ? await Store.GetRoutineWeekAsync(routineId) : new long?[7];
+        days = string.Join(", ", Enumerable.Range(0, 7).Where(i => week[i] == Id).Select(Schedule.ShortName));
+
+        // Its exercises in its order, then any others done in its workouts (swapped in, or since taken out). Each one only against
+        // this session's other workouts, so these add up to its trend.
+        var planned = (await Store.GetTemplateExercisesAsync(Id)).OrderBy(e => e.Order).Select(e => e.ExerciseId);
+        foreach (var exerciseId in planned.Concat(theirSets.Select(s => s.ExerciseId)).Distinct())
+        {
+            if (!exercises.TryGetValue(exerciseId, out var exercise)) continue;
+
+            var exerciseSets = theirSets.Where(s => s.ExerciseId == exerciseId).ToList();
+            var done = workouts.Select(w => setsBySession[w.Id].Where(s => s.ExerciseId == exerciseId).OrderBy(s => s.Order).ToList());
+            var total = Progress.Trend(theirs, exerciseSets, exercises, bodyWeights) is [.., var last] ? last.Total : (double?)null;
+            exerciseRows.Add((exercise, done.FirstOrDefault(s => s.Count > 0) ?? [], total));
+        }
+    }
+}

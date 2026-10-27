@@ -52,6 +52,15 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         return Current;
     }
 
+    /// <summary>Every finished workout and their sets, oldest first, from memory once history has loaded: for looking back, as Stats does.</summary>
+    public async Task<(List<WorkoutSession> Sessions, List<WorkoutSet> Sets)> LoadFinishedAsync()
+    {
+        await LoadAsync();
+        var finished = pastSessions.Where(s => s.FinishedAt is not null).OrderBy(s => s.StartedAt).ToList();
+        var ids = finished.Select(s => s.Id).ToHashSet();
+        return (finished, [.. pastSets.Where(s => ids.Contains(s.SessionId))]);
+    }
+
     /// <summary>
     /// Starts a session now, or resumes the open one. A session with a warm-up starts with it, until the big button starts the first
     /// exercise; otherwise a planned first exercise's first set starts right away.

@@ -1,0 +1,95 @@
+@page "/stats/routines/{Id:long}"
+@inject WorkoutStore Store
+@inject WorkoutFlow Flow
+@inject AppNavigation Navigation
+
+<PageTitle>@(routine?.Name ?? "Routine")</PageTitle>
+
+@* How is this routine going? Its sessions' workouts against each other, then its week: each day's session and how it's going. *@
+@if (routine is not null)
+{
+    var telemetry = Theme == Theme.Telemetry;
+    var note = telemetry ? "Better than its first time, on average"
+        : $"How much better this routine's exercises are than the first time, on average, over {trend.Count} {(trend.Count == 1 ? "workout" : "workouts")}.";
+    <div class="screen">
+        <PageHeader Back="stats" BackText="Stats" Label="@(inUse ? "Routine · In use" : "Routine")" Title="@routine.Name" />
+
+        <TrendChart Points="trend" @bind-Picked="picked" NameOf="NameOf" Note="@note" Empty="Its trend starts once you repeat an exercise in its sessions." />
+
+        <section class="stack" aria-labelledby="week-heading">
+            <h2 id="week-heading" class="label">The week</h2>
+            <div class="ledger">
+                @for (var i = 0; i < 7; i++)
+                {
+                    if (week[i] is long templateId && templateNames.TryGetValue(templateId, out var name))
+                    {
+                        var (count, total) = bySession[templateId];
+                        <a class="row" href="stats/sessions/@templateId">
+                            <span class="row-text">
+                                <span class="name">@Schedule.Name(i)</span>
+                                <span class="caption">@name · @(count == 0 ? "Not done yet" : $"{count} {(count == 1 ? "workout" : "workouts")}")</span>
+                            </span>
+                            @if (total is { } change)
+                            {
+                                <Delta Change="change" />
+                            }
+                        </a>
+                    }
+                    else
+                    {
+                        <div class="row">
+                            <span class="row-text">
+                                <span class="name">@Schedule.Name(i)</span>
+                                <span class="caption">Rest day</span>
+                            </span>
+                        </div>
+                    }
+                }
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private Routine? routine;
+    private bool inUse;
+    private long?[] week = new long?[7];
+    private Dictionary<long, string> templateNames = [];
+    private readonly Dictionary<long, (int Workouts, double? Total)> bySession = [];
+    private List<TrendPoint> trend = [];
+    private WorkoutSession? picked;
+
+    [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
+
+    [Parameter] public long Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        routine = (await Store.GetRoutinesAsync()).Find(r => r.Id == Id);
+        if (routine is null)
+        {
+            await Navigation.BackAsync("stats");
+            return;
+        }
+
+        inUse = (await Store.GetActiveRoutineAsync())?.Id == Id;
+        week = await Store.GetRoutineWeekAsync(Id);
+        templateNames = (await Store.GetTemplatesAsync()).ToDictionary(t => t.Id, t => t.Name);
+        var (sessions, sets) = await Flow.LoadFinishedAsync();
+        var exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
+        var bodyWeights = await Store.GetBodyWeightsAsync();
+        var setsBySession = sets.ToLookup(s => s.SessionId);
+
+        // Its workouts are its sessions', whichever routine was in use then. Each session's own trend compares its workouts only with each other.
+        var theirs = sessions.Where(s => s.TemplateId is long templateId && week.Contains(templateId)).ToList();
+        trend = Progress.Trend(theirs, [.. theirs.SelectMany(s => setsBySession[s.Id])], exercises, bodyWeights);
+        foreach (var templateId in week.OfType<long>().Distinct())
+        {
+            var its = theirs.Where(s => s.TemplateId == templateId).ToList();
+            var total = Progress.Trend(its, [.. its.SelectMany(s => setsBySession[s.Id])], exercises, bodyWeights) is [.., var last] ? last.Total : (double?)null;
+            bySession[templateId] = (its.Count, total);
+        }
+    }
+
+    private string NameOf(WorkoutSession session) => session.TemplateId is long id && templateNames.TryGetValue(id, out var name) ? name : "Workout";
+}
