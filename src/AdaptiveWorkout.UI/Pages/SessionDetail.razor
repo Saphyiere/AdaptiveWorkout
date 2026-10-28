@@ -9,14 +9,17 @@
 @if (session is not null)
 {
     var heartRate = WorkoutStats.HeartRate(samples, session.StartedAt, session.FinishedAt ?? session.StartedAt);
+    var time = TimeText.Format((session.FinishedAt ?? session.StartedAt) - session.StartedAt);
+    var volume = WorkoutStats.Volume(sets, Settings.Unit).ToString("N0", CultureInfo.CurrentCulture);
     <div class="screen">
         <PageHeader Back="gym" BackText="Gym" Label="@session.StartedAt.ToString("dddd, MMM d · h:mm tt", CultureInfo.CurrentCulture)" Title="@name" />
 
+        @* The time and volume can run long (1:02:05, 14,250), so they say how many characters they have, for the type to fit them. *@
         <section class="block" aria-label="Summary">
-            <div class="grid-2">
+            <div class="grid-2 readouts">
                 <div class="row-text">
                     <span class="label">Time</span>
-                    <span class="number sm">@TimeText.Format((session.FinishedAt ?? session.StartedAt) - session.StartedAt)</span>
+                    <span class="number sm" style="--chars: @time.Length">@time</span>
                 </div>
                 <div class="row-text">
                     <span class="label">Sets</span>
@@ -25,7 +28,7 @@
                 <div class="row-text">
                     <span class="label">Volume</span>
                     <span class="inline baseline">
-                        <span class="number sm">@WorkoutStats.Volume(sets, Settings.Unit).ToString("N0", CultureInfo.CurrentCulture)</span>
+                        <span class="number sm" style="--chars: @volume.Length">@volume</span>
                         <span class="unit">@Unit(Settings.Unit)</span>
                     </span>
                 </div>

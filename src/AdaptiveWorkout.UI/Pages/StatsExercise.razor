@@ -26,12 +26,13 @@
             var (label, value, unit) = timed ? ("Longest", TimeText.Format(TimeSpan.FromSeconds(best.DurationSeconds ?? 0)), "")
                 : bodyweight ? ("Most reps", $"{best.Reps ?? 0}", "reps")
                 : ("Heaviest", SetSummary.WeightText(best.Weight), $"{(best.WeightUnit == WeightUnit.Kilograms ? "kg" : "lb")} × {best.Reps ?? 0}");
+            @* The best can run long (a walk of over an hour reads 1:02:05), so it says how many characters it has, for the type to fit them. *@
             <section class="block" aria-label="Summary">
-                <div class="grid-2">
+                <div class="grid-2 readouts">
                     <div class="row-text">
                         <span class="label">@label</span>
                         <span class="inline baseline">
-                            <span class="number sm">@value</span>
+                            <span class="number sm" style="--chars: @value.Length">@value</span>
                             <span class="unit">@unit</span>
                         </span>
                         <span class="caption">@bestOn.ToString(Theme.DayFormat, CultureInfo.CurrentCulture)</span>

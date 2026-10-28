@@ -1770,6 +1770,22 @@ button.set-line:active {
     line-height: 44px;
 }
 
+/* Readouts side by side, like a workout's summary. The mono type is wide, so a long one (1:02:05, 14,250) shrinks to fit its
+   column with a little air: it says how many characters it has (--chars), and each is 0.58 of the type size. A unit that doesn't
+   fit beside its number goes under it. */
+[data-theme="telemetry"] .readouts > * {
+    container-type: inline-size;
+}
+
+[data-theme="telemetry"] .readouts .number.sm {
+    font-size: min(44px, (100cqi - 12px) / var(--chars, 1) / 0.58);
+}
+
+[data-theme="telemetry"] .readouts .inline {
+    flex-wrap: wrap;
+    row-gap: 0;
+}
+
 [data-theme="telemetry"] .number.xs {
     font-size: 20px;
     line-height: 24px;
