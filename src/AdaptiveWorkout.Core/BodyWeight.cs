@@ -2,6 +2,21 @@ namespace AdaptiveWorkout.Core;
 
 public static class BodyWeight
 {
+    private static readonly Comparer<BodyWeightEntry> ByTime = Comparer<BodyWeightEntry>.Create((a, b) => a.At.CompareTo(b.At));
+
+    /// <summary>The weigh-ins in time order, for <see cref="Nearest"/>.</summary>
+    public static List<BodyWeightEntry> InOrder(IEnumerable<BodyWeightEntry> entries) => [.. entries.Order(ByTime)];
+
+    /// <summary>
+    /// What I weighed at a time: the weigh-in nearest before it, else the first one after; empty without any. The weigh-ins are in
+    /// time order (<see cref="InOrder"/>), so it finds its own without reading them all.
+    /// </summary>
+    public static BodyWeightEntry? Nearest(List<BodyWeightEntry> inOrder, DateTimeOffset at)
+    {
+        var index = inOrder.BinarySearch(new BodyWeightEntry { At = at }, ByTime);
+        return index >= 0 ? inOrder[index] : ~index > 0 ? inOrder[~index - 1] : inOrder.FirstOrDefault();
+    }
+
     /// <summary>The latest weigh-in minus the earliest one within the last <paramref name="days"/> days; null with fewer than two.</summary>
     public static double? Change(IEnumerable<BodyWeightEntry> entries, DateTimeOffset now, int days)
     {

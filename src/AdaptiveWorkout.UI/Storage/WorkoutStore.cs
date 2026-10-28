@@ -20,7 +20,7 @@ public sealed class WorkoutStore(string databasePath)
         CREATE TABLE IF NOT EXISTS Setting (Key TEXT PRIMARY KEY, Value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS Exercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, NameKey TEXT NOT NULL UNIQUE, Measure INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS TemplateExercise (Id INTEGER PRIMARY KEY AUTOINCREMENT, TemplateId INTEGER NOT NULL REFERENCES SessionTemplate (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, PlannedSets INTEGER, SupersetGroup INTEGER);
-        CREATE TABLE IF NOT EXISTS WorkoutSession (Id INTEGER PRIMARY KEY AUTOINCREMENT, TemplateId INTEGER REFERENCES SessionTemplate (Id), StartedAt TEXT NOT NULL, FinishedAt TEXT, LoggedAfterward INTEGER NOT NULL DEFAULT 0, Improvement REAL, ExercisesCompared INTEGER, WarmUp INTEGER NOT NULL DEFAULT 0, WarmUpEndedAt TEXT, CoolDown INTEGER NOT NULL DEFAULT 0, CoolDownStartedAt TEXT);
+        CREATE TABLE IF NOT EXISTS WorkoutSession (Id INTEGER PRIMARY KEY AUTOINCREMENT, TemplateId INTEGER REFERENCES SessionTemplate (Id), StartedAt TEXT NOT NULL, FinishedAt TEXT, LoggedAfterward INTEGER NOT NULL DEFAULT 0, Improvement REAL, ExercisesCompared INTEGER, WarmUp INTEGER NOT NULL DEFAULT 0, WarmUpEndedAt TEXT, CoolDown INTEGER NOT NULL DEFAULT 0, CoolDownStartedAt TEXT, AverageBpm REAL);
         CREATE TABLE IF NOT EXISTS WorkoutSet (Id INTEGER PRIMARY KEY AUTOINCREMENT, SessionId INTEGER NOT NULL REFERENCES WorkoutSession (Id) ON DELETE CASCADE, ExerciseId INTEGER NOT NULL REFERENCES Exercise (Id), "Order" INTEGER NOT NULL, StartedAt TEXT, StoppedAt TEXT, Weight REAL, WeightUnit INTEGER NOT NULL, Reps INTEGER, DurationSeconds INTEGER, HitGoal INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS FoodEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Calories INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS BodyWeightEntry (Id INTEGER PRIMARY KEY AUTOINCREMENT, At TEXT NOT NULL, Weight REAL NOT NULL, WeightUnit INTEGER NOT NULL);
@@ -59,8 +59,14 @@ public sealed class WorkoutStore(string databasePath)
         COMMIT;
         """;
 
+    // Workouts got their average heart rate (worked out once, at Finish) after the table existed.
+    private const string SessionHeartRate = "ALTER TABLE WorkoutSession ADD COLUMN AverageBpm REAL;";
+
     private const string ActiveRoutineKey = "ActiveRoutineId";
-    private const string CalorieGoalKey = "CalorieGoal", SexKey = "Sex", BirthYearKey = "BirthYear", HeightKey = "HeightCm", ActivityKey = "Activity";
+    private const string CalorieGoalKey = "CalorieGoal", SexKey = "Sex", BirthYearKey = "BirthYear", HeightKey = "HeightCm";
+
+    // How I spend a usual day outside workouts. (An "Activity" before it counted workouts in, so it's left behind.)
+    private const string DailyActivityKey = "DailyActivity";
 
     private readonly string connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString();
     private readonly Lock laneGate = new();
@@ -102,7 +108,7 @@ public sealed class WorkoutStore(string databasePath)
         settings.Sex = Enum.TryParse<Sex>(saved.GetValueOrDefault(SexKey), out var sex) ? sex : null;
         settings.BirthYear = int.TryParse(saved.GetValueOrDefault(BirthYearKey), CultureInfo.InvariantCulture, out var born) ? born : null;
         settings.HeightCm = double.TryParse(saved.GetValueOrDefault(HeightKey), CultureInfo.InvariantCulture, out var height) ? height : null;
-        settings.Activity = Enum.TryParse<ActivityLevel>(saved.GetValueOrDefault(ActivityKey), out var activity) ? activity : defaults.Activity;
+        settings.DailyActivity = Enum.TryParse<DailyActivity>(saved.GetValueOrDefault(DailyActivityKey), out var activity) ? activity : defaults.DailyActivity;
     }
 
     /// <summary>Saves the calorie goal and body details; an empty one is removed.</summary>
@@ -111,7 +117,7 @@ public sealed class WorkoutStore(string databasePath)
         SetSettingAsync(SexKey, settings.Sex?.ToString()),
         SetSettingAsync(BirthYearKey, settings.BirthYear?.ToString(CultureInfo.InvariantCulture)),
         SetSettingAsync(HeightKey, settings.HeightCm?.ToString(CultureInfo.InvariantCulture)),
-        SetSettingAsync(ActivityKey, settings.Activity.ToString()));
+        SetSettingAsync(DailyActivityKey, settings.DailyActivity.ToString()));
 
     /// <summary>A routine's week, Monday first: each day's session, or null for a rest day.</summary>
     public Task<long?[]> GetRoutineWeekAsync(long routineId) => RunAsync(async c =>
@@ -178,11 +184,11 @@ public sealed class WorkoutStore(string databasePath)
     });
 
     public Task<List<WorkoutSession>> GetSessionsAsync() => RunAsync(async c =>
-        (await c.QueryAsync<WorkoutSession>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared, WarmUp, WarmUpEndedAt, CoolDown, CoolDownStartedAt FROM WorkoutSession ORDER BY Id")).AsList());
+        (await c.QueryAsync<WorkoutSession>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared, WarmUp, WarmUpEndedAt, CoolDown, CoolDownStartedAt, AverageBpm FROM WorkoutSession ORDER BY Id")).AsList());
 
     /// <summary>One workout, or null when there's none with that id.</summary>
     public Task<WorkoutSession?> GetSessionAsync(long id) => RunAsync(c =>
-        c.QueryFirstOrDefaultAsync<WorkoutSession?>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared, WarmUp, WarmUpEndedAt, CoolDown, CoolDownStartedAt FROM WorkoutSession WHERE Id = @id", new { id }));
+        c.QueryFirstOrDefaultAsync<WorkoutSession?>("SELECT Id, TemplateId, StartedAt, FinishedAt, LoggedAfterward, Improvement, ExercisesCompared, WarmUp, WarmUpEndedAt, CoolDown, CoolDownStartedAt, AverageBpm FROM WorkoutSession WHERE Id = @id", new { id }));
 
     /// <summary>Saves a new session and fills in its Id.</summary>
     public Task StartSessionAsync(WorkoutSession session) => RunAsync(async c =>
@@ -268,8 +274,23 @@ public sealed class WorkoutStore(string databasePath)
     });
 
     /// <summary>Readings in a stretch of time. Times are text with an offset, so SQL narrows with a day of slack and the exact range is checked in memory.</summary>
-    public Task<List<HeartRateSample>> GetHeartRateAsync(DateTimeOffset from, DateTimeOffset to) => RunAsync(async c =>
-        (await c.QueryAsync<HeartRateSample>("SELECT At, Bpm FROM HeartRateSample WHERE At >= @start AND At <= @end", new { start = from.AddDays(-1), end = to.AddDays(1) })).Where(s => s.At >= from && s.At <= to).ToList());
+    public Task<List<HeartRateSample>> GetHeartRateAsync(DateTimeOffset from, DateTimeOffset to) => RunAsync(c => ReadingsAsync(c, from, to));
+
+    /// <summary>
+    /// Works out a workout's average heart rate from <paramref name="from"/> to <paramref name="to"/> (0 without readings), keeps it
+    /// with the workout, and returns it. It's one piece of work, so a read started after it sees it.
+    /// </summary>
+    public Task<double> SaveAverageBpmAsync(WorkoutSession session, DateTimeOffset from, DateTimeOffset to) => RunAsync(async c =>
+    {
+        var readings = await ReadingsAsync(c, from, to);
+        var average = readings.Count == 0 ? 0 : readings.Average(r => r.Bpm);
+        await c.ExecuteAsync("UPDATE WorkoutSession SET AverageBpm = @average WHERE Id = @Id", new { average, session.Id });
+        return average;
+    });
+
+    // GetHeartRateAsync's readings, for work already running.
+    private static async Task<List<HeartRateSample>> ReadingsAsync(SqliteConnection c, DateTimeOffset from, DateTimeOffset to) =>
+        (await c.QueryAsync<HeartRateSample>("SELECT At, Bpm FROM HeartRateSample WHERE At >= @start AND At <= @end", new { start = from.AddDays(-1), end = to.AddDays(1) })).Where(s => s.At >= from && s.At <= to).ToList();
 
     /// <summary>Queues work behind everything started before it and runs it on a background thread with its own connection.</summary>
     private Task<T> RunAsync<T>(Func<SqliteConnection, Task<T>> work)
@@ -287,6 +308,7 @@ public sealed class WorkoutStore(string databasePath)
                     if (await connection.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM pragma_table_info('SessionTemplate') WHERE name = 'RoutineId'") > 0) await connection.ExecuteAsync(SessionsWithoutRoutine);
                     if (await connection.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM pragma_table_info('WorkoutSession') WHERE name = 'Improvement'") == 0) await connection.ExecuteAsync(SessionImprovement);
                     if (await connection.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM pragma_table_info('WorkoutSession') WHERE name = 'WarmUp'") == 0) await connection.ExecuteAsync(WarmUpAndCoolDown);
+                    if (await connection.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM pragma_table_info('WorkoutSession') WHERE name = 'AverageBpm'") == 0) await connection.ExecuteAsync(SessionHeartRate);
                     schemaReady = true;
                 }
 

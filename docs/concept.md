@@ -18,7 +18,7 @@ Build the foundation first, then add on.
 
 ## Principles
 
-- **Store raw facts with timestamps; calculate everything else.** Rest time, heart rate during a set, progress, consistency and calorie deficits are all derived, never stored. Those calculations are the business logic the tests cover. The one exception is each workout's **improvement**: it's worked out once, right after Finish, and kept with the workout, so the trend never has to redo it.
+- **Store raw facts with timestamps; calculate everything else.** Rest time, heart rate during a set, progress, consistency and calorie deficits are all derived, never stored. Those calculations are the business logic the tests cover. The exceptions are each workout's **improvement** and **average heart rate**: each is worked out once, right after Finish, and kept with the workout, so the trend and the calories never have to redo them.
 - **Sessions are the center of workouts.** A session holds its sets and its heart rate. Calories and body weight happen on days, not in sessions, so they are simple daily logs.
 - **No exercise library.** Exercises are whatever names I type. Typing a name I've used before links to it.
 - **One button.** The app knows what's next and puts it on one big button. Everything else is one step away, never in the way.
@@ -43,7 +43,7 @@ Build the foundation first, then add on.
 The home screen answers the three questions at a glance. **(proposed)**
 
 - **Gym today:** done, not yet, or **rest day**, plus this week's gym days (e.g. Mon, Wed, Thu) with the routine's rest days marked, and the streak. Tapping it opens **Gym**.
-- **Calories:** eaten today against my goal (1,800) and maintenance, with a quick add. **Edit** lists today's entries, each deletable. Tapping its heading opens **Calories**.
+- **Calories:** eaten today against my goal (1,800) and maintenance, which goes up by what today's finished workouts burned, with a quick add. **Edit** lists today's entries, each deletable. Tapping its heading opens **Calories**.
 - **Body weight:** the latest weigh-in and its trend, with a quick add. **Edit** lists the last 10 weigh-ins, each deletable.
 - The big button: **Start Back day** (today's session in the routine). On a rest day, or once today is done, it reads **Start a workout** and opens the session picker. On a rest day, **Edit routine** sits under it.
 - At the top right: **Stats** (a little line chart), then **Settings**.
@@ -56,7 +56,7 @@ Am I getting better, and everything I've done:
 
 - **Improvement:** how much better my exercises are than the first time I did them, on average (**+12.8%** over 13 workouts), with the line of how it got there. Tapping the line picks a workout: its name, date and how it did against the last time. See *Adaptive* for how it's worked out.
 - **Edit routine** opens the routines, to edit one or switch.
-- **History:** every finished workout, newest first and grouped by month: its name, date, length, set count and improvement, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. Tapping a set opens it to change its weight and reps (or time) and Hit goal, or to delete just that set after asking once; that workout's improvement, and every later one's, is worked out again. A warm-up comes before the exercises and a cool-down after them, each with how long it took and its average and highest heart rate. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
+- **History:** every finished workout, newest first and grouped by month: its name, date, length, set count and improvement, with a delete on each row. Tapping one shows its numbers (time, sets, volume, average and highest heart rate, and roughly what it burned, with its likely range) and every set by exercise: weight × reps, how long the set took, and the heart rate during it. Tapping a set opens it to change its weight and reps (or time) and Hit goal, or to delete just that set after asking once; that workout's improvement, and every later one's, is worked out again. A warm-up comes before the exercises and a cool-down after them, each with how long it took and its average and highest heart rate. **Delete workout** at the bottom removes it and its sets, so suggestions and the last three times forget it too.
 
 ### Stats
 
@@ -78,7 +78,7 @@ Tapping a point on any line picks that workout in the list below, and tapping a 
 
 How have I been eating, and why am I (not) losing weight? Opened from Today's calorie heading, or from the top of Stats:
 
-- **Eaten:** a bar for each day of the last five weeks, or with **Weeks**, each week of the last six months as its average day. Each bar is solid up to the goal and hatched past it, with the goal across in ink and maintenance dashed (it steps as my weight changes). A day with nothing logged is a dash on the baseline; today's bar, still filling, is fainter. Tapping a bar shows its day (or week): eaten, and how far over or under the goal and maintenance.
+- **Eaten:** a bar for each day of the last five weeks, or with **Weeks**, each week of the last six months as its average day. Each bar is solid up to the goal and hatched past it, with the goal across in ink and maintenance dashed (it steps as my weight changes, and up on the days I worked out). A day with nothing logged is a dash on the baseline; today's bar, still filling, is fainter. Tapping a bar shows its day (or week): eaten, how far over or under the goal and maintenance, and what its workouts burned.
 - **This week**, its days that are over: the average day against my goal, how many days I logged, how far under maintenance, and what that should do to my weight so far.
 - **Last 4 weeks:** the weight my logs add up to, against the scale's (the line through my weigh-ins). When the scale lost less, it says so: some of what I eat may not be logged, or my maintenance is lower than the formula's.
 - **Every week** since I started logging, by month: its average day, the days logged, and the weight it should come to.
@@ -88,8 +88,8 @@ How have I been eating, and why am I (not) losing weight? Opened from Today's ca
 The icon at the top right of Today, after Stats:
 
 - **Look:** **Logbook**, a printed training log, warm paper and a red pen; or **Telemetry**, a dark instrument panel, with every number on a ruler. Choosing one switches the whole app at once.
-- **Calories:** my goal a day (1,800 to start), and maintenance, worked out from my body and latest weigh-in (see *Calories* below).
-- **Body:** sex, age, height, and how active I am in a usual week, training included: from sitting most of the day to hard training and a physical job.
+- **Calories:** my goal a day (1,800 to start), and maintenance on a day without a workout, worked out from my body and latest weigh-in (see *Calories* below).
+- **Body:** sex, age, height, and how I spend a usual day outside workouts: from sitting most of it to physical work all day. Each workout adds its own.
 
 Everything is remembered.
 
@@ -220,7 +220,7 @@ In a superset, each exercise has its own **Change**. From the set screen, the ru
 
 Every tap has to feel instant. The open workout lives in memory: Stop, Start and the break screen change on the spot, and saving happens in the background, one write at a time and in order. Buttons react the moment they're pressed, and each step slides in, already mostly visible so the slide never reads as waiting. Debug builds run compiled code too (the Android interpreter is off), so testing feels like the real thing.
 
-Opening has to be quick, and stay quick as the log grows. Today reads only what it shows: the list of workouts for the week and the streak, today's food, and the last 30 days of weigh-ins (plus the latest few for the list). The workout history behind suggestions and the last three times, every set ever logged, loads once Today is up, so it never holds Today up and is usually ready before Start or Resume needs it. The history screens read only what they show too: a past workout reads its own sets and the heart rate during it, and Gym reads how many sets each workout had of each exercise rather than every set. Stats works from the history already in memory and draws each line from the sets as it opens: a few milliseconds a line, even over years of workouts.
+Opening has to be quick, and stay quick as the log grows. Today reads only what it shows: the list of workouts for the week and the streak, today's food, and the last 30 days of weigh-ins (plus the latest few for the list). The workout history behind suggestions and the last three times, every set ever logged, loads once Today is up, so it never holds Today up and is usually ready before Start or Resume needs it. The history screens read only what they show too: a past workout reads its own sets and the heart rate during it, and Gym reads how many sets each workout had of each exercise rather than every set. Stats works from the history already in memory and draws each line from the sets as it opens: a few milliseconds a line, even over years of workouts. Calories takes each workout's kept average heart rate, never the readings behind it.
 
 ### Supersets
 
@@ -293,6 +293,7 @@ The watch streams heart rate (about once a second) for the whole session, sets a
 - heart rate during the warm-up and the cool-down
 - heart rate while resting (readings between sets)
 - the whole session's curve
+- the workout's average, from Start to its last set (through a cool-down, to Finish), for what it burned (see *Calories*)
 
 How it runs:
 
@@ -304,13 +305,15 @@ How it runs:
 - **The phone** shows the live number on the set and break screens, and saves every reading, even with the phone app in the background. Without a recent reading it says it's waiting and offers **Open on watch**.
 - **Finish** (or cancelling an empty session) closes the watch app. If that message doesn't arrive, the next reading the phone gets for a finished workout sends it again, and the watch stops on its own after 4 hours.
 - Opening the watch app by hand works too: it reads until I close it.
+- **Kept averages:** Finish works out the workout's average heart rate and keeps it with the workout. Readings the watch held and sends after Finish are taken in then, and deleting a set of a past workout works it out again. Workouts from before averages were kept get theirs once, after Today is up.
 
 ## Calories
 
 - Just what I ate. Not tied to sessions.
 - Enter one total before bed, or add amounts through the day; both are entries summed per day, by the day on the clock when I ate. Every entry is kept, so every day is there to look back on; a day counts once it's over.
 - Goal 1,800 a day, changed in Settings.
-- **Maintenance** is what would keep my weight where it is: resting calories by the Mifflin-St Jeor formula (10 × kg + 6.25 × cm − 5 × age, then +5 for a man or −161 for a woman), times how active I am (1.2 sitting most of the day, 1.375 lightly active, 1.55 moderately, 1.725 very, 1.9 hard training and a physical job). Each day takes the weigh-in nearest before it ended, so maintenance follows my weight down. Until my sex, age, height and a weigh-in are in, Today takes it as 2,200.
+- **Maintenance** is what would keep my weight where it is: resting calories by the Mifflin-St Jeor formula (10 × kg + 6.25 × cm − 5 × age, then +5 for a man or −161 for a woman), times how I spend a usual day outside workouts (1.2 sitting most of it, 1.375 on my feet some of it, 1.55 on my feet most of it, 1.725 physical work all day). Each day takes the weigh-in nearest before it ended, so maintenance follows my weight down. Until my sex, age, height and a weigh-in are in, Today takes it as 2,200.
+- **Each workout** adds what it burned on top of resting to the maintenance of the day it started: (METs − 1) × kg × its time, from Start to its last set (to Finish when a cool-down ran, so a workout left open isn't counted on). Lifting is 3.5 METs (weight training, in the 2024 Adult Compendium of Physical Activities), rising to 6 (vigorous) as the workout's average heart rate goes from 64% to 77% of my maximum (208 − 0.7 × age); a workout of only timed exercises, like a walk or a run, goes on to 8.8 at 96%. Without heart rate or my age, it's 3.5; without a weigh-in, nothing. It's rough, within about a third either way at best, so a workout shows its likely range. A rest day is maintenance alone, and today's goes up once a workout is finished.
 - **A day with nothing logged** is a day I didn't log, not a day I didn't eat: it's left out of the averages and shown as a gap, with how many days I did log. What my logs should do to my weight counts every day as an average one: the average deficit × the days ÷ 3,500 a pound (7,700 a kilogram).
 - **The scale's change** is read off the straight line through the weigh-ins in that time, so one heavy morning doesn't swing it. It needs two weigh-ins a week apart.
 
@@ -324,12 +327,13 @@ A weigh-in whenever I step on the scale, charted over time.
 Routine            Id, Name
 RoutineDay         RoutineId, Day (Monday 0 to Sunday 6), TemplateId (empty = rest day)
 SessionTemplate    Id, Name, Order, WarmUp, CoolDown
-Setting            Key, Value                    (the routine in use, the theme, rest countdowns, the calorie goal, sex, birth year, height, activity)
+Setting            Key, Value                    (the routine in use, the theme, rest countdowns, the calorie goal, sex, birth year, height, usual day)
 TemplateExercise   TemplateId, ExerciseId, Order, PlannedSets (optional), SupersetGroup (optional)
 SessionExercise    SessionId, ExerciseId, Order, PlannedSets, SupersetGroup   (the workout's own copy, changed as it goes)
 Session            Id, TemplateId (empty = just tracking), StartedAt, FinishedAt, LoggedAfterward
                    WarmUp, WarmUpEndedAt         (copied from the template at Start; warming up from StartedAt until the first set)
                    CoolDown, CoolDownStartedAt   (cooling down from Start cool-down until FinishedAt)
+                   AverageBpm                    (worked out at Finish; 0 without readings)
 Exercise           Id, Name (unique, ignoring case and extra spaces), Measure (Weight | Time)
 Set                Id, SessionId, ExerciseId, Order,
                    StartedAt, StoppedAt         (empty when logged afterward)
@@ -339,7 +343,7 @@ Set                Id, SessionId, ExerciseId, Order,
 HeartRateSample    At, Bpm                      (matched to sessions, sets and rests by time)
 FoodEntry          Id, At, Calories
 BodyWeightEntry    Id, At, Weight, WeightUnit
-Settings           CalorieGoal 1800, Sex, BirthYear, HeightCm, Activity (Moderate), Unit lb; maintenance 2200 until it can be worked out
+Settings           CalorieGoal 1800, Sex, BirthYear, HeightCm, DailyActivity (Sitting), Unit lb; maintenance 2200 until it can be worked out
 ```
 
 **(proposed)** Stored locally on the phone (SQLite). Backup or Google sync later.

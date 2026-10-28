@@ -147,7 +147,7 @@
                         <text class="maint-label" x="@N(X(maintenance))" y="9" text-anchor="middle">MAINT</text>
                     </g>
                 </svg>
-                <p class="note"><span class="ink strong">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span> · maintenance @maintenance.ToString("N0", CultureInfo.CurrentCulture)</p>
+                <p class="note"><span class="ink strong">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span> · maintenance @maintenance.ToString("N0", CultureInfo.CurrentCulture)@workoutText</p>
             }
             else
             {
@@ -161,7 +161,7 @@
                 <div class="spread end">
                     <span class="row-text">
                         <span class="name big tabular">@(left >= 0 ? $"{left:N0} left" : $"{-left:N0} over")</span>
-                        <span class="caption">maintenance @maintenance.ToString("N0", CultureInfo.CurrentCulture)</span>
+                        <span class="caption">maintenance @maintenance.ToString("N0", CultureInfo.CurrentCulture)@workoutText</span>
                     </span>
                     <span class="number md">@eaten.ToString("N0", CultureInfo.CurrentCulture)</span>
                 </div>
@@ -377,6 +377,7 @@
     private int eaten;
     private int left;
     private int maintenance;
+    private string workoutText = "";
     private BodyWeightEntry? latestWeight;
     private (string Points, string LastY)? sparkline;
     private (string Points, string LastX, string LastY)? weightTrace;
@@ -448,7 +449,21 @@
         // The weigh-ins Today shows: the last 30 days, and the latest few for the list. The latest also works out maintenance.
         weights = await Store.GetBodyWeightsSinceAsync(now.AddDays(-30), 10);
         latestWeight = weights.MaxBy(w => w.At);
-        maintenance = Calories.Maintenance(Settings, latestWeight, today) ?? Settings.Maintenance;
+
+        // Maintenance takes in what today's finished workouts burned, once there are any; their sets are all it reads for them.
+        var finishedToday = sessions.Where(s => s.FinishedAt is not null && DateOnly.FromDateTime(s.StartedAt.DateTime) == today).ToList();
+        var burned = 0;
+        if (finishedToday.Count > 0)
+        {
+            var exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
+            var setsToday = new List<WorkoutSet>();
+            foreach (var session in finishedToday) setsToday.AddRange(await Store.GetSessionSetsAsync(session.Id));
+            burned = Calories.BurnedByDay(finishedToday, setsToday, exercises, weights, Settings).GetValueOrDefault(today);
+        }
+
+        var withoutWorkouts = Calories.Maintenance(Settings, latestWeight, today);
+        maintenance = withoutWorkouts + burned ?? Settings.Maintenance;
+        workoutText = withoutWorkouts is not null && burned > 0 ? $", with {burned:N0} from today's {(finishedToday.Count == 1 ? "workout" : "workouts")}" : "";
         var change = BodyWeight.Change(weights, now, 30);
         weightChange = change is null or 0 ? null : $"{(change < 0 ? "−" : "+")}{Math.Abs(change.Value).ToString("0.#", CultureInfo.CurrentCulture)} {UnitText}";
         weightChangeText = change switch
@@ -486,10 +501,10 @@
         if (!loaded || shown) return;
 
         // Today is up, which ends the opening. The workout history loads only now, so however long it grows it never holds Today up,
-        // and it's usually ready by the time Start or Resume needs it.
+        // and it's usually ready by the time Start or Resume needs it. Then any workout's heart rate not worked out yet is.
         shown = true;
         Launch.Drawn();
-        _ = Flow.LoadAsync();
+        _ = Flow.MeasureHeartRatesAsync();
     }
 
     private async Task AddFoodAsync()

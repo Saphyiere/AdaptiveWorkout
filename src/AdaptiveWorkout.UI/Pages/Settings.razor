@@ -37,7 +37,8 @@
         </div>
     </section>
 
-    @* What I aim to eat in a day, and maintenance: what would keep my weight where it is, from my body below and my latest weigh-in. *@
+    @* What I aim to eat in a day, and maintenance: what would keep my weight where it is on a day without a workout, from my body below
+       and my latest weigh-in. Each workout adds what it burned on its own day. *@
     <section class="stack" aria-labelledby="calories-heading">
         <h2 id="calories-heading" class="label">Calories</h2>
         <div class="grid-2">
@@ -54,7 +55,7 @@
         <p class="note">
             @if (maintenance is not null)
             {
-                @($"What would keep your weight where it is: resting calories for your weight ({latestWeight!.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {(metric ? "kg" : "lb")}), height, age and sex by the Mifflin-St Jeor formula, × {Calories.Factor(AppSettings.Activity).ToString("0.###", CultureInfo.CurrentCulture)} for how active you are.")
+                @($"What would keep your weight where it is on a day without a workout: resting calories for your weight ({latestWeight!.Weight.ToString("0.#", CultureInfo.CurrentCulture)} {(metric ? "kg" : "lb")}), height, age and sex by the Mifflin-St Jeor formula, × {Calories.Factor(AppSettings.DailyActivity).ToString("0.###", CultureInfo.CurrentCulture)} for your usual day. Each workout adds what it burned, on the day you do it.")
             }
             else
             {
@@ -95,11 +96,12 @@
                 </div>
             }
         </div>
-        <div class="ledger" role="group" aria-label="How active you are">
+        <p class="note">How you spend a usual day, not counting workouts: each one adds its own.</p>
+        <div class="ledger" role="group" aria-label="Your usual day, outside workouts">
             @foreach (var (level, name, description) in Levels)
             {
-                var chosen = AppSettings.Activity == level;
-                <button type="button" class="row" aria-pressed="@(chosen ? "true" : "false")" @onclick="() => SaveAsync(() => AppSettings.Activity = level)">
+                var chosen = AppSettings.DailyActivity == level;
+                <button type="button" class="row" aria-pressed="@(chosen ? "true" : "false")" @onclick="() => SaveAsync(() => AppSettings.DailyActivity = level)">
                     <span class="status">
                         @if (chosen)
                         {
@@ -118,14 +120,13 @@
 </div>
 
 @code {
-    // How active I am in a usual week, training included: the usual levels.
-    private static readonly (ActivityLevel Level, string Name, string Description)[] Levels =
+    // How much I move on a usual day, outside my workouts, which add their own.
+    private static readonly (DailyActivity Level, string Name, string Description)[] Levels =
     [
-        (ActivityLevel.Sedentary, "Sitting most of the day", "Little or no exercise"),
-        (ActivityLevel.Light, "Lightly active", "Exercise 1 to 3 days a week"),
-        (ActivityLevel.Moderate, "Moderately active", "Exercise 3 to 5 days a week"),
-        (ActivityLevel.Very, "Very active", "Hard exercise 6 or 7 days a week"),
-        (ActivityLevel.Extra, "Extra active", "Hard training and a physical job"),
+        (DailyActivity.Sitting, "Sitting most of the day", "A desk job, not much walking"),
+        (DailyActivity.PartlyOnFeet, "On your feet some of the day", "Like teaching, or lots of walking"),
+        (DailyActivity.MostlyOnFeet, "On your feet most of the day", "Like waiting tables, nursing or warehouse work"),
+        (DailyActivity.PhysicalWork, "Physical work all day", "Like construction or farm work"),
     ];
 
     private BodyWeightEntry? latestWeight;

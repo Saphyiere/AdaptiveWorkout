@@ -43,6 +43,23 @@
                         <span class="note">No readings</span>
                     }
                 </div>
+                @* What it burned on top of resting, give or take a third (Calories.BurnedError). *@
+                <div class="row-text">
+                    <span class="label">Burned</span>
+                    @if (burned is int calories)
+                    {
+                        var (low, high) = (Math.Round(calories * (1 - Calories.BurnedError) / 10) * 10, Math.Round(calories * (1 + Calories.BurnedError) / 10) * 10);
+                        <span class="inline baseline">
+                            <span class="number sm">@calories.ToString("N0", CultureInfo.CurrentCulture)</span>
+                            <span class="unit">kcal</span>
+                        </span>
+                        <span class="caption">likely @low.ToString("N0", CultureInfo.CurrentCulture)–@high.ToString("N0", CultureInfo.CurrentCulture), above resting</span>
+                    }
+                    else
+                    {
+                        <span class="note">Weigh in to see it</span>
+                    }
+                </div>
             </div>
         </section>
 
@@ -85,6 +102,7 @@
     private List<WorkoutSet> sets = [];
     private Dictionary<long, Exercise> exercises = [];
     private List<HeartRateSample> samples = [];
+    private int? burned;
     private bool confirming;
 
     [Parameter] public long Id { get; set; }
@@ -102,6 +120,12 @@
         sets = await Store.GetSessionSetsAsync(Id);
         exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
         samples = await Store.GetHeartRateAsync(session.StartedAt, session.FinishedAt!.Value);
+
+        // What it burned, at its average heart rate: kept since Finish, or from these readings for a workout not measured yet.
+        var (from, to) = Calories.WorkoutTime(session, sets);
+        var during = samples.Where(s => s.At >= from && s.At <= to).ToList();
+        session.AverageBpm ??= during.Count == 0 ? 0 : during.Average(s => s.Bpm);
+        burned = Calories.BurnedByDay([session], sets, exercises, await Store.GetBodyWeightsAsync(), Settings) is { Count: > 0 } byDay ? byDay.Values.Single() : null;
     }
 
     private static string Unit(WeightUnit unit) => unit == WeightUnit.Kilograms ? "kg" : "lb";

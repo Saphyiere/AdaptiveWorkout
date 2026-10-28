@@ -134,7 +134,7 @@
         var today = DateOnly.FromDateTime(DateTime.Now);
         var monday = Consistency.WeekStart(today);
         var food = await Store.GetFoodSinceAsync(new DateTimeOffset(monday.ToDateTime(TimeOnly.MinValue)));
-        var thisWeek = Calories.Span(Calories.Days(food, [], Settings, monday, today.AddDays(-1)));
+        var thisWeek = Calories.Span(Calories.Days(food, [], Settings, monday, today.AddDays(-1), new Dictionary<DateOnly, int>()));
         var logged = $"{thisWeek.Logged} of {thisWeek.Days} {(thisWeek.Days == 1 ? "day" : "days")} logged";
         caloriesText = thisWeek.Days == 0 ? "Day by day, against your goal and maintenance"
             : thisWeek.AverageEaten is double eaten ? $"This week: {eaten:N0} a day · {logged}" : "Nothing logged this week";

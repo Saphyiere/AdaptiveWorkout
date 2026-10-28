@@ -15,6 +15,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
     private const string RestCountdownKey = "RestCountdown";
 
     private Task? loading;
+    private Task? measuring;
     private List<WorkoutSession> pastSessions = [];
     private List<WorkoutSet> pastSets = [];
     private Dictionary<string, string> preferences = [];
@@ -223,6 +224,29 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         pastSets.RemoveAll(s => s.Id == set.Id);
         Save(store.DeleteSetAsync(set));
         await RescoreFromAsync(set.SessionId);
+
+        // Its last set gone, the workout may have ended sooner (see Calories.WorkoutTime).
+        if (pastSessions.Find(s => s.Id == set.SessionId) is { } session) await MeasureAsync(session, pastSets.Where(s => s.SessionId == session.Id));
+    }
+
+    /// <summary>
+    /// Works out the average heart rate of each finished workout that doesn't have one yet (see WorkoutSession.AverageBpm), from
+    /// before it was kept: once a run, after Today is up. Finish works out its own workout's.
+    /// </summary>
+    public Task MeasureHeartRatesAsync() => measuring ??= MeasureUnmeasuredAsync();
+
+    /// <summary>
+    /// Readings the watch held while out of the phone's reach can come in after their workout finished: works out the average heart
+    /// rate again of each finished workout they fall in.
+    /// </summary>
+    public async Task TakeLateReadingsAsync(IReadOnlyList<HeartRateSample> readings)
+    {
+        if (readings.Count == 0) return;
+
+        await LoadAsync();
+        var (first, last) = (readings.Min(r => r.At), readings.Max(r => r.At));
+        var during = pastSessions.Where(s => s.StartedAt <= last && s.FinishedAt >= first).ToList();
+        foreach (var session in during) await MeasureAsync(session, pastSets.Where(s => s.SessionId == session.Id));
     }
 
     /// <summary>Saves a set entered on the rest screen; once every set there is saved, the rest screen shows today's summary.</summary>
@@ -274,6 +298,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         }
 
         Save(store.FinishSessionAsync(state.Session));
+        Save(MeasureAsync(state.Session, state.Sets));
         pastSessions.Add(state.Session);
         pastSets.AddRange(state.Sets);
         Save(ScoreSessionsAsync());
@@ -435,6 +460,22 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         var next = running.Count == 0 ? null : startNow is not null ? state.RoundOf(startNow.Id) : state.Next?.ExerciseIds;
         if (next is not null) StartSets(next);
         else Announce();
+    }
+
+    private async Task MeasureUnmeasuredAsync()
+    {
+        await LoadAsync();
+        var setsBySession = pastSets.ToLookup(s => s.SessionId);
+        var unmeasured = pastSessions.Where(s => s is { FinishedAt: not null, AverageBpm: null }).ToList();
+        foreach (var session in unmeasured) await MeasureAsync(session, setsBySession[session.Id]);
+    }
+
+    // A workout's average heart rate while it was on, kept with it. Asking the store is one piece of work, queued at once, so the
+    // screens that read after it see it.
+    private async Task MeasureAsync(WorkoutSession session, IEnumerable<WorkoutSet> sets)
+    {
+        var (from, to) = Calories.WorkoutTime(session, sets);
+        session.AverageBpm = await store.SaveAverageBpmAsync(session, from, to);
     }
 
     // A finished workout's sets changed: it, and every one after it, compared against them, so each is worked out again.

@@ -13,8 +13,6 @@ public sealed record TrendPoint(WorkoutSession Session, double Change, double To
 /// </summary>
 public static class Progress
 {
-    private static readonly Comparer<BodyWeightEntry> ByTime = Comparer<BodyWeightEntry>.Create((a, b) => a.At.CompareTo(b.At));
-
     /// <summary>
     /// How <paramref name="session"/> compares with the last earlier workout of each of its exercises: 0.03 is 3% better.
     /// It's the geometric mean, so one exercise up 10% and another down by the same ratio come out even. Bodyweight and
@@ -27,7 +25,7 @@ public static class Progress
         var earlier = sessions.Where(s => s.StartedAt < session.StartedAt).ToList();
         IReadOnlyList<WorkoutSet>? LastTime(long exerciseId) => ExerciseHistory.Recent(exerciseId, earlier, sets, session.Id, 1) is [var last] ? last.Sets : null;
         var now = sets.Where(s => s.SessionId == session.Id).GroupBy(s => s.ExerciseId);
-        return Compare(now, LastTime, exercises, WeighIn(session, [.. bodyWeights.Order(ByTime)]));
+        return Compare(now, LastTime, exercises, WeighIn(session, BodyWeight.InOrder(bodyWeights)));
     }
 
     /// <summary>
@@ -50,7 +48,7 @@ public static class Progress
         // Only the workouts with some of the sets count, e.g. the ones that had the exercise.
         var setsBySession = sets.ToLookup(s => s.SessionId);
         var done = sessions.Where(s => s.FinishedAt is not null && setsBySession.Contains(s.Id)).OrderBy(s => s.StartedAt).ToList();
-        List<BodyWeightEntry> weighIns = [.. bodyWeights.Order(ByTime)];
+        var weighIns = BodyWeight.InOrder(bodyWeights);
         var lastTime = new Dictionary<long, IReadOnlyList<WorkoutSet>>();
         var changes = new Dictionary<long, (double? Change, int Compared)>();
         foreach (var session in done)
@@ -99,14 +97,9 @@ public static class Progress
         return (ratios.Count == 0 ? null : Math.Exp(ratios.Average(Math.Log)) - 1, ratios.Count);
     }
 
-    // What the body weighed for a workout, in pounds: the weigh-in nearest before it, else the first one after. Empty without any.
-    // The weigh-ins are in time order, so a workout finds its own without reading them all.
-    private static double? WeighIn(WorkoutSession session, List<BodyWeightEntry> weighIns)
-    {
-        var at = weighIns.BinarySearch(new BodyWeightEntry { At = session.StartedAt }, ByTime);
-        var weighIn = at >= 0 ? weighIns[at] : ~at > 0 ? weighIns[~at - 1] : weighIns.FirstOrDefault();
-        return weighIn is null ? null : WorkoutStats.Pounds(weighIn.Weight, weighIn.WeightUnit);
-    }
+    // What the body weighed for a workout, in pounds (see BodyWeight.Nearest). Empty without any weigh-in.
+    private static double? WeighIn(WorkoutSession session, List<BodyWeightEntry> weighIns) =>
+        BodyWeight.Nearest(weighIns, session.StartedAt) is { } weighIn ? WorkoutStats.Pounds(weighIn.Weight, weighIn.WeightUnit) : null;
 
     // Adds the finished workouts' changes up, oldest first, into each one's total so far (see Trend). Ones without a change are left out.
     private static List<TrendPoint> Accumulate(IEnumerable<WorkoutSession> sessions, IEnumerable<(long SessionId, long ExerciseId)> exercisesDone,

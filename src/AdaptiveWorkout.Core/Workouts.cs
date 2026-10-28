@@ -88,6 +88,12 @@ public sealed class WorkoutSession
 
     /// <summary>How many of its exercises had a last time to compare with; empty until worked out.</summary>
     public int? ExercisesCompared { get; set; }
+
+    /// <summary>
+    /// The watch's average heart rate while it was on (see <see cref="Calories.WorkoutTime"/>), for how hard it was: worked out once,
+    /// at Finish, and kept, so looking back doesn't read every reading. 0 without readings; empty until worked out.
+    /// </summary>
+    public double? AverageBpm { get; set; }
 }
 
 /// <summary>One bout of an exercise. Rest is the gap between sets and is never stored.</summary>
@@ -145,14 +151,16 @@ public enum Sex
     Female = 1,
 }
 
-/// <summary>How much I move in a usual week, training included. It takes resting calories up to maintenance.</summary>
-public enum ActivityLevel
+/// <summary>
+/// How much I move on a usual day, outside my workouts: they add their own (see <see cref="Calories.Burned"/>). It takes resting
+/// calories up to maintenance.
+/// </summary>
+public enum DailyActivity
 {
-    Sedentary = 0,
-    Light = 1,
-    Moderate = 2,
-    Very = 3,
-    Extra = 4,
+    Sitting = 0,
+    PartlyOnFeet = 1,
+    MostlyOnFeet = 2,
+    PhysicalWork = 3,
 }
 
 public sealed class AppSettings
@@ -175,5 +183,5 @@ public sealed class AppSettings
 
     public double? HeightCm { get; set; }
 
-    public ActivityLevel Activity { get; set; } = ActivityLevel.Moderate;
+    public DailyActivity DailyActivity { get; set; } = DailyActivity.Sitting;
 }

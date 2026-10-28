@@ -1,29 +1,31 @@
 @page "/calories"
 @inject WorkoutStore Store
+@inject WorkoutFlow Flow
 @inject AppSettings Settings
 
 <PageTitle>Calories</PageTitle>
 
 @* What I've eaten, day by day and week by week, against my goal and maintenance, and what that should do to my weight. A day counts
-   once it's over; today shows what's in so far. A day with nothing logged is a day I didn't log, not a day I didn't eat. *@
+   once it's over; today shows what's in so far. A day with nothing logged is a day I didn't log, not a day I didn't eat. Maintenance
+   steps up on the days I worked out, by what each workout burned. *@
 @if (loaded)
 {
     var telemetry = Theme == Theme.Telemetry;
     var monday = Consistency.WeekStart(today);
     var goal = Settings.CalorieGoal;
-    var maintenance = days[^1].Maintenance;
+    var restDay = days[^1].Maintenance - days[^1].Workouts;
     var unitText = unit == WeightUnit.Kilograms ? "kg" : "lb";
 
     // The bars: the last five weeks' days, or the last 26 weeks, each the average of its days that are over.
-    var bars = new List<(DateOnly From, DateOnly To, CalorieSpan Span, double? Maintenance, bool SoFar)>();
+    var bars = new List<(DateOnly From, DateOnly To, CalorieSpan Span, double? Maintenance, int Workouts, bool SoFar)>();
     var (oldest, newest, stride) = byWeek ? (monday.AddDays(-7 * 25), monday, 7) : (monday.AddDays(-28), monday.AddDays(6), 1);
     for (var start = oldest; start <= newest; start = start.AddDays(stride))
     {
         var end = start.AddDays(stride - 1);
         var counted = Range(start, byWeek && end >= today ? today.AddDays(-1) : end);
         var maintenances = counted.Select(d => d.Maintenance).OfType<int>().ToList();
-        double? level = maintenances.Count == 0 ? maintenance : maintenances.Average();
-        bars.Add((start, end, Calories.Span(counted), level, start <= today && today <= end));
+        double? level = maintenances.Count == 0 ? restDay : maintenances.Average();
+        bars.Add((start, end, Calories.Span(counted), level, counted.Sum(d => d.Workouts), start <= today && today <= end));
     }
 
     var shown = picked ?? (bars.FindLastIndex(b => b.Span.Logged > 0) is var latest && latest >= 0 ? latest : bars.FindIndex(b => b.SoFar));
@@ -55,7 +57,7 @@
                 </div>
             </div>
             <div class="calorie-chart">
-                <svg viewBox="0 0 @N(ChartWidth) @N(ChartHeight)" role="img" aria-label="@($"Calories eaten {(byWeek ? "a day, by week, over 26 weeks" : "each day over five weeks")}, against a goal of {goal:N0}{(maintenance is int m ? $" and maintenance of {m:N0}" : "")}")">
+                <svg viewBox="0 0 @N(ChartWidth) @N(ChartHeight)" role="img" aria-label="@($"Calories eaten {(byWeek ? "a day, by week, over 26 weeks" : "each day over five weeks")}, against a goal of {goal:N0}{(restDay is int m ? $" and maintenance of {m:N0} plus workouts" : "")}")">
                     <defs>
                         <pattern id="calorie-over" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                             <rect class="hatch" width="1.5" height="4"></rect>
@@ -65,7 +67,7 @@
                     <line class="base" x1="0" x2="@N(ChartWidth)" y1="@N(PlotBottom + 0.5)" y2="@N(PlotBottom + 0.5)"></line>
                     @for (var i = 0; i < bars.Count; i++)
                     {
-                        var (first, _, span, _, soFar) = bars[i];
+                        var (first, _, span, _, _, soFar) = bars[i];
                         var x = i * slot + (slot - barWidth) / 2;
                         if (span.AverageEaten is double eaten)
                         {
@@ -110,9 +112,9 @@
             </div>
             <div class="inline legend">
                 <span class="inline"><svg width="20" height="8" aria-hidden="true"><line class="goal-line" x1="0" x2="20" y1="4" y2="4"></line></svg>@(telemetry ? "Goal" : "goal") @goal.ToString("N0", CultureInfo.CurrentCulture)</span>
-                @if (maintenance is int maintains)
+                @if (restDay is int maintains)
                 {
-                    <span class="inline"><svg width="20" height="8" aria-hidden="true"><line class="maint-line" x1="0" x2="20" y1="4" y2="4"></line></svg>@(telemetry ? "Maint" : "maintenance") @maintains.ToString("N0", CultureInfo.CurrentCulture)</span>
+                    <span class="inline"><svg width="20" height="8" aria-hidden="true"><line class="maint-line" x1="0" x2="20" y1="4" y2="4"></line></svg>@(telemetry ? "Maint" : "maintenance") @maintains.ToString("N0", CultureInfo.CurrentCulture) + @(telemetry ? "Workouts" : "workouts")</span>
                 }
             </div>
             @if (shown >= 0)
@@ -138,6 +140,7 @@
                     {
                         var against = new List<string> { Against(average, goal, "goal") };
                         if (bar.Maintenance is double level) against.Add(Against(average, level, "maintenance"));
+                        if (bar.Workouts > 0) against.Add($"{CaloriesText(bar.Workouts)} burned {(byWeek ? "in the week's workouts" : "working out")}");
                         if (byWeek) against.Add(LoggedText(bar.Span));
                         @string.Join(" · ", against)
                     }
@@ -201,7 +204,7 @@
             {
                 <p class="note">Nothing logged in the last four weeks.</p>
             }
-            else if (maintenance is null)
+            else if (restDay is null)
             {
                 <p class="note">@CaloriesText(fourWeeks.AverageEaten!.Value) a day on the @fourWeeks.Logged days logged. Add your sex, age and height in <a class="link" href="settings">Settings</a> to see what that means for your weight.</p>
             }
@@ -293,7 +296,11 @@
         var monday = Consistency.WeekStart(today);
         firstLogged = food.Count == 0 ? today : DateOnly.FromDateTime(food.MinBy(f => f.At)!.At.DateTime);
         from = Consistency.WeekStart(firstLogged < monday.AddDays(-7 * 25) ? firstLogged : monday.AddDays(-7 * 25));
-        days = Calories.Days(food, weighIns, Settings, from, today);
+        // Maintenance takes in what each day's workouts burned, from each one's heart rate, worked out once.
+        await Flow.MeasureHeartRatesAsync();
+        var (sessions, sets) = await Flow.LoadFinishedAsync();
+        var exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
+        days = Calories.Days(food, weighIns, Settings, from, today, Calories.BurnedByDay(sessions, sets, exercises, weighIns, Settings));
 
         // The weeks, each its days that are over: this week's only once one is.
         var firstWeek = Consistency.WeekStart(firstLogged);

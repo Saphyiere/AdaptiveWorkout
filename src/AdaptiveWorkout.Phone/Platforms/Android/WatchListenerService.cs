@@ -56,13 +56,17 @@ public sealed class WatchListenerService : WearableListenerService
         watch.Receive(readings);
         if (workoutStartedAt is null) return;
 
-        // The watch thinks a phone workout is still on. If none is open, the stop didn't reach the watch: send it again.
-        // Reads storage rather than loading the flow, which the screen may be loading at the same moment.
+        // The watch thinks a phone workout is still on. If none is open, the stop didn't reach the watch: send it again. These readings
+        // may be ones it held until the phone was back in reach, so the workout they fall in takes them in, on the main thread like
+        // the screens. Reads storage first rather than loading the flow here, which the screen may be loading at the same moment.
         var flow = services.GetRequiredService<WorkoutFlow>();
         var store = services.GetRequiredService<WorkoutStore>();
         _ = Task.Run(async () =>
         {
-            if (flow.Current is null && (await store.GetSessionsAsync()).All(s => s.FinishedAt is not null)) watch.Close();
+            if (flow.Current is not null || (await store.GetSessionsAsync()).Any(s => s.FinishedAt is null)) return;
+
+            watch.Close();
+            MainThread.BeginInvokeOnMainThread(() => _ = flow.TakeLateReadingsAsync(readings));
         });
     }
 }
