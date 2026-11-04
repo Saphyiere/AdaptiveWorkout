@@ -6,8 +6,8 @@
 <PageTitle>Calories</PageTitle>
 
 @* What I've eaten, day by day and week by week, against my goal and maintenance, and what that should do to my weight. A day counts
-   once it's over; today shows what's in so far. A day with nothing logged is a day I didn't log, not a day I didn't eat. Maintenance
-   steps up on the days I worked out, by what each workout burned. *@
+   once it's over; today shows what's in so far. A day I forgot to log counts as eating maintenance, so it moves my weight neither
+   way, until I pick it and add what I ate. Maintenance steps up on the days I worked out, by what each workout burned. *@
 @if (loaded)
 {
     var telemetry = Theme == Theme.Telemetry;
@@ -52,8 +52,8 @@
             <div class="spread">
                 <h2 id="chart-heading" class="label @(telemetry ? "tag channel-fuel" : "")">Eaten</h2>
                 <div class="segmented compact" role="group" aria-label="Show">
-                    <button type="button" aria-pressed="@(byWeek ? "false" : "true")" @onclick="() => (byWeek, picked) = (false, null)">Days</button>
-                    <button type="button" aria-pressed="@(byWeek ? "true" : "false")" @onclick="() => (byWeek, picked) = (true, null)">Weeks</button>
+                    <button type="button" aria-pressed="@(byWeek ? "false" : "true")" @onclick="() => (byWeek, picked, addingFood, editingFood) = (false, null, false, false)">Days</button>
+                    <button type="button" aria-pressed="@(byWeek ? "true" : "false")" @onclick="() => (byWeek, picked, addingFood, editingFood) = (true, null, false, false)">Weeks</button>
                 </div>
             </div>
             <div class="calorie-chart">
@@ -69,7 +69,12 @@
                     {
                         var (first, _, span, _, _, soFar) = bars[i];
                         var x = i * slot + (slot - barWidth) / 2;
-                        if (span.AverageEaten is double eaten)
+                        if (span is { Logged: 0, AverageEaten: double assumed })
+                        {
+                            // Nothing logged, so it counts as maintenance: an empty bar up to it.
+                            <rect class="assumed" x="@N(x)" y="@N(Y(assumed))" width="@N(barWidth)" height="@N(PlotBottom - Y(assumed))"></rect>
+                        }
+                        else if (span.AverageEaten is double eaten)
                         {
                             // Up to the goal in ink (or the fuel channel's amber), past it hatched, like Today's meter.
                             var solid = Math.Min(eaten, goal);
@@ -106,7 +111,7 @@
                     {
                         var index = i;
                         <button type="button" disabled="@(bars[i].Span.Days == 0)" aria-pressed="@(i == shown ? "true" : "false")" aria-label="@BarName(bars[i].From, bars[i].To)"
-                                @onclick="() => picked = index" @onfocus="() => picked = index"></button>
+                                @onclick="() => Pick(index)" @onfocus="() => Pick(index)"></button>
                     }
                 </div>
             </div>
@@ -123,7 +128,7 @@
                 var name = bar.SoFar ? (byWeek ? "This week" : "Today, so far") : BarName(bar.From, bar.To);
                 <div class="spread baseline">
                     <p class="@(telemetry ? "label ink" : "body strong")">@name</p>
-                    @if (bar.Span.AverageEaten is double eaten)
+                    @if (bar.Span is { Logged: > 0, AverageEaten: double eaten })
                     {
                         <p class="inline baseline">
                             <span class="number xs">@CaloriesText(eaten)</span>
@@ -134,17 +139,63 @@
                 <p class="@(telemetry ? "label" : "note")">
                     @if (bar.Span.AverageEaten is not double average)
                     {
-                        @(bar.Span.Days == 0 ? "Counts once today is over." : bar.To < firstLogged ? "Before you started logging." : "Nothing logged.")
+                        @(bar.SoFar && !byWeek ? "Nothing logged yet today." : bar.Span.Days == 0 ? "Counts once today is over." : bar.To < firstLogged ? "Before you started logging." : "Nothing logged.")
+                    }
+                    else if (bar.Span.Logged == 0)
+                    {
+                        @($"Nothing logged, so {(byWeek ? "its days count" : "it counts")} as maintenance{(byWeek ? "" : $", {CaloriesText(average)}")}: no loss, no gain.")
                     }
                     else
                     {
                         var against = new List<string> { Against(average, goal, "goal") };
                         if (bar.Maintenance is double level) against.Add(Against(average, level, "maintenance"));
                         if (bar.Workouts > 0) against.Add($"{CaloriesText(bar.Workouts)} burned {(byWeek ? "in the week's workouts" : "working out")}");
-                        if (byWeek) against.Add(LoggedText(bar.Span));
+                        if (byWeek) against.Add(bar.Span.LoggedText);
                         @string.Join(" · ", against)
                     }
                 </p>
+
+                @* A day's food can be put right afterwards: what I forgot to log, or an entry that was wrong. *@
+                @if (!byWeek)
+                {
+                    var entries = food.Where(f => DateOnly.FromDateTime(f.At.DateTime) == bar.From).OrderBy(f => f.At).ToList();
+                    @if (addingFood)
+                    {
+                        <form class="inline end" @onsubmit="() => AddFoodAsync(bar.From)">
+                            <div class="field-group grow">
+                                <label class="field-label" for="day-calories">Calories to add</label>
+                                <input id="day-calories" class="field number-field" type="number" inputmode="numeric" min="0" @bind="foodAmount" />
+                            </div>
+                            <button type="submit" class="btn tall fill">Save</button>
+                            <button type="button" class="icon-btn plain" aria-label="Cancel" @onclick="() => addingFood = false"><Icon Name="close" /></button>
+                        </form>
+                    }
+                    @if (editingFood && entries.Count > 0)
+                    {
+                        <div class="entries" aria-label="@($"{name}'s entries")">
+                            @foreach (var entry in entries)
+                            {
+                                <div @key="entry.Id">
+                                    <span class="inline baseline">
+                                        <span class="name tabular">@entry.Calories.ToString("N0", CultureInfo.CurrentCulture)</span>
+                                        <span class="note">at @entry.At.ToString("h:mm tt", CultureInfo.CurrentCulture)</span>
+                                    </span>
+                                    <ConfirmDelete Label="@($"Delete {entry.Calories} calories at {entry.At.ToString("h:mm tt", CultureInfo.CurrentCulture)}")" OnDelete="() => DeleteFoodAsync(entry)" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    <div class="inline right">
+                        @if (entries.Count > 0)
+                        {
+                            <button type="button" class="btn-ghost" @onclick="() => editingFood = !editingFood">@(editingFood ? "Done" : "Edit")</button>
+                        }
+                        @if (!addingFood)
+                        {
+                            <button type="button" class="btn" @onclick="() => addingFood = true"><Icon Name="plus" Size="16" />Add</button>
+                        }
+                    </div>
+                }
             }
         </section>
 
@@ -158,6 +209,10 @@
             {
                 <p class="note">Its days add up here once they're over. @(days[^1].Eaten is int sofar ? $"So far today: {sofar:N0}." : "")</p>
             }
+            else if (week.Logged == 0)
+            {
+                <p class="note">Nothing logged this week yet@(week.AtMaintenance > 0 ? ", so its days count as maintenance" : ""). Pick a day above to add what you ate.</p>
+            }
             else
             {
                 <div class="grid-2">
@@ -169,7 +224,7 @@
                     <div class="row-text">
                         <span class="label">Logged</span>
                         <span class="number sm">@week.Logged</span>
-                        <span class="caption">of @week.Days @(week.Days == 1 ? "day" : "days")</span>
+                        <span class="caption">of @week.Days @(week.Days == 1 ? "day" : "days")@(week.AtMaintenance > 0 ? $", {week.AtMaintenance} at maintenance" : "")</span>
                     </div>
                     @if (week.AverageDeficit is double deficit)
                     {
@@ -217,7 +272,7 @@
                             <span class="number sm">@WeightText(byLogs!.Value)</span>
                             <span class="unit">@unitText</span>
                         </span>
-                        <span class="caption">@CaloriesText(fourWeeks.AverageEaten!.Value) a day, @fourWeeks.Logged of 28 days logged</span>
+                        <span class="caption">@CaloriesText(fourWeeks.AverageEaten!.Value) a day, @fourWeeks.LoggedText</span>
                     </div>
                     <div class="row-text">
                         <span class="label">By the scale</span>
@@ -254,7 +309,7 @@
                         <div class="row">
                             <span class="row-text">
                                 <span class="name">@(start == monday ? "This week" : BarName(start, start.AddDays(6)))</span>
-                                <span class="caption">@(span.AverageEaten is double eaten ? $"{CaloriesText(eaten)} a day · {LoggedText(span)}" : "Nothing logged")</span>
+                                <span class="caption">@(span is { Logged: > 0, AverageEaten: double eaten } ? $"{CaloriesText(eaten)} a day · {span.LoggedText}" : span.AtMaintenance > 0 ? "Nothing logged, so it counts as maintenance" : "Nothing logged")</span>
                             </span>
                             @if (span.WeightChange(unit) is double change)
                             {
@@ -276,19 +331,25 @@
     private DateOnly today;
     private DateOnly from;
     private DateOnly firstLogged;
+    private List<FoodEntry> food = [];
     private List<CalorieDay> days = [];
     private List<BodyWeightEntry> weighIns = [];
     private WeightUnit unit;
     private List<(DateOnly Monday, CalorieSpan Span)> weeks = [];
     private bool byWeek;
     private int? picked;
+    private bool addingFood;
+    private int? foodAmount;
+    private bool editingFood;
 
     [CascadingParameter] public Theme Theme { get; set; } = Theme.Logbook;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
         today = DateOnly.FromDateTime(DateTime.Now);
-        var food = await Store.GetFoodAsync();
+        food = await Store.GetFoodAsync();
         weighIns = await Store.GetBodyWeightsAsync();
         unit = weighIns.MaxBy(w => w.At)?.WeightUnit ?? Settings.Unit;
 
@@ -303,6 +364,7 @@
         days = Calories.Days(food, weighIns, Settings, from, today, Calories.BurnedByDay(sessions, sets, exercises, weighIns, Settings));
 
         // The weeks, each its days that are over: this week's only once one is.
+        weeks.Clear();
         var firstWeek = Consistency.WeekStart(firstLogged);
         for (var start = monday; start >= firstWeek && food.Count > 0; start = start.AddDays(-7))
         {
@@ -330,7 +392,28 @@
     // "150 over goal", "60 under maintenance".
     private static string Against(double eaten, double mark, string what) => $"{CaloriesText(Math.Abs(eaten - mark))} {(eaten > mark ? "over" : "under")} {what}";
 
-    private static string LoggedText(CalorieSpan span) => $"{span.Logged} of {span.Days} {(span.Days == 1 ? "day" : "days")} logged";
+    // Another bar closes the day's adding and editing.
+    private void Pick(int index)
+    {
+        if (index != picked) (addingFood, editingFood) = (false, false);
+        picked = index;
+    }
+
+    // Today's food goes in at the time it's added; another day's, at noon, well inside it.
+    private async Task AddFoodAsync(DateOnly day)
+    {
+        if (foodAmount is not > 0) return;
+
+        await Store.AddFoodAsync(foodAmount.Value, day == today ? DateTimeOffset.Now : new DateTimeOffset(day.ToDateTime(new TimeOnly(12, 0))));
+        (addingFood, foodAmount) = (false, null);
+        await LoadAsync();
+    }
+
+    private async Task DeleteFoodAsync(FoodEntry entry)
+    {
+        await Store.DeleteFoodAsync(entry);
+        await LoadAsync();
+    }
 
     // A change in weight: "−1.4", "+0.3", "0.0".
     private static string WeightText(double change)

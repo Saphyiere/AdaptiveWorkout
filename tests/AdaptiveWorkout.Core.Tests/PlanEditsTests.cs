@@ -112,6 +112,41 @@ public class PlanEditsTests
     }
 
     [Fact]
+    public void Join_SkullCrushersFromLaterWithPulldowns_GoTogetherFromTheNextRound()
+    {
+        TemplateExercise[] plan = [Entry(Pulldown, 0, sets: 3), Entry(Skulls, 1, sets: 3), Entry(Dips, 2, sets: 3)];
+
+        // One still to do comes off its own spot first, as Change does.
+        var changed = PlanEdits.Join(PlanEdits.Drop(plan, Skulls), Skulls, Pulldown);
+
+        Assert.Equal("6x3s1 7s1 5x3", Show(changed));
+        Assert.Equal(new PlanStep([Pulldown, Skulls], 2, 3), WorkoutPlan.Next(changed, Done(Pulldown), NoHistory, []));
+        Assert.Equal(new PlanStep([Dips], 1, 3), WorkoutPlan.Next(changed, Done(Pulldown, Pulldown, Skulls, Pulldown, Skulls), NoHistory, []));
+    }
+
+    [Fact]
+    public void Join_AnotherExercise_MakesASupersetsRoundsLonger_AndOneDoneTodayGoesInAfresh()
+    {
+        TemplateExercise[] plan = [Entry(Fly, 0, sets: 3), Entry(PullUps, 1, sets: 3, superset: 2), Entry(Dips, 2, superset: 2)];
+
+        Assert.Equal("3x3 4x3s2 5s2 9s2", Show(PlanEdits.Join(plan, Plank, PullUps)));
+
+        // Fly is done, so it stays where it was done and goes in again with pull-ups and dips, for all three rounds.
+        var again = PlanEdits.Join(plan, Fly, Dips);
+        Assert.Equal("3x3 4x3s2 5s2 3s2", Show(again));
+        Assert.Equal(new PlanStep([PullUps, Dips, Fly], 1, 3), WorkoutPlan.Next(again, Done(Fly, Fly, Fly), NoHistory, []));
+    }
+
+    [Fact]
+    public void Join_AlreadyTogether_OrWithOneNotInThePlan_LeavesThePlanAsItIs()
+    {
+        TemplateExercise[] plan = [Entry(PullUps, 0, sets: 3, superset: 1), Entry(Dips, 1, superset: 1), Entry(Pulldown, 2, sets: 3)];
+
+        Assert.Equal(Show(plan), Show(PlanEdits.Join(plan, Dips, PullUps)));
+        Assert.Equal(Show(plan), Show(PlanEdits.Join(plan, Plank, Bench)));
+    }
+
+    [Fact]
     public void InsertAfter_AnExercisePickedInsteadOfTheNextOne_TakesItsPlace()
     {
         TemplateExercise[] plan = [Entry(Fly, 0, sets: 3), Entry(Pulldown, 1, sets: 3), Entry(Dips, 2, sets: 3)];

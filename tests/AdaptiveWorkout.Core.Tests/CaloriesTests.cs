@@ -48,6 +48,20 @@ public class CaloriesTests
     }
 
     [Fact]
+    public void Days_TakeADayIForgotToLog_AsMaintenance_OnceItsOver_SinceIStartedLogging()
+    {
+        FoodEntry[] food = [new() { At = At(Monday.AddDays(1), 12), Calories = 1800 }, new() { At = At(Monday.AddDays(3), 12), Calories = 2000 }];
+
+        var days = Calories.Days(food, [WeighIn(Monday, 80)], Him, Monday, Monday.AddDays(4), NoWorkouts);
+
+        // Monday was before I started logging, and today (Friday) isn't over. Wednesday I forgot: it counts as maintenance, 2,759,
+        // so it's nothing under.
+        Assert.Equal([false, false, true, false, false], days.Select(d => d.Forgotten));
+        Assert.Equal([null, 1800, 2759, 2000, null], days.Select(d => d.Counted));
+        Assert.Equal([null, 959, 0, 759, null], days.Select(d => d.Deficit));
+    }
+
+    [Fact]
     public void Days_TakeMaintenanceFromTheWeighInBeforeTheDayWasOut_ElseTheFirstOneAfter()
     {
         BodyWeightEntry[] weighIns = [WeighIn(Monday.AddDays(1), 80), WeighIn(Monday.AddDays(3), 70)];
@@ -130,28 +144,43 @@ public class CaloriesTests
     }
 
     [Fact]
-    public void Span_AveragesTheLoggedDays_AndCountsTheRestAsAverageForTheWeight()
+    public void Span_CountsTheDaysIForgot_AsEatingMaintenance_SoTheyLoseNothing()
     {
         CalorieDay[] week =
         [
-            new(Monday, 1800, 2300), new(Monday.AddDays(1), 2000, 2300), new(Monday.AddDays(2), null, 2300), new(Monday.AddDays(3), 1700, 2300),
-            new(Monday.AddDays(4), 1500, 2300), new(Monday.AddDays(5), null, 2300), new(Monday.AddDays(6), 2000, 2300),
+            new(Monday, 1800, 2300), new(Monday.AddDays(1), 2000, 2300), new(Monday.AddDays(2), null, 2300, Forgotten: true), new(Monday.AddDays(3), 1700, 2300),
+            new(Monday.AddDays(4), 1500, 2300), new(Monday.AddDays(5), null, 2300, Forgotten: true), new(Monday.AddDays(6), 2000, 2300),
         ];
 
         var span = Calories.Span(week);
 
-        // Five logged days, 1,800 on average, 500 under maintenance: 3,500 calories a week is a pound, or 3500 / 7700 kg.
-        Assert.Equal((7, 5), (span.Days, span.Logged));
-        Assert.Equal(1800, span.AverageEaten);
-        Assert.Equal(500, span.AverageDeficit);
-        Assert.Equal(-1.0, span.WeightChange(WeightUnit.Pounds)!.Value, 10);
-        Assert.Equal(-3500 / 7700.0, span.WeightChange(WeightUnit.Kilograms)!.Value, 10);
+        // Five logged days, 9,000 eaten and 2,500 under maintenance between them; the two forgotten ones count as 2,300 eaten and
+        // nothing under. 3,500 calories is a pound, or 3500 / 7700 kg.
+        Assert.Equal((7, 5, 2), (span.Days, span.Logged, span.AtMaintenance));
+        Assert.Equal((9000 + 2 * 2300) / 7.0, span.AverageEaten!.Value, 10);
+        Assert.Equal(2500 / 7.0, span.AverageDeficit!.Value, 10);
+        Assert.Equal(-2500 / 3500.0, span.WeightChange(WeightUnit.Pounds)!.Value, 10);
+        Assert.Equal(-2500 / 7700.0, span.WeightChange(WeightUnit.Kilograms)!.Value, 10);
     }
 
     [Fact]
-    public void Span_HasNoAveragesWithNothingLogged_AndNoWeightWithoutMaintenance()
+    public void Span_TakesADayThatCountsNeitherWay_AsAnAverageOneForTheWeight()
     {
-        Assert.Equal(new CalorieSpan(2, 0, null, null), Calories.Span([new(Monday, null, 2300), new(Monday.AddDays(1), null, 2300)]));
+        // Monday was before I started logging: the two days logged are 400 under on average, and Monday is taken as one like them.
+        var span = Calories.Span([new(Monday, null, 2300), new(Monday.AddDays(1), 1800, 2300), new(Monday.AddDays(2), 2000, 2300)]);
+
+        Assert.Equal((3, 2, 0), (span.Days, span.Logged, span.AtMaintenance));
+        Assert.Equal(1900, span.AverageEaten);
+        Assert.Equal(400, span.AverageDeficit);
+        Assert.Equal(-1200 / 3500.0, span.WeightChange(WeightUnit.Pounds)!.Value, 10);
+    }
+
+    [Fact]
+    public void Span_HasNoAveragesWithNothingThatCounts_AndNoWeightWithoutMaintenance()
+    {
+        // Days before I started logging, and a forgotten one before maintenance can be worked out, count for nothing.
+        CalorieDay[] nothing = [new(Monday, null, 2300), new(Monday.AddDays(1), null, 2300), new(Monday.AddDays(2), null, null, Forgotten: true)];
+        Assert.Equal(new CalorieSpan(3, 0, 0, null, null), Calories.Span(nothing));
 
         var unknown = Calories.Span([new(Monday, 1800, null)]);
         Assert.Equal(1800, unknown.AverageEaten);

@@ -111,10 +111,7 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
 
         foreach (var exerciseId in exerciseIds)
         {
-            var exercise = state.Exercises[exerciseId];
-            var thisSession = state.Sets.Where(s => s.ExerciseId == exerciseId).ToList();
-            var lastTime = state.History(exerciseId).FirstOrDefault()?.Sets ?? [];
-            var values = exercise.Measure == ExerciseMeasure.Weight ? SetSuggestion.For(thisSession, lastTime, settings.HitGoalStep) : null;
+            var values = state.NextValues(exerciseId);
             var set = new WorkoutSet
             {
                 ExerciseId = exerciseId,
@@ -372,6 +369,20 @@ public sealed class WorkoutFlow(WorkoutStore store, AppSettings settings, WatchL
         state.Exercises.TryAdd(exercise.Id, exercise);
         var moveUp = state.Plan.Any(e => e.ExerciseId == exercise.Id) && state.Sets.All(s => s.ExerciseId != exercise.Id);
         ChangePlan(state, moveUp ? PlanEdits.Drop(PlanEdits.DoFirst(state.Plan, exercise.Id, target), target) : PlanEdits.Swap(state.Plan, target, exercise.Id), exercise);
+    }
+
+    /// <summary>
+    /// Does another exercise together with the one Change was opened on, today only: a superset, in rounds that start and stop
+    /// together, for as many rounds as it has left. One further on in the plan, not started yet, moves up into it; one already done
+    /// today goes in afresh. A running set starts over as the round.
+    /// </summary>
+    public void SupersetWith(Exercise exercise, long target)
+    {
+        if (Current is not { } state || exercise.Id == target) return;
+
+        state.Exercises.TryAdd(exercise.Id, exercise);
+        var moveUp = state.Plan.Any(e => e.ExerciseId == exercise.Id) && state.Sets.All(s => s.ExerciseId != exercise.Id);
+        ChangePlan(state, PlanEdits.Join(moveUp ? PlanEdits.Drop(state.Plan, exercise.Id) : state.Plan, exercise.Id, target), state.Exercises[target]);
     }
 
     /// <summary>Leaves the exercise Change was opened on out of today's workout.</summary>

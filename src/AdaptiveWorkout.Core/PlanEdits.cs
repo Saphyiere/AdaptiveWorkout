@@ -72,6 +72,18 @@ public static class PlanEdits
     }
 
     /// <summary>
+    /// Does an exercise together with another one, as a superset: it joins the other's block, after its exercises, for the block's
+    /// rounds. Already in that block, or with the other one not in the plan, the plan stays as it is.
+    /// </summary>
+    public static List<TemplateExercise> Join(IReadOnlyList<TemplateExercise> plan, long exerciseId, long withExerciseId)
+    {
+        var blocks = WorkoutPlan.Blocks(plan);
+        var block = blocks.Find(b => b.Any(e => e.ExerciseId == withExerciseId));
+        if (block is not null && block.All(e => e.ExerciseId != exerciseId)) block.Add(new TemplateExercise { ExerciseId = exerciseId });
+        return Build(blocks);
+    }
+
+    /// <summary>
     /// Adds an exercise as its own entry right after the block at this index in <see cref="WorkoutPlan.Blocks"/> (an exercise, or a
     /// whole superset), e.g. one picked from the list in that one's place; with no index, after everything else.
     /// </summary>

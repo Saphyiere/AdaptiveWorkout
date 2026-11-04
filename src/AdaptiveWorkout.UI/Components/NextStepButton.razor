@@ -1,7 +1,8 @@
 @inject WorkoutFlow Flow
 @inject AppNavigation Navigation
 @* The break screen's buttons: the next set or exercise, and Finish once there's nothing left to do. A planned cool-down starts in
-   Finish's place, and Finish ends it. During the warm-up, the big button starts the first exercise. *@
+   Finish's place, and Finish ends it. During the warm-up, the big button starts the first exercise. What's next shows the weight it
+   starts at, so it can be ready before the rest is up. *@
 
 @if (State.CoolingDown)
 {
@@ -20,7 +21,10 @@ else if (State.Next is { } next)
             @foreach (var exerciseId in next.ExerciseIds)
             {
                 <div class="spread">
-                    <p class="body">@State.Exercises[exerciseId].Name</p>
+                    <div class="row-text">
+                        <p class="body">@State.Exercises[exerciseId].Name</p>
+                        @Ready(exerciseId)
+                    </div>
                     <a class="btn-ghost" href="workout/change?exercise=@exerciseId" aria-label="Change @State.Exercises[exerciseId].Name">Change</a>
                 </div>
             }
@@ -32,13 +36,17 @@ else if (State.Next is { } next)
             <div class="row-text">
                 <p class="label">Next</p>
                 <p class="body">@names, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+                @Ready(next.ExerciseId)
             </div>
             <a class="btn-ghost" href="workout/change">Change</a>
         </div>
     }
     else
     {
-        <p class="note center">Next: @names, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+        <div class="stack tight center">
+            <p class="note">Next: @names, @WorkoutState.StepLabel(next).ToLowerInvariant()</p>
+            @Ready(next.ExerciseId)
+        </div>
     }
 
     @* Other ways on sit above the big button, which stays in the same place on every screen. *@
@@ -96,6 +104,22 @@ else
     [Parameter] public EventCallback OnFinish { get; set; }
 
     private string FinishText => State.CoolDownNext ? "Start cool-down" : "Finish workout";
+
+    // What an exercise's next set starts with, to have the weights ready: "120 lb × 10", marked when it went up for a hit goal.
+    // Nothing for a time exercise, or with nothing to go on.
+    private RenderFragment Ready(long exerciseId)
+    {
+        if (State.NextValues(exerciseId) is not { } values) return _ => { };
+
+        var weight = values.Weight is double amount ? $"{SetSummary.WeightText(amount)} {(values.Unit == WeightUnit.Kilograms ? "kg" : "lb")}" : "Bodyweight";
+        return @<p class="row-text">
+            <span class="name big tabular">@(values.Reps is int reps ? $"{weight} × {reps}" : weight)</span>
+            @if (values.RaisedForGoal)
+            {
+                <span class="pen-note">Up: you hit your goal last time</span>
+            }
+        </p>;
+    }
 
     // More of what I just did, past its sets, while its exercises are still in today's plan.
     private bool CanGoOn => State.LastRound is [_, ..] round && round.All(s => State.Plan.Any(e => e.ExerciseId == s.ExerciseId));

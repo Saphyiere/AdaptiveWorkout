@@ -135,6 +135,18 @@ public sealed class WorkoutState
         return SetSuggestion.For(before, History(set.ExerciseId).FirstOrDefault()?.Sets ?? [], HitGoalStep);
     }
 
+    /// <summary>
+    /// What the next set of this exercise starts with, as Start fills it in (see <see cref="SetSuggestion"/>), so the weights can be
+    /// ready during the rest. Empty for a time exercise, or with nothing to go on.
+    /// </summary>
+    public SetValues? NextValues(long exerciseId)
+    {
+        if (Exercises[exerciseId].Measure != ExerciseMeasure.Weight) return null;
+
+        var lastTime = History(exerciseId).FirstOrDefault()?.Sets ?? [];
+        return SetSuggestion.For([.. Sets.Where(s => s.ExerciseId == exerciseId)], lastTime, HitGoalStep);
+    }
+
     /// <summary>"Set 2 of 3", "Set 4", or "Superset · round 1 of 3".</summary>
     public static string StepLabel(PlanStep step)
     {

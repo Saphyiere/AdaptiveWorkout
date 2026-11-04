@@ -124,20 +124,21 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Workouts' heart rates are worked out first, for the Calories row's maintenance, as on Calories.
+        await Flow.MeasureHeartRatesAsync();
         var (sessions, sets) = await Flow.LoadFinishedAsync();
         var exercises = (await Store.GetExercisesAsync()).ToDictionary(e => e.Id);
         var bodyWeights = await Store.GetBodyWeightsAsync();
         var setsBySession = sets.ToLookup(s => s.SessionId);
         workouts = sessions.Count;
 
-        // This week's days that are over, for the Calories row.
+        // This week's days that are over, for the Calories row, worked out as on Calories: a day I forgot counts as maintenance.
         var today = DateOnly.FromDateTime(DateTime.Now);
         var monday = Consistency.WeekStart(today);
-        var food = await Store.GetFoodSinceAsync(new DateTimeOffset(monday.ToDateTime(TimeOnly.MinValue)));
-        var thisWeek = Calories.Span(Calories.Days(food, [], Settings, monday, today.AddDays(-1), new Dictionary<DateOnly, int>()));
-        var logged = $"{thisWeek.Logged} of {thisWeek.Days} {(thisWeek.Days == 1 ? "day" : "days")} logged";
+        var burned = Calories.BurnedByDay(sessions, sets, exercises, bodyWeights, Settings);
+        var thisWeek = Calories.Span([.. Calories.Days(await Store.GetFoodAsync(), bodyWeights, Settings, monday, today, burned).Where(d => d.Day < today)]);
         caloriesText = thisWeek.Days == 0 ? "Day by day, against your goal and maintenance"
-            : thisWeek.AverageEaten is double eaten ? $"This week: {eaten:N0} a day · {logged}" : "Nothing logged this week";
+            : thisWeek is { Logged: > 0, AverageEaten: double eaten } ? $"This week: {eaten:N0} a day · {thisWeek.LoggedText}" : "Nothing logged this week";
 
         // How much better some workouts' exercises are than their first time among them, by the last of them; empty until there's a change.
         double? Total(IReadOnlyList<WorkoutSession> some, IEnumerable<WorkoutSet> theirSets) =>
